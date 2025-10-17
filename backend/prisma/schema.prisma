@@ -1,0 +1,823 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserStatus {
+  ACTIVE
+  IN_ACTIVE
+  DELETE
+}
+
+enum ServiceStatus {
+  ACTIVE
+  IN_ACTIVE
+  UNAVAILABLE
+}
+
+enum AccountType {
+  PERSONAL
+  BUSINESS
+}
+
+enum CommissionType {
+  FLAT
+  PERCENTAGE
+}
+
+enum TxStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+  REFUNDED
+  CANCELLED
+}
+
+enum CommissionScope {
+  ROLE
+  USER
+}
+
+enum Env {
+  PROD
+  STAGING
+}
+
+enum LedgerEntryType {
+  DEBIT
+  CREDIT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECT
+}
+
+enum Currency {
+  INR
+  USD
+  EUR
+  GBP
+  AED
+}
+
+enum ReferenceType {
+  TRANSACTION
+  COMMISSION
+  REFUND
+  ADJUSTMENT
+  BONUS
+  CHARGE
+}
+
+// ==================== ROLE MODEL ====================
+
+model Role {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  level         Int      @unique
+  description   String?  @db.LongText
+  createdBy     String?  @map("created_by")
+  createdByUser User?    @relation("RoleCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  users             User[]
+  rolePermissions   RolePermission[]
+  CommissionSetting CommissionSetting[]
+
+  @@map("roles")
+}
+
+// ==================== USER MODEL ====================
+
+model User {
+  id String @id @default(uuid())
+
+  username       String @db.Text
+  firstName      String @map("first_name")
+  lastName       String @map("last_name")
+  profileImage   String @map("profile_image") @db.Text
+  email          String @unique
+  phoneNumber    String @unique @map("phone_number")
+  password       String
+  transactionPin String @map("transaction_pin") @db.Text
+  // domainName     String @unique @map("domain_name")
+
+  // walletBalance deprecated in favor of Wallet model — kept for backward compat if needed
+  walletBalance BigInt? @default(0) @map("wallet_balance")
+  isAuthorized  Boolean @default(false) @map("is_authorized")
+
+  // Self-referencing hierarchy
+  parentId String? @map("parent_id")
+  parent   User?   @relation("UserHierarchy", fields: [parentId], references: [id])
+  children User[]  @relation("UserHierarchy")
+
+  // Hierarchy metadata
+  hierarchyLevel Int    @map("hierarchy_level")
+  hierarchyPath  String @map("hierarchy_path") @db.Text
+
+  // Status / KYC
+  status        UserStatus @default(ACTIVE)
+  isKycVerified Boolean    @default(false) @map("is_kyc_verified")
+
+  //  Timestamps
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // reverse relation for createdBy
+  createdRoles Role[] @relation("RoleCreatedBy")
+
+  // Role relation (recommended: roleId as FK)
+  roleId String @map("role_id")
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  //tokens
+  refreshToken String? @unique @map("refresh_token")
+
+  // tokens for password reset / email verification
+  passwordResetToken            String?   @map("password_reset_token")
+  passwordResetExpires          DateTime? @map("password_reset_expires")
+  emailVerificationToken        String?   @map("email_verification_token")
+  emailVerifiedAt               DateTime? @map("email_verified_at")
+  emailVerificationTokenExpires DateTime? @map("email_verification_token_expires")
+
+  // Service relation
+  userPermissions UserPermission[]
+  bankAccount     BankDetail[]
+  wallets         Wallet[]
+  piiConsents     PiiConsent[]
+
+  commissionTargets           CommissionSetting[] @relation("CommissionTargetUser")
+  commissionCreated           CommissionSetting[] @relation("CommissionSettingCreatedBy")
+  commissionEarnings          CommissionEarning[] @relation("CommissionEarningToUser")
+  commissionsGiven            CommissionEarning[] @relation("CommissionEarningFromUser")
+  commissionEarningsCreatedBy CommissionEarning[] @relation("CommissionEarningCreatedBy")
+  UserKyc                     UserKyc[]
+  SystemSetting               SystemSetting[]
+  LoginLogs                   LoginLogs[]
+  Transaction                 Transaction[]
+  auditLogs                   AuditLog[]
+
+  // ==================== CC PAYOUT RELATIONS ====================
+  ccSenders       CCSender[]
+  ccBeneficiaries CCBeneficiary[]
+  ccCollections   CCCollection[]
+
+  // Indexes for performance
+  @@index([parentId])
+  @@index([hierarchyLevel])
+  @@map("users")
+}
+
+// ============ User KYC & VERIFICATION MODELS ============
+
+model UserKyc {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id])
+  firstName  String    @map("first_name")
+  lastName   String    @map("last_name")
+  fatherName String    @map("father_name")
+  dob        DateTime
+  gender     Gender
+  status     KycStatus @default(PENDING)
+
+  addressId String  @map("address_id")
+  address   Address @relation(fields: [addressId], references: [id])
+
+  panFile          String @map("pan_file")
+  aadhaarFile      String @map("aadhaar_file")
+  addressProofFile String @map("address_proof_file")
+  photo            String
+
+  piiConsents PiiConsent[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("user_kyc")
+}
+
+// ==================== BANK DETAILS ====================
+
+model BankDetail {
+  id            String      @id @default(uuid())
+  accountHolder String      @map("account_holder") @db.Text
+  accountNumber String      @map("account_number") @db.VarChar(18)
+  phoneNumber   String      @map("phone_number")
+  accountType   AccountType @map("account_type")
+  bankProofFile String      @map("bank_proof_file")
+  isVerified    Boolean     @default(false) @map("is_verified")
+  isPrimary     Boolean     @default(false) @map("is_primary")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  bankId String @map("bank_id")
+  bank   Banks  @relation(fields: [bankId], references: [id])
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("bank_details")
+}
+
+// ==================== BANKS NAME & IFSC CODE ====================
+
+model Banks {
+  id       String @id @default(uuid())
+  bankName String @map("bank_name") @db.Text
+  ifscCode String @map("ifsc_code") @db.Text
+  bankIcon String @map("bank_icon") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  bankDetails BankDetail[]
+
+  @@map("banks")
+}
+
+// ================== Address ====================
+
+model State {
+  id        String @id @default(uuid())
+  stateName String @map("state_name")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  Address   Address[]
+
+  @@map("states")
+}
+
+model City {
+  id       String @id @default(uuid())
+  cityName String @map("city_name")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  Address   Address[]
+
+  @@map("cities")
+}
+
+model Address {
+  id      String @id @default(uuid())
+  address String @db.LongText
+  pinCode String @map("pin_code")
+
+  stateId String @map("state_id")
+  state   State  @relation(fields: [stateId], references: [id])
+
+  cityId String @map("city_id")
+  city   City   @relation(fields: [cityId], references: [id])
+
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  UserKyc     UserKyc[]
+
+  @@map("addresses")
+}
+
+// ==================== Wallet ====================
+
+model Wallet {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id])
+  balance   BigInt    @default(0)
+  currency  Currency  @default(INR) // ✅ Changed from String → Enum
+  isPrimary Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  ledgerEntries LedgerEntry[]
+  transactions  Transaction[]
+
+  @@unique([userId])
+  @@map("wallets")
+}
+
+// ==================== Commission  ====================
+
+model CommissionSetting {
+  id           String          @id @default(uuid())
+  scope        CommissionScope @default(ROLE)
+  roleId       String?         @map("role_id")
+  role         Role?           @relation(fields: [roleId], references: [id])
+  targetUserId String?         @map("target_user_id")
+  targetUser   User?           @relation("CommissionTargetUser", fields: [targetUserId], references: [id])
+
+  serviceId String  @map("service_id")
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  commissionType  CommissionType @map("commission_type")
+  commissionValue Decimal        @map("commission_value") @db.Decimal(12, 4)
+
+  minAmount BigInt? @map("min_amount")
+  maxAmount BigInt? @map("max_amount")
+
+  // tax config snapshot
+  applyTDS   Boolean  @default(false)
+  tdsPercent Decimal? @map("tds_percent") @db.Decimal(5, 2)
+  applyGST   Boolean  @default(false)
+  gstPercent Decimal? @map("gst_percent") @db.Decimal(5, 2)
+
+  channel String? // e.g. "AEPS", "DMT", "BBPS"
+
+  createdBy     String @map("created_by")
+  createdByUser User   @relation("CommissionSettingCreatedBy", fields: [createdBy], references: [id])
+
+  isActive      Boolean   @default(true) @map("is_active")
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([scope, roleId, targetUserId, serviceId, channel])
+  @@map("commission_settings")
+}
+
+model CommissionEarning {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation("CommissionEarningToUser", fields: [userId], references: [id])
+
+  fromUserId String @map("from_user_id")
+  fromUser   User   @relation("CommissionEarningFromUser", fields: [fromUserId], references: [id])
+
+  serviceId String  @map("service_id")
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  transactionId    String         @map("transaction_id") @db.VarChar(100)
+  amount           BigInt
+  commissionAmount BigInt         @map("commission_amount")
+  commissionType   CommissionType @map("commission_type")
+  level            Int
+
+  createdBy     String @map("created_by")
+  createdByUser User   @relation("CommissionEarningCreatedBy", fields: [createdBy], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([transactionId, userId])
+  @@index([serviceId, createdAt])
+  @@map("commission_earnings")
+}
+
+// ==================== SERVICES  ====================
+
+model Service {
+  id          String        @id @default(uuid())
+  name        String        @unique
+  code        String        @unique
+  status      ServiceStatus @default(ACTIVE)
+  icon        String?
+  description String?       @db.LongText
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  providerRateCards ProviderRateCard[]
+  CommissionSetting CommissionSetting[]
+  CommissionEarning CommissionEarning[]
+  UserPermission    UserPermission[]
+  RolePermission    RolePermission[]
+  Transaction       Transaction[]
+
+  @@map("services")
+}
+
+// ==================== Service Providers & Credentials ====================
+
+model ServiceProvider {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  type      String // e.g., "AEPS", "BBPS", "DMT", "RECHARGE"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  credentials ProviderCredential[]
+  ratecards   ProviderRateCard[]
+  Transaction Transaction[]
+
+  @@map("service_providers")
+}
+
+model ProviderCredential {
+  id          String          @id @default(uuid())
+  providerId  String
+  provider    ServiceProvider @relation(fields: [providerId], references: [id])
+  env         Env
+  keyName     String
+  keyVaultRef String
+  meta        String?         @db.LongText
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([providerId, env], name: "providerId_env")
+  @@map("provider_credentials")
+}
+
+model ProviderRateCard {
+  id            String          @id @default(uuid())
+  providerId    String          @map("provider_id")
+  provider      ServiceProvider @relation(fields: [providerId], references: [id])
+  serviceId     String          @map("service_id")
+  service       Service         @relation(fields: [serviceId], references: [id])
+  fixedCharge   BigInt? // paise
+  percentCharge Float? // percent (use Decimal if needed)
+  minCharge     BigInt?
+  maxCharge     BigInt?
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([providerId, serviceId, effectiveFrom], name: "providerId_serviceId_effectiveFrom")
+  @@map("provider_ratecards")
+}
+
+// ==================== User Service Permission  ====================
+
+model UserPermission {
+  id        String  @id @default(uuid())
+  serviceId String  @map("service_id")
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  canView          Boolean @default(false) @map("can_view")
+  canEdit          Boolean @default(false) @map("can_edit")
+  canSetCommission Boolean @default(false) @map("can_set_commission")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([userId, serviceId])
+  @@map("user_permissions")
+}
+
+// ==================== Role/Group Service Permission ====================
+
+model RolePermission {
+  id               String  @id @default(uuid())
+  roleId           String  @map("role_id")
+  role             Role    @relation(fields: [roleId], references: [id])
+  serviceId        String  @map("service_id")
+  service          Service @relation(fields: [serviceId], references: [id])
+  canView          Boolean @default(false) @map("can_view")
+  canEdit          Boolean @default(false) @map("can_edit")
+  canSetCommission Boolean @default(false) @map("can_set_commission")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([roleId, serviceId])
+  @@map("role_permissions")
+}
+
+// ==================== Settings ======================
+
+model SystemSetting {
+  id String @id @default(uuid())
+
+  userId String? @map("user_id")
+  user   User?   @relation(fields: [userId], references: [id])
+
+  companyName   String @map("company_name")
+  companyLogo   String @map("company_logo")
+  favIcon       String @map("fav_icon")
+  phoneNumber   String @map("phone_number")
+  whtsappNumber String @map("whtsapp_number")
+  companyEmail  String @map("company_email")
+
+  facebookUrl  String @map("facebook_url")
+  instagramUrl String @map("instagram_url")
+  twitterUrl   String @map("twitter_url")
+  linkedinUrl  String @map("linkedin_url")
+  websiteUrl   String @map("website_url")
+
+  createdAt DateTime  @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("settings")
+}
+
+// ====================== Login Logs =================
+
+model LoginLogs {
+  id String @id @default(uuid())
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  domainName String @map("domain_name")
+
+  ipAddress String @map("ip_address")
+
+  userAgent String? @map("user_agent")
+
+  location  String? @map("location") @db.LongText
+  latitude  Float?  @map("latitude")
+  longitude Float?  @map("longitude")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([latitude, longitude])
+  @@map("login_logs")
+}
+
+// ==================== Transactions & Ledger ====================
+
+model Transaction {
+  id               String           @id @default(uuid())
+  referenceId      String?          @map("reference_id")
+  externalRefId    String?          @map("external_ref_id") // ✅ Added for external provider reference
+  idempotencyKey   String?          @map("idempotency_key")
+  userId           String           @map("user_id")
+  user             User             @relation(fields: [userId], references: [id])
+  walletId         String           @map("wallet_id")
+  wallet           Wallet           @relation(fields: [walletId], references: [id])
+  serviceId        String           @map("service_id")
+  service          Service          @relation(fields: [serviceId], references: [id])
+  providerId       String?          @map("provider_id")
+  provider         ServiceProvider? @relation(fields: [providerId], references: [id])
+  amount           BigInt
+  providerCharge   BigInt?
+  commissionAmount BigInt
+  netAmount        BigInt
+  status           TxStatus         @default(PENDING)
+  rateLimit        Int?
+  requestPayload   Json?
+  responsePayload  Json?
+  completedAt      DateTime?        @map("completed_at")
+  errorCode        String?
+  errorMessage     String?          @db.LongText
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  ledgerEntries LedgerEntry[]
+  Refund        Refund[]
+
+  @@index([userId])
+  @@index([idempotencyKey])
+  @@index([status, createdAt])
+  @@index([serviceId, createdAt])
+  @@index([externalRefId])
+  @@map("transactions")
+}
+
+model LedgerEntry {
+  id             String          @id @default(uuid())
+  transactionId  String?         @map("transaction_id")
+  transaction    Transaction?    @relation(fields: [transactionId], references: [id])
+  walletId       String?         @map("wallet_id")
+  wallet         Wallet?         @relation(fields: [walletId], references: [id])
+  entryType      LedgerEntryType @map("entry_type")
+  referenceType  ReferenceType?  @map("reference_type") // ✅ new field
+  amount         BigInt
+  runningBalance BigInt          @map("running_balance")
+  narration      String          @db.Text
+  createdAt      DateTime        @default(now()) @map("created_at")
+  createdBy      String          @map("created_by")
+  meta           Json?
+  idempotencyKey String?         @map("idempotency_key")
+
+  @@index([transactionId])
+  @@index([walletId, createdAt])
+  @@map("ledger_entries")
+}
+
+model IdempotencyKey {
+  key       String   @id
+  userId    String?  @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expired_at") // required to allow TTL cleanup
+  used      Boolean  @default(false)
+  meta      Json?
+
+  @@map("idempotency_keys")
+}
+
+model Refund {
+  id            String      @id @default(uuid())
+  transactionId String      @map("transaction_id")
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  initiatedBy   String      @map("initiated_by")
+  amount        BigInt
+  status        TxStatus    @default(PENDING)
+  reason        String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@map("refunds")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String? // e.g. "User", "Transaction", "Service"
+  entityId   String? // related entity record ID
+  ipAddress  String? // request origin
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model PiiConsent {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  userKycId String?  @map("user_kyc_id")
+  userKyc   UserKyc? @relation(fields: [userKycId], references: [id])
+
+  piiType    String
+  piiHash    String
+  providedAt DateTime @default(now())
+  expiresAt  DateTime
+  scope      String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, piiType, scope])
+  @@map("pii_consents")
+}
+
+// ==================== CC PAYOUT MODELS ====================
+
+enum CardType {
+  VISA
+  RUPAY
+  MASTER
+}
+
+enum SenderStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  REJECTED
+}
+
+enum BeneficiaryStatus {
+  PENDING
+  ACTIVE
+  FAILED
+  SUCCESS
+}
+
+enum CollectionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  PROCESSING
+  CANCELLED
+}
+
+enum SettlementType {
+  INSTANT
+  T_PLUS_1
+}
+
+model CCSender {
+  id          String @id @default(uuid())
+  senderId    String @unique @map("sender_id")
+  referenceId String @unique @map("reference_id")
+  userId      String @map("user_id")
+  user        User   @relation(fields: [userId], references: [id])
+
+  name      String
+  nameInPan String  @map("name_in_pan")
+  pan       String
+  aadhar    String?
+  phone     String
+  cardNo    String  @map("card_no") @db.VarChar(16)
+  cvv       String  @db.VarChar(3)
+  expiry    String  @db.VarChar(7)
+
+  cardFrontImage String?  @map("card_front_image") @db.Text
+  cardBackImage  String?  @map("card_back_image") @db.Text
+  cardType       CardType @map("card_type")
+
+  charge   Decimal?     @db.Decimal(10, 2)
+  gst      Decimal?     @db.Decimal(10, 2)
+  isActive Boolean      @default(true) @map("is_active")
+  status   SenderStatus @default(PENDING)
+
+  collections CCCollection[]
+
+  @@index([userId])
+  @@index([referenceId])
+  @@map("cc_senders")
+}
+
+model CCBeneficiary {
+  id            String @id @default(uuid())
+  beneficiaryId String @unique @map("beneficiary_id")
+  reference     String @unique
+  userId        String @map("user_id")
+  user          User   @relation(fields: [userId], references: [id])
+
+  name              String
+  accountHolderName String?           @map("account_holder_name")
+  accountNumber     String            @map("account_number")
+  ifsc              String
+  status            BeneficiaryStatus @default(PENDING)
+  message           String?           @db.Text
+
+  collections CCCollection[]
+
+  @@index([userId])
+  @@index([reference])
+  @@map("cc_beneficiaries")
+}
+
+model CCCollection {
+  id           String @id @default(uuid())
+  collectionId String @unique @map("collection_id")
+  reference    String @unique
+  userId       String @map("user_id")
+  user         User   @relation(fields: [userId], references: [id])
+
+  senderId String
+  sender   CCSender @relation(fields: [senderId], references: [id])
+
+  beneficiaryId String
+  beneficiary   CCBeneficiary @relation(fields: [beneficiaryId], references: [id])
+
+  amount           BigInt
+  type             SettlementType
+  redirectUrl      String         @map("redirect_url") @db.Text
+  cardType         CardType       @map("card_type")
+  additionalCharge Decimal?       @map("additional_charge") @db.Decimal(10, 2)
+
+  collectionUrl String?          @map("collection_url") @db.Text
+  status        CollectionStatus @default(PENDING)
+  message       String?          @db.Text
+  utr           String?
+
+  charge Decimal? @db.Decimal(10, 2)
+  gst    Decimal? @db.Decimal(10, 2)
+
+  payouts CCPayout[]
+
+  @@index([userId])
+  @@index([reference])
+  @@index([collectionId])
+  @@map("cc_collections")
+}
+
+model CCPayout {
+  id           String       @id @default(uuid())
+  collectionId String       @map("collection_id")
+  collection   CCCollection @relation(fields: [collectionId], references: [id])
+
+  transactionId   String   @map("transaction_id")
+  amount          BigInt
+  accountNumber   String   @map("account_number")
+  ifsc            String
+  beneficiaryName String   @map("beneficiary_name")
+  status          TxStatus @default(PENDING)
+  message         String?
+  paymentMode     String   @default("IMPS") @map("payment_mode")
+  utr             String?
+  holderName      String?  @map("holder_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([collectionId])
+  @@map("cc_payouts")
+}

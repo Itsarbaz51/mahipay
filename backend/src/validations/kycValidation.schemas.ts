@@ -1,0 +1,74 @@
+import { z } from "zod";
+import { Gender } from "../types/kyc.types.js";
+
+// Required file
+export const requiredFileSchema = z
+  .any()
+  .refine((file) => !!file, "File is required")
+  .refine(
+    (file) =>
+      ["application/pdf", "image/jpeg", "image/png"].includes(file.mimetype),
+    "Only PDF or image files are allowed"
+  )
+  .transform((file) => ({
+    ...file,
+    fileType: file.mimetype === "application/pdf" ? "pdf" : "image",
+  }));
+
+// Optional file
+export const optionalFileSchema = z
+  .any()
+  .optional()
+  .refine(
+    (file) =>
+      !file ||
+      ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(
+        file.mimetype
+      ),
+    "Only PDF or image files are allowed"
+  )
+  .transform((file) =>
+    !file
+      ? null
+      : {
+          ...file,
+          fileType: file.mimetype === "application/pdf" ? "pdf" : "image",
+        }
+  );
+
+class KycValidationSchemas {
+  static get UserKyc() {
+    return z.object({
+      firstName: z.string().min(1, "First name is required"),
+      lastName: z.string().min(1, "Last name is required"),
+      fatherName: z.string().min(1, "Father name is required"),
+      dob: z
+        .string()
+        .refine((val) => !isNaN(Date.parse(val)), "Invalid date format"),
+      gender: z.nativeEnum(Gender),
+      addressId: z.string().uuid(),
+      panNumber: z.string().length(10, "PAN number must be 10 characters"),
+      aadhaarNumber: z
+        .string()
+        .length(12, "Aadhaar number must be 12 characters")
+    });
+  }
+
+  static get VerificationKycSchema() {
+    return z.object({
+      id: z.string().uuid(),
+      status: z.enum(["VERIFIED", "REJECTED"]),
+    });
+  }
+
+  static get ListkycSchema() {
+    return z.object({
+      status: z.enum(["VERIFIED", "REJECTED", "PENDING", "ALL"]).optional(),
+      page: z.number().optional().default(1),
+      limit: z.number().optional().default(10),
+      sort: z.enum(["asc", "desc"]).optional().default("desc"),
+    });
+  }
+}
+
+export default KycValidationSchemas;
