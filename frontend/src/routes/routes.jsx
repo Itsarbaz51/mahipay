@@ -21,7 +21,7 @@ import Contact from "../pages/landing/Contact";
 
 import AllKycTable from "../components/tabels/AllKycTable";
 import PayoutTable from "../components/tabels/PayoutTable";
-import Setting from "../components/Setting";
+import Settings from "../components/Settings";
 import EmployeeTable from "../components/tabels/EmployeeTable";
 import MembersTable from "../components/tabels/MembersTable";
 import WalletTable from "../components/tabels/Wallet";
@@ -181,7 +181,7 @@ export const createRouter = (appProps) => {
           <Route
             path="settings"
             element={
-              <Setting
+              <Settings
                 currentUser={appProps.currentUser}
                 users={appProps.users}
                 setUsers={appProps.setUsers}

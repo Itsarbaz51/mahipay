@@ -188,15 +188,16 @@ model User {
 // ============ User KYC & VERIFICATION MODELS ============
 
 model UserKyc {
-  id         String    @id @default(uuid())
-  userId     String    @map("user_id")
-  user       User      @relation(fields: [userId], references: [id])
-  firstName  String    @map("first_name")
-  lastName   String    @map("last_name")
-  fatherName String    @map("father_name")
-  dob        DateTime
-  gender     Gender
-  status     KycStatus @default(PENDING)
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  user               User      @relation(fields: [userId], references: [id])
+  firstName          String    @map("first_name")
+  lastName           String    @map("last_name")
+  fatherName         String    @map("father_name")
+  dob                DateTime
+  gender             Gender
+  status             KycStatus @default(PENDING)
+  kycRejectionReason String?   @map("kyc_rejection_reason") @default("")
 
   addressId String  @map("address_id")
   address   Address @relation(fields: [addressId], references: [id])
@@ -291,9 +292,9 @@ model Address {
   cityId String @map("city_id")
   city   City   @relation(fields: [cityId], references: [id])
 
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  UserKyc     UserKyc[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  UserKyc   UserKyc[]
 
   @@map("addresses")
 }

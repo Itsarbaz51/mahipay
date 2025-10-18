@@ -16,8 +16,6 @@ const Login = () => {
     (state) => state.auth
   );
 
-  console.log(currentUser?.user.status);
-
   const handleLogin = async (e) => {
     e.preventDefault();
     const payload = { emailOrUsername: emailOrPhone, password };

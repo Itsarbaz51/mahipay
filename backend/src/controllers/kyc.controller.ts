@@ -11,7 +11,7 @@ class UserKycController {
       throw ApiError.internal("User ID not found in request");
     }
 
-    const { status, page = 1, limit = 10, sort = "desc" } = req.body;
+    const { status, page, limit, sort, search } = req.body;
 
     const allKyc = await KycServices.indexUserKyc({
       userId,
@@ -19,6 +19,7 @@ class UserKycController {
       page,
       limit,
       sort,
+      search,
     });
 
     return res
@@ -29,19 +30,25 @@ class UserKycController {
   });
 
   static show = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) throw ApiError.internal("User ID not found in request");
-
     const { id } = req.params;
-    if (!id) {
-      throw ApiError.badRequest("KYC ID is required");
+    const userId = req.query.userId as string;
+
+    // Get the authenticated user's info including role
+    const requestingUser = req.user; // Assuming req.user has { id: string, role: string }
+
+    if (!requestingUser) {
+      throw ApiError.unauthorized("User not authenticated");
     }
 
-    const kycData = await KycServices.showUserKyc(userId, id);
+    const kyc = await KycServices.showUserKyc(
+      id,
+      userId,
+      requestingUser // Pass the requesting user object with role
+    );
 
     return res
       .status(200)
-      .json(ApiResponse.success(kycData, "User KYC fetched successfully", 201));
+      .json(ApiResponse.success(kyc, "KYC fetched successfully", 200));
   });
 
   static store = asyncHandler(async (req: Request, res: Response) => {
@@ -107,7 +114,7 @@ class UserKycController {
 
     const updateData: any = {
       ...req.body,
-      userId,
+      userId, // Pass userId to service for validation
     };
 
     if (panFile) updateData.panFile = panFile;
@@ -130,10 +137,13 @@ class UserKycController {
     return res
       .status(200)
       .json(
-        ApiResponse.success(dbStoreData, "User KYC verified successfully", 200)
+        ApiResponse.success(
+          dbStoreData,
+          `User KYC ${req.body.status} successfully`,
+          200
+        )
       );
   });
 }
-
 
 export { UserKycController };

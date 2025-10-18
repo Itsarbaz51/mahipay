@@ -59,7 +59,7 @@ export const { requestStart, requestSuccess, requestFail, reset } =
 export const createEntity = (entityType, payload) => async (dispatch) => {
   try {
     dispatch(requestStart());
-    const { data } = await axios.post(entityType, payload);
+    const { data } = await axios.post(`addresses/${entityType}`, payload);
     toast.success(data.message);
     return data;
   } catch (error) {

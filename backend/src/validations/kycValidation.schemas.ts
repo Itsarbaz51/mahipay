@@ -50,23 +50,38 @@ class KycValidationSchemas {
       panNumber: z.string().length(10, "PAN number must be 10 characters"),
       aadhaarNumber: z
         .string()
-        .length(12, "Aadhaar number must be 12 characters")
+        .length(12, "Aadhaar number must be 12 characters"),
     });
   }
 
   static get VerificationKycSchema() {
-    return z.object({
-      id: z.string().uuid(),
-      status: z.enum(["VERIFIED", "REJECTED"]),
-    });
+    return z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["VERIFIED", "REJECT"]),
+        kycRejectionReason: z.string().optional(),
+      })
+      .refine(
+        (data) => {
+          if (data.status === "REJECT") {
+            return !!data.kycRejectionReason?.trim();
+          }
+          return true;
+        },
+        {
+          message: "Rejection reason is required when status is REJECT",
+          path: ["kycRejectionReason"],
+        }
+      );
   }
 
   static get ListkycSchema() {
     return z.object({
-      status: z.enum(["VERIFIED", "REJECTED", "PENDING", "ALL"]).optional(),
-      page: z.number().optional().default(1),
-      limit: z.number().optional().default(10),
+      status: z.enum(["VERIFIED", "REJECT", "PENDING", "ALL"]).optional(),
+      page: z.coerce.number().optional().default(1),
+      limit: z.coerce.number().optional().default(10),
       sort: z.enum(["asc", "desc"]).optional().default("desc"),
+      search: z.string().optional(),
     });
   }
 }

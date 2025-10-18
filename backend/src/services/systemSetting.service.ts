@@ -123,9 +123,75 @@ class SystemSettingService {
     return this.mapToSystemSetting(updated);
   }
 
-  static async getById(id: string): Promise<SystemSetting> {
-    const setting = await Prisma.systemSetting.findUnique({ where: { id } });
+  static async upsert(
+    data: SystemSettingInput,
+    userId: string
+  ): Promise<SystemSetting> {
+    const existing = await Prisma.systemSetting.findFirst({
+      where: { userId },
+    });
+
+    // File processing
+    let companyLogoUrl = existing?.companyLogo ?? null;
+    let favIconUrl = existing?.favIcon ?? null;
+
+    if (data.companyLogo) {
+      if (existing?.companyLogo) {
+        await S3Service.delete({ fileUrl: existing.companyLogo });
+      }
+      companyLogoUrl = await S3Service.upload(
+        data.companyLogo,
+        "system-setting"
+      );
+    }
+
+    if (data.favIcon) {
+      if (existing?.favIcon) {
+        await S3Service.delete({ fileUrl: existing.favIcon });
+      }
+      favIconUrl = await S3Service.upload(data.favIcon, "system-setting");
+    }
+
+    const payload = {
+      userId,
+      companyName: data.companyName || "",
+      companyLogo: companyLogoUrl || "",
+      favIcon: favIconUrl || "",
+      phoneNumber: data.phoneNumber || "",
+      whtsappNumber: data.whtsappNumber || "",
+      companyEmail: data.companyEmail || "",
+      facebookUrl: data.facebookUrl || "",
+      instagramUrl: data.instagramUrl || "",
+      twitterUrl: data.twitterUrl || "",
+      linkedinUrl: data.linkedinUrl || "",
+      websiteUrl: data.websiteUrl || "",
+      updatedAt: new Date(),
+      createdAt: new Date(),
+    };
+
+    if (existing) {
+      // Update
+      const updated = await Prisma.systemSetting.update({
+        where: { id: existing.id },
+        data: payload,
+      });
+      return this.mapToSystemSetting(updated);
+    } else {
+      // Create
+      const created = await Prisma.systemSetting.create({
+        data: { ...payload },
+      });
+      return this.mapToSystemSetting(created);
+    }
+  }
+
+  static async getById(userId: string): Promise<SystemSetting> {
+    const setting = await Prisma.systemSetting.findFirst({
+      where: { userId },
+    });
+
     if (!setting) throw ApiError.notFound("System setting not found");
+
     return this.mapToSystemSetting(setting);
   }
 

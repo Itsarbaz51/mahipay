@@ -9,7 +9,7 @@ const kycRoutes = Router();
 
 // users kyc routes
 kycRoutes.post(
-  "/user-list",
+  "/list-kyc",
   AuthMiddleware.isAuthenticated,
   validateRequest(KycValidationSchemas.ListkycSchema),
   UserKycController.index
@@ -40,7 +40,7 @@ kycRoutes.put(
 kycRoutes.put(
   "/user-kyc-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
+  // AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
   upload.fields([
     { name: "panFile", maxCount: 1 },
     { name: "aadhaarFile", maxCount: 1 },

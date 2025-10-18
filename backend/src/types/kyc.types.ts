@@ -34,6 +34,7 @@ export interface UserKyc {
   photo: string;
   addressId: string;
   address?: Address;
+  kycRejectionReason?: string;
   panFile: string;
   aadhaarFile: string;
   addressProofFile: string;
@@ -57,12 +58,14 @@ import { KycStatus as PrismaKycStatus } from "@prisma/client";
 export interface KycVerificationInput {
   id: string;
   status: PrismaKycStatus;
+  kycRejectionReason?: string;
 }
 
 export interface FilterParams {
   userId: string;
-  status?: string;
+  status?: "VERIFIED" | "REJECT" | "PENDING" | "ALL";
   page: number;
   limit: number;
   sort: "asc" | "desc";
+  search?: string;
 }
