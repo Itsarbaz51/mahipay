@@ -12,10 +12,16 @@ import {
   AlertCircle,
   ChevronDown,
   Shield,
+  Ban,
+  Clock,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { createEntity, getAllEntities } from "../../redux/slices/addressSlice";
-import { kycSubmit } from "../../redux/slices/kycSlice";
+import {
+  getbyId,
+  kycSubmit,
+  updatekycSubmit,
+} from "../../redux/slices/kycSlice";
 import { toast } from "react-toastify";
 
 // ---------- InputField ----------
@@ -132,70 +138,176 @@ const FileUpload = ({
   filePreview,
   file,
   error,
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} <span className="text-red-500">*</span>
-    </label>
+  isPreFilled = false,
+}) => {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        {label} <span className="text-red-500">*</span>
+      </label>
+      <div
+        className={`relative border-2 border-dashed ${
+          error && !isPreFilled ? "border-red-500" : "border-gray-300"
+        } rounded-lg p-6 hover:border-cyan-500 transition-colors cursor-pointer bg-gray-50`}
+      >
+        <input
+          type="file"
+          name={name}
+          accept={accept}
+          onChange={onChange}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+        <div className="text-center">
+          {filePreview ? (
+            <div className="space-y-2">
+              {/* Improved PDF Preview Logic */}
+              {filePreview === "PDF" ||
+              (file && file.type === "application/pdf") ? (
+                <div className="flex flex-col items-center justify-center gap-2 p-3">
+                  <div className="relative">
+                    <FileText size={40} className="text-red-500" />
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                      PDF
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-sm text-gray-800 truncate max-w-[140px]">
+                      {file?.name || `${label}.pdf`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {file
+                        ? `Size: ${(file.size / 1024).toFixed(1)}KB`
+                        : "PDF Document"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={filePreview}
+                  alt="Preview"
+                  className="max-h-32 mx-auto rounded-lg shadow-md"
+                />
+              )}
+              <p className="text-xs text-green-600 flex items-center justify-center gap-1">
+                <CheckCircle size={12} />
+                {isPreFilled
+                  ? "File pre-filled from previous submission"
+                  : "File uploaded successfully"}
+              </p>
+              {isPreFilled && (
+                <p className="text-xs text-blue-600">
+                  Click to upload new file
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Icon className="mx-auto text-gray-400" size={32} />
+              <p className="text-sm text-gray-600">
+                <span className="text-cyan-600 font-semibold">
+                  Click to upload
+                </span>{" "}
+                or drag and drop
+              </p>
+              <p className="text-xs text-gray-500">
+                PNG, JPG or PDF (max 150KB)
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+      {error && !isPreFilled && (
+        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+          <AlertCircle size={12} />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+};
+
+// ---------- KYC Status Card ----------
+const KYCStatusCard = ({ kycDetail }) => {
+  const getStatusConfig = (status) => {
+    switch (status) {
+      case "APPROVE":
+        return {
+          icon: CheckCircle,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+          borderColor: "border-green-200",
+          title: "KYC Approved",
+          message: "Your KYC verification has been approved successfully.",
+        };
+      case "REJECT":
+        return {
+          icon: Ban,
+          color: "text-red-600",
+          bgColor: "bg-red-50",
+          borderColor: "border-red-200",
+          title: "KYC Rejected",
+          message: `Your KYC was rejected. Reason: ${kycDetail.rejectReason}`,
+        };
+      case "PENDING":
+        return {
+          icon: Clock,
+          color: "text-yellow-600",
+          bgColor: "bg-yellow-50",
+          borderColor: "border-yellow-200",
+          title: "KYC Pending",
+          message:
+            "Your KYC verification is under review. Please wait for approval.",
+        };
+      default:
+        return {
+          icon: Clock,
+          color: "text-gray-600",
+          bgColor: "bg-gray-50",
+          borderColor: "border-gray-200",
+          title: "KYC Status Unknown",
+          message: "Unable to determine KYC status.",
+        };
+    }
+  };
+
+  const config = getStatusConfig(kycDetail.status);
+  const StatusIcon = config.icon;
+
+  return (
     <div
-      className={`relative border-2 border-dashed ${
-        error ? "border-red-500" : "border-gray-300"
-      } rounded-lg p-6 hover:border-cyan-500 transition-colors cursor-pointer bg-gray-50`}
+      className={`border-2 ${config.borderColor} ${config.bgColor} rounded-2xl p-6 mb-6`}
     >
-      <input
-        type="file"
-        name={name}
-        accept={accept}
-        onChange={onChange}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-      />
-      <div className="text-center">
-        {filePreview ? (
-          <div className="space-y-2">
-            {filePreview === "PDF" ? (
-              <div className="flex items-center justify-center gap-2 text-green-600">
-                <FileText size={24} />
-                <span className="font-semibold">{file?.name}</span>
-              </div>
-            ) : (
-              <img
-                src={filePreview}
-                alt="Preview"
-                className="max-h-32 mx-auto rounded-lg shadow-md"
-              />
-            )}
-            <p className="text-sm text-gray-600">{file?.name}</p>
-            <p className="text-xs text-green-600 flex items-center justify-center gap-1">
-              <CheckCircle size={12} /> File uploaded successfully
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Icon className="mx-auto text-gray-400" size={32} />
-            <p className="text-sm text-gray-600">
-              <span className="text-cyan-600 font-semibold">
-                Click to upload
-              </span>{" "}
-              or drag and drop
-            </p>
-            <p className="text-xs text-gray-500">PNG, JPG or PDF (max 150KB)</p>
-          </div>
-        )}
+      <div className="flex items-center gap-4">
+        <div className={`p-3 rounded-full ${config.bgColor}`}>
+          <StatusIcon className={config.color} size={32} />
+        </div>
+        <div className="flex-1">
+          <h3 className={`text-xl font-bold ${config.color} mb-2`}>
+            {config.title}
+          </h3>
+          <p className="text-gray-700 mb-3">{config.message}</p>
+
+          {kycDetail.status === "REJECT" && (
+            <div className="mt-4">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+              >
+                Resubmit KYC
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
-    {error && (
-      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-        <AlertCircle size={12} />
-        {error}
-      </p>
-    )}
-  </div>
-);
+  );
+};
 
 // ---------- Main Form ----------
 export default function KYCWithAddressForm() {
   const dispatch = useDispatch();
   const addressState = useSelector((state) => state.address);
+  const { kycDetail, loading } = useSelector((state) => state.kyc);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -217,43 +329,208 @@ export default function KYCWithAddressForm() {
     photo: null,
     panFile: null,
     aadhaarFile: null,
-    addressProofFile: null, // ✅ Added
+    addressProofFile: null,
   });
 
   const [filePreviews, setFilePreviews] = useState({
     photo: null,
     panFile: null,
     aadhaarFile: null,
-    addressProofFile: null, // ✅ Added
+    addressProofFile: null,
+  });
+
+  const [preFilledFiles, setPreFilledFiles] = useState({
+    photo: false,
+    panFile: false,
+    aadhaarFile: false,
+    addressProofFile: false,
   });
 
   const [errors, setErrors] = useState({});
 
-  // Fetch states & cities
+  // Fetch KYC details and states & cities
   useEffect(() => {
-    if (!addressState?.data?.length) {
-      dispatch(getAllEntities("state-list"));
-      dispatch(getAllEntities("city-list"));
-    }
-  }, [dispatch, addressState.data]);
+    dispatch(getbyId());
+    dispatch(getAllEntities("state-list"));
+    dispatch(getAllEntities("city-list"));
+  }, [dispatch]);
 
   const stateList = useMemo(
     () => addressState?.stateList?.filter((i) => i.stateName) || [],
     [addressState.stateList]
   );
+
   const cityList = useMemo(
     () => addressState?.cityList?.filter((i) => i.cityName) || [],
     [addressState.cityList]
   );
 
+  // Helper functions to find state and city IDs by name
+  const findStateIdByName = (stateName) => {
+    if (!stateName) return "";
+    const state = stateList.find(
+      (s) =>
+        s.stateName?.toLowerCase().trim() === stateName?.toLowerCase().trim()
+    );
+    return state ? state.id : "";
+  };
+
+  const findCityIdByName = (cityName) => {
+    if (!cityName) return "";
+    const city = cityList.find(
+      (c) => c.cityName?.toLowerCase().trim() === cityName?.toLowerCase().trim()
+    );
+    return city ? city.id : "";
+  };
+
+  // Filter cities based on selected state
+  const filteredCities = useMemo(() => {
+    if (!formData.stateId) return cityList;
+    return cityList.filter(
+      (city) => city.stateId === formData.stateId || !city.stateId
+    );
+  }, [cityList, formData.stateId]);
+
+  // Fixed Pre-fill logic for rejected KYC
+  useEffect(() => {
+    if (kycDetail && kycDetail.status === "REJECT") {
+      // Convert state and city names to IDs
+      const stateId = findStateIdByName(kycDetail.location?.state);
+      const cityId = findCityIdByName(kycDetail.location?.city);
+
+      // Format date properly
+      const dob = kycDetail.profile?.dob
+        ? kycDetail.profile.dob.split("T")[0]
+        : "";
+
+      // Get PAN and Aadhaar values
+      let aadhaarNumber =
+        kycDetail.documents?.find((doc) => doc.type === "AADHAAR")?.value || "";
+      let panNumber =
+        kycDetail.documents?.find((doc) => doc.type === "PAN")?.value || "";
+
+      // If values are encrypted or legacy data, clear them
+      if (
+        aadhaarNumber.includes("Encrypted Data") ||
+        aadhaarNumber.includes("Legacy Data")
+      ) {
+        aadhaarNumber = "";
+      }
+      if (
+        panNumber.includes("Encrypted Data") ||
+        panNumber.includes("Legacy Data")
+      ) {
+        panNumber = "";
+      }
+
+      // Format Aadhaar number if it's a plain 12-digit number
+      if (
+        aadhaarNumber &&
+        aadhaarNumber.length === 12 &&
+        /^\d+$/.test(aadhaarNumber)
+      ) {
+        aadhaarNumber = `${aadhaarNumber.slice(0, 4)}-${aadhaarNumber.slice(
+          4,
+          8
+        )}-${aadhaarNumber.slice(8)}`;
+      }
+
+      setFormData({
+        firstName: kycDetail.profile?.name?.split(" ")[0] || "",
+        lastName: kycDetail.profile?.name?.split(" ").slice(1).join(" ") || "",
+        fatherName: kycDetail.profile?.fatherName || "",
+        dob: dob,
+        gender: kycDetail.profile?.gender || "MALE",
+        panNumber: panNumber,
+        aadhaarNumber: aadhaarNumber,
+        address: kycDetail.location?.address || "",
+        pinCode: kycDetail.location?.pinCode || "",
+        stateId: stateId,
+        cityId: cityId,
+      });
+
+      // Fixed Pre-fill file previews logic
+      if (kycDetail.files) {
+        const newFilePreviews = {};
+        const newPreFilledFiles = {
+          photo: false,
+          panFile: false,
+          aadhaarFile: false,
+          addressProofFile: false,
+        };
+
+        // Check each file type and set preview accordingly
+        Object.keys(kycDetail.files).forEach((fileType) => {
+          const fileUrl = kycDetail.files[fileType];
+          if (fileUrl) {
+            // Check if file is PDF based on URL extension or content type
+            if (
+              fileUrl.toLowerCase().includes(".pdf") ||
+              fileUrl.toLowerCase().includes("application/pdf")
+            ) {
+              newFilePreviews[fileType] = "PDF";
+            } else {
+              // It's an image
+              newFilePreviews[fileType] = fileUrl;
+            }
+            newPreFilledFiles[fileType] = true;
+          }
+        });
+        setFilePreviews(newFilePreviews);
+        setPreFilledFiles(newPreFilledFiles);
+
+        // Clear validation errors for pre-filled files
+        setErrors((prev) => ({
+          ...prev,
+          photo: newPreFilledFiles.photo ? "" : prev.photo,
+          panFile: newPreFilledFiles.panFile ? "" : prev.panFile,
+          aadhaarFile: newPreFilledFiles.aadhaarFile ? "" : prev.aadhaarFile,
+          addressProofFile: newPreFilledFiles.addressProofFile
+            ? ""
+            : prev.addressProofFile,
+        }));
+      }
+    }
+  }, [kycDetail, stateList, cityList]);
+
   const handleInputChange = (e) => {
     let value = e.target.value;
     const { name } = e.target;
-    if (name === "panNumber")
+
+    if (name === "panNumber") {
       value = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (name === "aadhaarNumber") value = value.replace(/\D/g, "").slice(0, 12);
+    }
+
+    if (name === "aadhaarNumber") {
+      // Keep only digits for processing
+      const digitsOnly = value.replace(/\D/g, "");
+
+      // Format as 1234-5678-9012
+      if (digitsOnly.length <= 4) {
+        value = digitsOnly;
+      } else if (digitsOnly.length <= 8) {
+        value = `${digitsOnly.slice(0, 4)}-${digitsOnly.slice(4)}`;
+      } else {
+        value = `${digitsOnly.slice(0, 4)}-${digitsOnly.slice(
+          4,
+          8
+        )}-${digitsOnly.slice(8, 12)}`;
+      }
+    }
+
     if (name === "pinCode") value = value.replace(/\D/g, "").slice(0, 6);
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // If state changes, clear city selection
+    if (name === "stateId") {
+      setFormData((prev) => ({
+        ...prev,
+        stateId: value,
+        cityId: "",
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -280,14 +557,17 @@ export default function KYCWithAddressForm() {
     }
 
     setFiles((prev) => ({ ...prev, [name]: file }));
+    setPreFilledFiles((prev) => ({ ...prev, [name]: false })); // Mark as user-uploaded file
     setErrors((prev) => ({ ...prev, [name]: "" }));
 
     if (isImage) {
       const reader = new FileReader();
-      reader.onloadend = () =>
+      reader.onloadend = () => {
         setFilePreviews((prev) => ({ ...prev, [name]: reader.result }));
+      };
       reader.readAsDataURL(file);
-    } else {
+    } else if (isPdf) {
+      // For PDF files, set preview to "PDF"
       setFilePreviews((prev) => ({ ...prev, [name]: "PDF" }));
     }
   };
@@ -311,8 +591,11 @@ export default function KYCWithAddressForm() {
       )
         newErrors.panNumber = "Invalid PAN format";
 
-      if (formData.aadhaarNumber && !/^\d{12}$/.test(formData.aadhaarNumber))
-        newErrors.aadhaarNumber = "Aadhaar must be 12 digits";
+      if (
+        formData.aadhaarNumber &&
+        !/^\d{4}-\d{4}-\d{4}$/.test(formData.aadhaarNumber)
+      )
+        newErrors.aadhaarNumber = "Aadhaar must be in format 1234-5678-9012";
     }
 
     if (step === 3) {
@@ -324,9 +607,12 @@ export default function KYCWithAddressForm() {
     }
 
     if (step === 4) {
-      ["photo", "panFile", "aadhaarFile", "addressProofFile"].forEach(
-        (f) => !files[f] && (newErrors[f] = "Required")
-      );
+      // Only require files that are not pre-filled
+      ["photo", "panFile", "aadhaarFile", "addressProofFile"].forEach((f) => {
+        if (!files[f] && !preFilledFiles[f]) {
+          newErrors[f] = "Required";
+        }
+      });
     }
 
     setErrors(newErrors);
@@ -345,6 +631,9 @@ export default function KYCWithAddressForm() {
     try {
       setSubmitting(true);
 
+      // Remove dashes from Aadhaar number before sending
+      const aadhaarNumberClean = formData.aadhaarNumber.replace(/\D/g, "");
+
       const addressPayload = {
         userId,
         stateId: formData.stateId,
@@ -353,11 +642,11 @@ export default function KYCWithAddressForm() {
         pinCode: formData.pinCode,
       };
 
-      const addressRes = dispatch(
+      const addressRes = await dispatch(
         createEntity("address-store", addressPayload)
       );
 
-      const addressId = addressRes.data?.data?.id;
+      const addressId = addressRes.data?.id;
 
       const kycPayload = new FormData();
       kycPayload.append("firstName", formData.firstName);
@@ -366,9 +655,10 @@ export default function KYCWithAddressForm() {
       kycPayload.append("dob", formData.dob);
       kycPayload.append("gender", formData.gender);
       kycPayload.append("panNumber", formData.panNumber);
-      kycPayload.append("aadhaarNumber", formData.aadhaarNumber);
+      kycPayload.append("aadhaarNumber", aadhaarNumberClean);
       kycPayload.append("addressId", addressId);
 
+      // Only append files that are newly uploaded or changed
       if (files.photo) kycPayload.append("photo", files.photo);
       if (files.panFile) kycPayload.append("panFile", files.panFile);
       if (files.aadhaarFile)
@@ -376,34 +666,59 @@ export default function KYCWithAddressForm() {
       if (files.addressProofFile)
         kycPayload.append("addressProofFile", files.addressProofFile);
 
-      await dispatch(kycSubmit(kycPayload));
+      // Use update if KYC exists, otherwise create new
+      if (kycDetail && kycDetail.id) {
+        // Fixed: Pass id and data separately
+        await dispatch(
+          updatekycSubmit({
+            id: kycDetail.id,
+            data: kycPayload,
+          })
+        );
+      } else {
+        await dispatch(kycSubmit(kycPayload));
+      }
 
-      setCurrentStep(1);
-      setFormData({
-        firstName: "",
-        lastName: "",
-        fatherName: "",
-        dob: "",
-        gender: "MALE",
-        panNumber: "",
-        aadhaarNumber: "",
-        address: "",
-        pinCode: "",
-        stateId: "",
-        cityId: "",
-      });
-      setFiles({
-        photo: null,
-        panFile: null,
-        aadhaarFile: null,
-        addressProofFile: null,
-      });
-      setFilePreviews({
-        photo: null,
-        panFile: null,
-        aadhaarFile: null,
-        addressProofFile: null,
-      });
+      toast.success("KYC submitted successfully!");
+
+      // Reset form only if needed
+      if (!kycDetail || kycDetail.status === "REJECT") {
+        setCurrentStep(1);
+        setFormData({
+          firstName: "",
+          lastName: "",
+          fatherName: "",
+          dob: "",
+          gender: "MALE",
+          panNumber: "",
+          aadhaarNumber: "",
+          address: "",
+          pinCode: "",
+          stateId: "",
+          cityId: "",
+        });
+        setFiles({
+          photo: null,
+          panFile: null,
+          aadhaarFile: null,
+          addressProofFile: null,
+        });
+        setFilePreviews({
+          photo: null,
+          panFile: null,
+          aadhaarFile: null,
+          addressProofFile: null,
+        });
+        setPreFilledFiles({
+          photo: false,
+          panFile: false,
+          aadhaarFile: false,
+          addressProofFile: false,
+        });
+      }
+
+      // Refresh KYC data
+      dispatch(getbyId());
     } catch (err) {
       toast.error(err?.message || "Submission failed");
     } finally {
@@ -418,6 +733,79 @@ export default function KYCWithAddressForm() {
     { number: 4, title: "Upload Files", icon: Upload },
   ];
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading KYC status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't show form if KYC is APPROVE or PENDING
+  if (kycDetail && kycDetail.status !== "REJECT") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-cyan-500 to-purple-600 rounded-2xl shadow-xl p-8 mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <Shield className="text-white" size={32} />
+              <h1 className="text-3xl font-bold text-white">
+                KYC Verification
+              </h1>
+            </div>
+            <p className="text-cyan-50">Your KYC verification status</p>
+          </div>
+
+          {/* KYC Status Card */}
+          <KYCStatusCard kycDetail={kycDetail} />
+
+          {/* Additional info for approved KYC */}
+          {kycDetail.status === "APPROVE" && (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                KYC Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Name</p>
+                  <p className="font-semibold">{kycDetail.profile?.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">PAN Number</p>
+                  <p className="font-semibold">
+                    {
+                      kycDetail.documents?.find((doc) => doc.type === "PAN")
+                        ?.value
+                    }
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Aadhaar Number</p>
+                  <p className="font-semibold">
+                    {
+                      kycDetail.documents?.find((doc) => doc.type === "AADHAAR")
+                        ?.value
+                    }
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Address</p>
+                  <p className="font-semibold">{kycDetail.location?.address}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show KYC form only if no KYC exists or status is REJECT
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -428,9 +816,16 @@ export default function KYCWithAddressForm() {
             <h1 className="text-3xl font-bold text-white">KYC Verification</h1>
           </div>
           <p className="text-cyan-50">
-            Complete your KYC to access all features
+            {kycDetail?.status === "REJECT"
+              ? "Please correct your KYC information and resubmit"
+              : "Complete your KYC to access all features"}
           </p>
         </div>
+
+        {/* Show reject reason if KYC was rejected */}
+        {kycDetail?.status === "REJECT" && (
+          <KYCStatusCard kycDetail={kycDetail} />
+        )}
 
         {/* Progress */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
@@ -559,8 +954,8 @@ export default function KYCWithAddressForm() {
                 value={formData.aadhaarNumber}
                 onChange={handleInputChange}
                 error={errors.aadhaarNumber}
-                placeholder="Enter 12-digit Aadhaar"
-                maxLength={12}
+                placeholder="1234-5678-9012"
+                maxLength={14}
               />
             </div>
           )}
@@ -568,22 +963,27 @@ export default function KYCWithAddressForm() {
           {/* Step 3 */}
           {currentStep === 3 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <textarea
-                name="address"
-                value={formData.address}
-                onChange={handleInputChange}
-                placeholder="Enter full address"
-                rows="3"
-                className={`w-full px-4 py-3 bg-gray-50 border-2 ${
-                  errors.address ? "border-red-500" : "border-gray-200"
-                } rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200`}
-              />
-              {errors.address && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <AlertCircle size={12} />
-                  {errors.address}
-                </p>
-              )}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Address <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  placeholder="Enter full address"
+                  rows="3"
+                  className={`w-full px-4 py-3 bg-gray-50 border-2 ${
+                    errors.address ? "border-red-500" : "border-gray-200"
+                  } rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200`}
+                />
+                {errors.address && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    {errors.address}
+                  </p>
+                )}
+              </div>
               <InputField
                 label="PIN Code"
                 name="pinCode"
@@ -610,10 +1010,12 @@ export default function KYCWithAddressForm() {
                 icon={MapPin}
                 value={formData.cityId}
                 onChange={handleInputChange}
-                options={cityList}
+                options={filteredCities}
                 error={errors.cityId}
-                placeholder="Select city"
-                disabled={false}
+                placeholder={
+                  formData.stateId ? "Select city" : "First select state"
+                }
+                disabled={!formData.stateId}
               />
             </div>
           )}
@@ -629,6 +1031,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.photo}
                 file={files.photo}
                 error={errors.photo}
+                isPreFilled={preFilledFiles.photo}
               />
               <FileUpload
                 label="PAN File"
@@ -638,6 +1041,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.panFile}
                 file={files.panFile}
                 error={errors.panFile}
+                isPreFilled={preFilledFiles.panFile}
               />
               <FileUpload
                 label="Aadhaar File"
@@ -647,6 +1051,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.aadhaarFile}
                 file={files.aadhaarFile}
                 error={errors.aadhaarFile}
+                isPreFilled={preFilledFiles.aadhaarFile}
               />
               <FileUpload
                 label="Address Proof"
@@ -656,6 +1061,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.addressProofFile}
                 file={files.addressProofFile}
                 error={errors.addressProofFile}
+                isPreFilled={preFilledFiles.addressProofFile}
               />
             </div>
           )}

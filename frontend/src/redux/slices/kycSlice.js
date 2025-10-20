@@ -5,11 +5,11 @@ import "react-toastify/dist/ReactToastify.css";
 import { logout } from "./authSlice";
 
 axios.defaults.withCredentials = true;
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-axios.defaults.baseURL = baseURL;
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const initialState = {
-  kycData: [],
+  kycList: [],
+  kycDetail: null,
   isLoading: false,
   error: null,
   success: null,
@@ -25,97 +25,144 @@ const kycSlice = createSlice({
       state.error = null;
       state.success = null;
     },
-    kycSuccess: (state, action) => {
+    kycListSuccess: (state, action) => {
       state.isLoading = false;
-      const kycData = action.payload?.data || action.payload;
-      state.kycData = kycData;
+      state.kycList = action.payload?.data || [];
       state.success = action.payload?.message || null;
       state.error = null;
-      state.isKycVerified = kycData?.status === "verified";
+    },
+    kycDetailSuccess: (state, action) => {
+      state.isLoading = false;
+      state.kycDetail = action.payload?.data || null;
+      state.success = action.payload?.message || null;
+      state.error = null;
+    },
+    kycActionSuccess: (state, action) => {
+      state.isLoading = false;
+      state.success = action.payload?.message || "KYC action completed";
+      state.error = null;
+      if (action.payload?.data?.status)
+        state.isKycVerified = action.payload.data.status === "VERIFIED";
     },
     kycFail: (state, action) => {
       state.isLoading = false;
       state.error = action.payload;
-      if (action.payload) toast.error(state.error);
+      if (action.payload) toast.error(action.payload);
     },
     resetKyc: (state) => {
-      state.kycData = null;
       state.isLoading = false;
-      state.isKycVerified = false;
-      state.success = null;
       state.error = null;
+      state.success = null;
+      state.kycDetail = null;
+      state.isKycVerified = false;
     },
   },
 });
 
-export const { kycRequest, kycSuccess, kycFail, resetKyc } = kycSlice.actions;
+export const {
+  kycRequest,
+  kycListSuccess,
+  kycDetailSuccess,
+  kycActionSuccess,
+  kycFail,
+  resetKyc,
+} = kycSlice.actions;
 
-// ---------------- API Actions ------------------
+export default kycSlice.reducer;
 
-// submit KYC documents
+// ------------------ submit by users --------------------------
 export const kycSubmit = (kycPayload) => async (dispatch) => {
-  console.log(kycPayload);
-
   try {
     dispatch(kycRequest());
+    const { data } = await axios.post("kycs/user-kyc-store", kycPayload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-    const { data } = await axios.post(
-      "kycs/user-kyc-store",
-      kycPayload, // <-- comma fixed here
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
-
-    dispatch(kycSuccess(data));
+    dispatch(kycActionSuccess(data));
     toast.success(data.message);
     dispatch(logout());
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
     dispatch(kycFail(errMsg));
-    toast.error(errMsg);
-    throw errMsg;
   }
 };
 
-// get all KYC records (admin use)
-export const getKycAll = () => async (dispatch) => {
+export const updatekycSubmit =
+  ({ id, data }) =>
+  async (dispatch) => {
+    try {
+      dispatch(kycRequest());
+      const response = await axios.put(`kycs/user-kyc-update/${id}`, data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      dispatch(kycActionSuccess(response.data));
+      toast.success(response.data.message);
+      return response.data;
+    } catch (error) {
+      console.error("KYC Update Error:", error);
+      const errMsg =
+        error?.response?.data?.message || error?.message || "KYC update failed";
+      dispatch(kycFail(errMsg));
+      toast.error(errMsg);
+      throw error;
+    }
+  };
+
+// ------------------ Manage by both (admin & user) --------------------------
+export const getbyId = (id) => async (dispatch) => {
   try {
     dispatch(kycRequest());
-    const { data } = await axios.get(`/kyc/get-all-kyc`);
-    dispatch(kycSuccess(data));
+    const { data } = await axios.get(`kycs/user-kyc-show/${id}`);
+    dispatch(kycDetailSuccess(data));
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
-    // dispatch(kycFail(errMsg));
+    dispatch(kycFail(errMsg));
   }
 };
 
-// verify KYC (admin use)
-export const verifyKyc = (kycId, status) => async (dispatch) => {
+// ------------------ Manage by admin --------------------------
+export const getKycAll =
+  (params = {}) =>
+  async (dispatch) => {
+    try {
+      dispatch(kycRequest());
+      const body = {
+        status: params.status || "ALL",
+        page: params.page || 1,
+        limit: params.limit || 10,
+        sort: params.sort || "desc",
+        search: params.search || "",
+      };
+      const { data } = await axios.post("kycs/list-kyc", body);
+      dispatch(kycListSuccess(data));
+      return data;
+    } catch (error) {
+      const errMsg = error?.response?.data?.message || error?.message;
+      dispatch(kycFail(errMsg));
+    }
+  };
+
+export const verifyKyc = (payload) => async (dispatch) => {
   try {
     dispatch(kycRequest());
-    const { data } = await axios.put(`/kyc/verify/${kycId}`, { status });
-    dispatch(kycSuccess(data));
+    const { data } = await axios.put("kycs/user-verify", payload);
+
+    dispatch(kycActionSuccess(data));
+    toast.success(data.message);
     dispatch(getKycAll());
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
+    console.error("KYC verification error:", error);
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "KYC verification failed";
     dispatch(kycFail(errMsg));
+    toast.error(errMsg);
   }
 };
-
-// delete KYC (admin use)
-export const deleteKyc = (userId) => async (dispatch) => {
-  try {
-    dispatch(kycRequest());
-    const { data } = await axios.post(`/kyc/delete/${userId}`);
-    dispatch(kycSuccess(data));
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(kycFail(errMsg));
-  }
-};
-
-export default kycSlice.reducer;

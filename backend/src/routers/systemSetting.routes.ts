@@ -33,7 +33,7 @@ systemSettingRoutes.put(
 
 // Get system setting by ID
 systemSettingRoutes.get(
-  "/show/:id",
+  "/show",
   AuthMiddleware.isAuthenticated,
   SystemSettingController.show
 );
@@ -50,6 +50,17 @@ systemSettingRoutes.delete(
   "/delete/:id",
   AuthMiddleware.isAuthenticated,
   SystemSettingController.delete
+);
+
+systemSettingRoutes.post(
+  "/upsert",
+  AuthMiddleware.isAuthenticated,
+  upload.fields([
+    { name: "companyLogo", maxCount: 1 },
+    { name: "favIcon", maxCount: 1 },
+  ]),
+  validateRequest(SystemSettingValidationSchemas.upsertSchema),
+  SystemSettingController.upsert
 );
 
 export default systemSettingRoutes;

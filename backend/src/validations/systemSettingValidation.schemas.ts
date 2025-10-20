@@ -34,4 +34,8 @@ export default class SystemSettingValidationSchemas {
   static get updateSchema() {
     return this.createSchema.partial();
   }
+
+  static get upsertSchema() {
+    return this.createSchema.partial();
+  }
 }
