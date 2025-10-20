@@ -13,7 +13,7 @@ const MainSetting = () => {
     loading: isLoading,
     error,
     success,
-  } = useSelector((state) => state.setting);
+  } = useSelector((state) => state.setting || {});
 
   const [formData, setFormData] = useState({
     companyName: "",
