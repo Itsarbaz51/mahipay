@@ -148,7 +148,7 @@ model User {
   role   Role   @relation(fields: [roleId], references: [id])
 
   //tokens
-  refreshToken String? @unique @map("refresh_token")
+  refreshToken String? @map("refresh_token") @db.Text
 
   // tokens for password reset / email verification
   passwordResetToken            String?   @map("password_reset_token")
@@ -197,7 +197,7 @@ model UserKyc {
   dob                DateTime
   gender             Gender
   status             KycStatus @default(PENDING)
-  kycRejectionReason String?   @map("kyc_rejection_reason") @default("")
+  kycRejectionReason String?   @default("") @map("kyc_rejection_reason")
 
   addressId String  @map("address_id")
   address   Address @relation(fields: [addressId], references: [id])
