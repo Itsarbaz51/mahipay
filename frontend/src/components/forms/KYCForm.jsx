@@ -138,65 +138,93 @@ const FileUpload = ({
   filePreview,
   file,
   error,
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} <span className="text-red-500">*</span>
-    </label>
-    <div
-      className={`relative border-2 border-dashed ${
-        error ? "border-red-500" : "border-gray-300"
-      } rounded-lg p-6 hover:border-cyan-500 transition-colors cursor-pointer bg-gray-50`}
-    >
-      <input
-        type="file"
-        name={name}
-        accept={accept}
-        onChange={onChange}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-      />
-      <div className="text-center">
-        {filePreview ? (
-          <div className="space-y-2">
-            {filePreview === "PDF" ? (
-              <div className="flex items-center justify-center gap-2 text-green-600">
-                <FileText size={24} />
-                <span className="font-semibold">{file?.name}</span>
-              </div>
-            ) : (
-              <img
-                src={filePreview}
-                alt="Preview"
-                className="max-h-32 mx-auto rounded-lg shadow-md"
-              />
-            )}
-            <p className="text-sm text-gray-600">{file?.name}</p>
-            <p className="text-xs text-green-600 flex items-center justify-center gap-1">
-              <CheckCircle size={12} /> File uploaded successfully
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Icon className="mx-auto text-gray-400" size={32} />
-            <p className="text-sm text-gray-600">
-              <span className="text-cyan-600 font-semibold">
-                Click to upload
-              </span>{" "}
-              or drag and drop
-            </p>
-            <p className="text-xs text-gray-500">PNG, JPG or PDF (max 150KB)</p>
-          </div>
-        )}
+  isPreFilled = false,
+}) => {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">
+        {label} <span className="text-red-500">*</span>
+      </label>
+      <div
+        className={`relative border-2 border-dashed ${
+          error && !isPreFilled ? "border-red-500" : "border-gray-300"
+        } rounded-lg p-6 hover:border-cyan-500 transition-colors cursor-pointer bg-gray-50`}
+      >
+        <input
+          type="file"
+          name={name}
+          accept={accept}
+          onChange={onChange}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+        <div className="text-center">
+          {filePreview ? (
+            <div className="space-y-2">
+              {/* Improved PDF Preview Logic */}
+              {filePreview === "PDF" ||
+              (file && file.type === "application/pdf") ? (
+                <div className="flex flex-col items-center justify-center gap-2 p-3">
+                  <div className="relative">
+                    <FileText size={40} className="text-red-500" />
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                      PDF
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-sm text-gray-800 truncate max-w-[140px]">
+                      {file?.name || `${label}.pdf`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {file
+                        ? `Size: ${(file.size / 1024).toFixed(1)}KB`
+                        : "PDF Document"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={filePreview}
+                  alt="Preview"
+                  className="max-h-32 mx-auto rounded-lg shadow-md"
+                />
+              )}
+              <p className="text-xs text-green-600 flex items-center justify-center gap-1">
+                <CheckCircle size={12} />
+                {isPreFilled
+                  ? "File pre-filled from previous submission"
+                  : "File uploaded successfully"}
+              </p>
+              {isPreFilled && (
+                <p className="text-xs text-blue-600">
+                  Click to upload new file
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Icon className="mx-auto text-gray-400" size={32} />
+              <p className="text-sm text-gray-600">
+                <span className="text-cyan-600 font-semibold">
+                  Click to upload
+                </span>{" "}
+                or drag and drop
+              </p>
+              <p className="text-xs text-gray-500">
+                PNG, JPG or PDF (max 150KB)
+              </p>
+            </div>
+          )}
+        </div>
       </div>
+      {error && !isPreFilled && (
+        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+          <AlertCircle size={12} />
+          {error}
+        </p>
+      )}
     </div>
-    {error && (
-      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-        <AlertCircle size={12} />
-        {error}
-      </p>
-    )}
-  </div>
-);
+  );
+};
 
 // ---------- KYC Status Card ----------
 const KYCStatusCard = ({ kycDetail }) => {
@@ -311,6 +339,13 @@ export default function KYCWithAddressForm() {
     addressProofFile: null,
   });
 
+  const [preFilledFiles, setPreFilledFiles] = useState({
+    photo: false,
+    panFile: false,
+    aadhaarFile: false,
+    addressProofFile: false,
+  });
+
   const [errors, setErrors] = useState({});
 
   // Fetch KYC details and states & cities
@@ -351,39 +386,19 @@ export default function KYCWithAddressForm() {
   // Filter cities based on selected state
   const filteredCities = useMemo(() => {
     if (!formData.stateId) return cityList;
-
-    // If cities have stateId field, filter by it
-    // Otherwise return all cities (adjust based on your API response)
     return cityList.filter(
-      (city) => city.stateId === formData.stateId || !city.stateId // If no stateId in city, show all cities
+      (city) => city.stateId === formData.stateId || !city.stateId
     );
   }, [cityList, formData.stateId]);
 
-  // Pre-fill form data if KYC exists and is rejected
+  // Fixed Pre-fill logic for rejected KYC
   useEffect(() => {
     if (kycDetail && kycDetail.status === "REJECT") {
-      console.log("Pre-filling KYC data:", kycDetail);
-
       // Convert state and city names to IDs
       const stateId = findStateIdByName(kycDetail.location?.state);
       const cityId = findCityIdByName(kycDetail.location?.city);
 
-      console.log("State mapping:", {
-        stateName: kycDetail.location?.state,
-        stateId: stateId,
-        availableStates: stateList.map((s) => ({
-          id: s.id,
-          name: s.stateName,
-        })),
-      });
-
-      console.log("City mapping:", {
-        cityName: kycDetail.location?.city,
-        cityId: cityId,
-        availableCities: cityList.map((c) => ({ id: c.id, name: c.cityName })),
-      });
-
-      // Format date properly (remove time part if exists)
+      // Format date properly
       const dob = kycDetail.profile?.dob
         ? kycDetail.profile.dob.split("T")[0]
         : "";
@@ -420,8 +435,7 @@ export default function KYCWithAddressForm() {
         )}-${aadhaarNumber.slice(8)}`;
       }
 
-      setFormData((prev) => ({
-        ...prev,
+      setFormData({
         firstName: kycDetail.profile?.name?.split(" ")[0] || "",
         lastName: kycDetail.profile?.name?.split(" ").slice(1).join(" ") || "",
         fatherName: kycDetail.profile?.fatherName || "",
@@ -433,40 +447,51 @@ export default function KYCWithAddressForm() {
         pinCode: kycDetail.location?.pinCode || "",
         stateId: stateId,
         cityId: cityId,
-      }));
+      });
 
-      // Pre-fill file previews if files exist
+      // Fixed Pre-fill file previews logic
       if (kycDetail.files) {
-        setFilePreviews((prev) => ({
+        const newFilePreviews = {};
+        const newPreFilledFiles = {
+          photo: false,
+          panFile: false,
+          aadhaarFile: false,
+          addressProofFile: false,
+        };
+
+        // Check each file type and set preview accordingly
+        Object.keys(kycDetail.files).forEach((fileType) => {
+          const fileUrl = kycDetail.files[fileType];
+          if (fileUrl) {
+            // Check if file is PDF based on URL extension or content type
+            if (
+              fileUrl.toLowerCase().includes(".pdf") ||
+              fileUrl.toLowerCase().includes("application/pdf")
+            ) {
+              newFilePreviews[fileType] = "PDF";
+            } else {
+              // It's an image
+              newFilePreviews[fileType] = fileUrl;
+            }
+            newPreFilledFiles[fileType] = true;
+          }
+        });
+        setFilePreviews(newFilePreviews);
+        setPreFilledFiles(newPreFilledFiles);
+
+        // Clear validation errors for pre-filled files
+        setErrors((prev) => ({
           ...prev,
-          photo: kycDetail.files.photo || null,
-          panFile: kycDetail.files.panFile || null,
-          aadhaarFile: kycDetail.files.aadhaarFile || null,
-          addressProofFile: kycDetail.files.addressProofFile || null,
+          photo: newPreFilledFiles.photo ? "" : prev.photo,
+          panFile: newPreFilledFiles.panFile ? "" : prev.panFile,
+          aadhaarFile: newPreFilledFiles.aadhaarFile ? "" : prev.aadhaarFile,
+          addressProofFile: newPreFilledFiles.addressProofFile
+            ? ""
+            : prev.addressProofFile,
         }));
       }
     }
   }, [kycDetail, stateList, cityList]);
-
-  // Debug logs
-  useEffect(() => {
-    console.log("Current form data:", formData);
-  }, [formData]);
-
-  useEffect(() => {
-    if (stateList.length > 0) {
-      console.log(
-        "Available states:",
-        stateList.map((s) => ({ id: s.id, name: s.stateName }))
-      );
-    }
-    if (cityList.length > 0) {
-      console.log(
-        "Available cities:",
-        cityList.map((c) => ({ id: c.id, name: c.cityName }))
-      );
-    }
-  }, [stateList, cityList]);
 
   const handleInputChange = (e) => {
     let value = e.target.value;
@@ -500,7 +525,7 @@ export default function KYCWithAddressForm() {
       setFormData((prev) => ({
         ...prev,
         stateId: value,
-        cityId: "", // Clear city when state changes
+        cityId: "",
       }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -532,14 +557,17 @@ export default function KYCWithAddressForm() {
     }
 
     setFiles((prev) => ({ ...prev, [name]: file }));
+    setPreFilledFiles((prev) => ({ ...prev, [name]: false })); // Mark as user-uploaded file
     setErrors((prev) => ({ ...prev, [name]: "" }));
 
     if (isImage) {
       const reader = new FileReader();
-      reader.onloadend = () =>
+      reader.onloadend = () => {
         setFilePreviews((prev) => ({ ...prev, [name]: reader.result }));
+      };
       reader.readAsDataURL(file);
-    } else {
+    } else if (isPdf) {
+      // For PDF files, set preview to "PDF"
       setFilePreviews((prev) => ({ ...prev, [name]: "PDF" }));
     }
   };
@@ -579,9 +607,12 @@ export default function KYCWithAddressForm() {
     }
 
     if (step === 4) {
-      ["photo", "panFile", "aadhaarFile", "addressProofFile"].forEach(
-        (f) => !files[f] && (newErrors[f] = "Required")
-      );
+      // Only require files that are not pre-filled
+      ["photo", "panFile", "aadhaarFile", "addressProofFile"].forEach((f) => {
+        if (!files[f] && !preFilledFiles[f]) {
+          newErrors[f] = "Required";
+        }
+      });
     }
 
     setErrors(newErrors);
@@ -627,6 +658,7 @@ export default function KYCWithAddressForm() {
       kycPayload.append("aadhaarNumber", aadhaarNumberClean);
       kycPayload.append("addressId", addressId);
 
+      // Only append files that are newly uploaded or changed
       if (files.photo) kycPayload.append("photo", files.photo);
       if (files.panFile) kycPayload.append("panFile", files.panFile);
       if (files.aadhaarFile)
@@ -636,40 +668,54 @@ export default function KYCWithAddressForm() {
 
       // Use update if KYC exists, otherwise create new
       if (kycDetail && kycDetail.id) {
-        await dispatch(updatekycSubmit({ id: kycDetail.id, data: kycPayload }));
+        // Fixed: Pass id and data separately
+        await dispatch(
+          updatekycSubmit({
+            id: kycDetail.id,
+            data: kycPayload,
+          })
+        );
       } else {
         await dispatch(kycSubmit(kycPayload));
       }
 
       toast.success("KYC submitted successfully!");
 
-      // Reset form
-      setCurrentStep(1);
-      setFormData({
-        firstName: "",
-        lastName: "",
-        fatherName: "",
-        dob: "",
-        gender: "MALE",
-        panNumber: "",
-        aadhaarNumber: "",
-        address: "",
-        pinCode: "",
-        stateId: "",
-        cityId: "",
-      });
-      setFiles({
-        photo: null,
-        panFile: null,
-        aadhaarFile: null,
-        addressProofFile: null,
-      });
-      setFilePreviews({
-        photo: null,
-        panFile: null,
-        aadhaarFile: null,
-        addressProofFile: null,
-      });
+      // Reset form only if needed
+      if (!kycDetail || kycDetail.status === "REJECT") {
+        setCurrentStep(1);
+        setFormData({
+          firstName: "",
+          lastName: "",
+          fatherName: "",
+          dob: "",
+          gender: "MALE",
+          panNumber: "",
+          aadhaarNumber: "",
+          address: "",
+          pinCode: "",
+          stateId: "",
+          cityId: "",
+        });
+        setFiles({
+          photo: null,
+          panFile: null,
+          aadhaarFile: null,
+          addressProofFile: null,
+        });
+        setFilePreviews({
+          photo: null,
+          panFile: null,
+          aadhaarFile: null,
+          addressProofFile: null,
+        });
+        setPreFilledFiles({
+          photo: false,
+          panFile: false,
+          aadhaarFile: false,
+          addressProofFile: false,
+        });
+      }
 
       // Refresh KYC data
       dispatch(getbyId());
@@ -985,6 +1031,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.photo}
                 file={files.photo}
                 error={errors.photo}
+                isPreFilled={preFilledFiles.photo}
               />
               <FileUpload
                 label="PAN File"
@@ -994,6 +1041,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.panFile}
                 file={files.panFile}
                 error={errors.panFile}
+                isPreFilled={preFilledFiles.panFile}
               />
               <FileUpload
                 label="Aadhaar File"
@@ -1003,6 +1051,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.aadhaarFile}
                 file={files.aadhaarFile}
                 error={errors.aadhaarFile}
+                isPreFilled={preFilledFiles.aadhaarFile}
               />
               <FileUpload
                 label="Address Proof"
@@ -1012,6 +1061,7 @@ export default function KYCWithAddressForm() {
                 filePreview={filePreviews.addressProofFile}
                 file={files.addressProofFile}
                 error={errors.addressProofFile}
+                isPreFilled={preFilledFiles.addressProofFile}
               />
             </div>
           )}

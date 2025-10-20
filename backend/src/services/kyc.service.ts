@@ -152,15 +152,6 @@ class KycServices {
     const kyc = await Prisma.userKyc.findFirst({
       where: whereClause,
       include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-          },
-        },
         address: {
           select: {
             address: true,
@@ -230,15 +221,8 @@ class KycServices {
     return {
       id: kyc.id,
       profile: {
-        name: `${kycWithRelations.user?.firstName || ""} ${kycWithRelations.user?.lastName || ""}`.trim(),
+        name: `${kycWithRelations?.firstName || ""} ${kycWithRelations?.lastName || ""}`.trim(),
         userId: kyc.userId,
-        email:
-          isAdmin || isOwner ? kycWithRelations.user?.email || "-" : "***@***",
-        phone:
-          isAdmin || isOwner
-            ? kycWithRelations.user?.phoneNumber || "-"
-            : "**********",
-        photo: kyc.photo || null,
         gender: kyc.gender || null,
         dob: kyc.dob || null,
         fatherName: kyc.fatherName || "-",
@@ -252,6 +236,7 @@ class KycServices {
       },
       status: kyc.status,
       files: {
+        photo: kyc.photo,
         panFile: kyc.panFile,
         aadhaarFile: kyc.aadhaarFile,
         addressProofFile: kyc.addressProofFile,
@@ -389,11 +374,10 @@ class KycServices {
     payload: Partial<UserKycUploadInput> & {
       status?: string;
       kycRejectionReason?: string | null;
-      userId?: string; // Add userId to payload
+      userId?: string;
     }
   ): Promise<UserKyc> {
     try {
-      // First find the KYC by ID
       const existingKyc = await Prisma.userKyc.findUnique({
         where: { id: id },
       });
@@ -402,7 +386,6 @@ class KycServices {
         throw ApiError.notFound("KYC not found");
       }
 
-      // Then check if the user owns this KYC
       if (payload.userId && existingKyc.userId !== payload.userId) {
         throw ApiError.forbidden(
           "Access denied - you can only update your own KYC"
@@ -410,27 +393,22 @@ class KycServices {
       }
 
       const updates: any = {};
-
-      // Personal information updates
       if (payload.firstName) updates.firstName = payload.firstName.trim();
       if (payload.lastName) updates.lastName = payload.lastName.trim();
       if (payload.fatherName) updates.fatherName = payload.fatherName.trim();
       if (payload.gender) updates.gender = payload.gender;
       if (payload.dob) updates.dob = new Date(payload.dob);
 
-      // Auto-reset status to PENDING when updating rejected KYC
       if (existingKyc.status === "REJECT") {
         updates.status = "PENDING";
         updates.kycRejectionReason = null;
       } else {
-        // Allow manual status update only if not rejected
         if (payload.status) updates.status = payload.status;
         if (payload.kycRejectionReason !== undefined) {
           updates.kycRejectionReason = payload.kycRejectionReason;
         }
       }
 
-      // Handle file uploads
       const uploadTasks: Promise<string | null>[] = [];
       const fileFields: [keyof typeof payload, keyof typeof existingKyc][] = [
         ["panFile", "panFile"],
@@ -463,7 +441,6 @@ class KycServices {
 
       if (uploadTasks.length > 0) await Promise.all(uploadTasks);
 
-      // Update timestamp
       updates.updatedAt = new Date();
 
       const updatedKyc = await Prisma.userKyc.update({

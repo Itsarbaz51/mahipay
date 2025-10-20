@@ -88,22 +88,29 @@ export const kycSubmit = (kycPayload) => async (dispatch) => {
   }
 };
 
-export const updatekycSubmit = (kycPayload) => async (dispatch) => {
-  try {
-    dispatch(kycRequest());
-    const { data } = await axios.post("kycs/user-kyc-update", kycPayload, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+export const updatekycSubmit =
+  ({ id, data }) =>
+  async (dispatch) => {
+    try {
+      dispatch(kycRequest());
+      const response = await axios.put(`kycs/user-kyc-update/${id}`, data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-    dispatch(kycActionSuccess(data));
-    toast.success(data.message);
-    dispatch(logout());
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(kycFail(errMsg));
-  }
-};
+      dispatch(kycActionSuccess(response.data));
+      toast.success(response.data.message);
+      return response.data;
+    } catch (error) {
+      console.error("KYC Update Error:", error);
+      const errMsg =
+        error?.response?.data?.message || error?.message || "KYC update failed";
+      dispatch(kycFail(errMsg));
+      toast.error(errMsg);
+      throw error;
+    }
+  };
 
 // ------------------ Manage by both (admin & user) --------------------------
 export const getbyId = (id) => async (dispatch) => {
@@ -140,22 +147,22 @@ export const getKycAll =
     }
   };
 
-export const verifyKyc =
-  (id, status, kycRejectionReason = null) =>
-  async (dispatch) => {
-    try {
-      dispatch(kycRequest());
-      const { data } = await axios.put("kycs/user-verify", {
-        id,
-        status,
-        kycRejectionReason,
-      });
-      dispatch(kycActionSuccess(data));
-      toast.success(data.message || "KYC status updated");
-      dispatch(getKycAll());
-      return data;
-    } catch (error) {
-      const errMsg = error?.response?.data?.message || error?.message;
-      dispatch(kycFail(errMsg));
-    }
-  };
+export const verifyKyc = (payload) => async (dispatch) => {
+  try {
+    dispatch(kycRequest());
+    const { data } = await axios.put("kycs/user-verify", payload);
+
+    dispatch(kycActionSuccess(data));
+    toast.success(data.message);
+    dispatch(getKycAll());
+    return data;
+  } catch (error) {
+    console.error("KYC verification error:", error);
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "KYC verification failed";
+    dispatch(kycFail(errMsg));
+    toast.error(errMsg);
+  }
+};

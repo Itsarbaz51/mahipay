@@ -140,16 +140,43 @@ const AllKycTable = () => {
     }
 
     if (selectedAction === "VERIFIED") {
-      dispatch(verifyKyc(selectedId, "VERIFIED"));
+      dispatch(
+        verifyKyc({
+          id: selectedId,
+          status: "VERIFIED",
+          kycRejectionReason: "", 
+        })
+      );
     }
 
     setShowModal(false);
   };
 
   const handleRejectSubmit = () => {
-    dispatch(verifyKyc(selectedId, "REJECT", rejectionReason));
+    if (!rejectionReason.trim()) {
+      alert("Please enter a rejection reason");
+      return;
+    }
+
+    dispatch(
+      verifyKyc({
+        id: selectedId,
+        status: "REJECT",
+        kycRejectionReason: rejectionReason.trim(),
+      })
+    );
+
     setShowRejectModal(false);
     setRejectionReason("");
+    setSelectedAction(null);
+    setSelectedId(null);
+  };
+
+  const handleCloseRejectModal = () => {
+    setShowRejectModal(false);
+    setRejectionReason("");
+    setSelectedAction(null);
+    setSelectedId(null);
   };
 
   return (
@@ -166,33 +193,51 @@ const AllKycTable = () => {
       {/* Reject Modal */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">
-              Reject KYC
-            </h3>
-            <textarea
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Enter rejection reason..."
-              className="w-full border border-gray-300 rounded-md p-2 mb-4"
-              rows={4}
-            />
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Reject KYC
+              </h3>
+              <button
+                onClick={handleCloseRejectModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Rejection Reason *
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Please provide a detailed reason for rejection..."
+                className="w-full border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={4}
+                required
+              />
+              {!rejectionReason.trim() && (
+                <p className="text-red-500 text-xs mt-1">
+                  Rejection reason is required
+                </p>
+              )}
+            </div>
+
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowRejectModal(false);
-                  setRejectionReason("");
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md"
+                onClick={handleCloseRejectModal}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleRejectSubmit}
                 disabled={!rejectionReason.trim()}
-                className="px-4 py-2 bg-red-600 text-white rounded-md disabled:opacity-50"
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Reject
+                Confirm Reject
               </button>
             </div>
           </div>
@@ -263,22 +308,22 @@ const AllKycTable = () => {
                     <tr key={kyc.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="flex items-center">
-                          <div className="w-12 h-12 rounded-full bg-gray-200 flex justify-center items-center">
+                          <div className="w-12 h-12 rounded-full bg-gray-200 flex justify-center items-center overflow-hidden">
                             {kyc?.profile?.photo ? (
                               <img
                                 src={kyc.profile.photo}
                                 alt={kyc.profile.name}
-                                className="w-full h-full rounded-full object-contain"
+                                className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-white font-semibold">
-                                {kyc?.profile?.name?.[0]?.toUpperCase()}
+                              <span className="text-gray-600 font-semibold text-lg">
+                                {kyc?.profile?.name?.[0]?.toUpperCase() || "U"}
                               </span>
                             )}
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {kyc.profile?.name}
+                              {kyc.profile?.name || "N/A"}
                             </div>
                             <div className="text-xs text-gray-500">
                               ID #{kyc.id}
@@ -287,7 +332,7 @@ const AllKycTable = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
-                        <div className="flex items-center">
+                        <div className="flex items-center mb-1">
                           <Phone className="w-4 h-4 mr-2 text-gray-400" />
                           {kyc.profile?.phone || "N/A"}
                         </div>
@@ -298,18 +343,22 @@ const AllKycTable = () => {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {kyc.documents?.map((doc) => (
-                          <div key={doc.id}>
-                            {doc.type}: {doc.value}
+                          <div key={doc.id} className="mb-1 last:mb-0">
+                            <span className="font-medium">{doc.type}:</span>{" "}
+                            {doc.value}
                           </div>
-                        ))}
+                        )) || "N/A"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
                         <div className="flex items-start">
-                          <MapPin className="w-4 h-4 mr-2 text-gray-400 mt-1" />
+                          <MapPin className="w-4 h-4 mr-2 text-gray-400 mt-1 flex-shrink-0" />
                           <div>
-                            <div>{kyc.location?.address}</div>
+                            <div className="line-clamp-2">
+                              {kyc.location?.address || "N/A"}
+                            </div>
                             <div className="text-xs text-gray-500">
-                              {kyc.location?.city}, {kyc.location?.state}
+                              {kyc.location?.city || "N/A"},{" "}
+                              {kyc.location?.state || "N/A"}
                             </div>
                           </div>
                         </div>
@@ -330,6 +379,8 @@ const AllKycTable = () => {
                                 onClick={() =>
                                   handleActionClick("VERIFIED", kyc.id)
                                 }
+                                className="p-1 hover:bg-green-50 rounded transition-colors"
+                                title="Approve KYC"
                               >
                                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                               </button>
@@ -337,12 +388,18 @@ const AllKycTable = () => {
                                 onClick={() =>
                                   handleActionClick("REJECT", kyc.id)
                                 }
+                                className="p-1 hover:bg-red-50 rounded transition-colors"
+                                title="Reject KYC"
                               >
                                 <X className="w-5 h-5 text-red-600" />
                               </button>
                             </>
                           )}
-                          <button onClick={() => handleViewShow(kyc.id)}>
+                          <button
+                            onClick={() => handleViewShow(kyc.id)}
+                            className="p-1 hover:bg-blue-50 rounded transition-colors"
+                            title="View Details"
+                          >
                             <Eye className="w-5 h-5 text-blue-600" />
                           </button>
                         </div>
