@@ -19,7 +19,7 @@ import Login from "../pages/auth/Login";
 import Dashboard from "../pages/Dashboard";
 import TransactionHistory from "../pages/TransactionHistory";
 import Reports from "../pages/Reports";
-import CommissionCharges from "../pages/CommissionCharges";
+import CommissionCharges from "../pages/CommissionManagement";
 
 import AllKycTable from "../components/tabels/AllKycTable";
 import PayoutTable from "../components/tabels/PayoutTable";
