@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Search, Edit, Save, X, Trash } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { toast } from "react-toastify";
 import { createOrUpdateCommissionSetting } from "../../redux/slices/commissionSlice";
+import { toast } from "react-toastify";
 
 // constants - updated to match your backend
 const scopes = ["ROLE", "USER"];
@@ -63,8 +63,6 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
     try {
       const payload = {
         scope: item.scope,
-        roleId: item.roleId,
-        targetUserId: item.targetUserId,
         serviceId: item.serviceId,
         commissionType: item.commissionType,
         commissionValue: item.commissionValue,
@@ -78,10 +76,19 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
         effectiveTo: item.effectiveTo,
       };
 
+      // Conditionally add roleId or targetUserId based on scope
+      if (item.scope === "ROLE") {
+        payload.roleId = item.roleId;
+      } else if (item.scope === "USER") {
+        payload.targetUserId = item.targetUserId;
+      }
+
       await dispatch(createOrUpdateCommissionSetting(payload));
       setEditingId(null);
+      toast.success("Commission setting updated successfully");
     } catch (err) {
       console.error("Update failed", err);
+      toast.error("Failed to update commission setting");
     }
   };
 
@@ -99,7 +106,7 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
       toast.success("Commission setting removed locally");
     } catch (err) {
       console.error("Delete failed", err);
-      alert("Failed to delete commission setting");
+      toast.error("Failed to delete commission setting");
     }
     setConfirmItem(null);
   };
@@ -146,7 +153,7 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
             <th className="px-6 py-3 text-left text-xs font-medium">Value</th>
             <th className="px-6 py-3 text-left text-xs font-medium">Min/Max</th>
             <th className="px-6 py-3 text-left text-xs font-medium">TDS/GST</th>
-            {currentUser.role === "ADMIN" && (
+            {currentUser.role === "SUPER ADMIN" && (
               <th className="px-6 py-3 text-left text-xs font-medium">
                 Actions
               </th>
@@ -187,41 +194,45 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
               {/* Role/User */}
               <td className="px-6 py-4">
                 {editingId === item.id ? (
-                  item.scope === "ROLE" ? (
-                    <select
-                      value={item.roleId}
-                      onChange={(e) =>
-                        updateChargeData(item.id, "roleId", e.target.value)
-                      }
-                      className="px-2 py-1 border rounded text-sm"
-                    >
-                      <option value="">Select Role</option>
-                      {roles.map((role) => (
-                        <option key={role} value={role}>
-                          {role}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder="User ID"
-                      value={item.targetUserId || ""}
-                      onChange={(e) =>
-                        updateChargeData(
-                          item.id,
-                          "targetUserId",
-                          e.target.value
-                        )
-                      }
-                      className="w-32 px-2 py-1 border rounded text-sm"
-                    />
-                  )
+                  <div>
+                    {item.scope === "ROLE" ? (
+                      <select
+                        value={item.roleId || ""}
+                        onChange={(e) =>
+                          updateChargeData(item.id, "roleId", e.target.value)
+                        }
+                        className="px-2 py-1 border rounded text-sm w-full"
+                      >
+                        <option value="">Select Role</option>
+                        {roles.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Enter User ID"
+                        value={item.targetUserId || ""}
+                        onChange={(e) =>
+                          updateChargeData(
+                            item.id,
+                            "targetUserId",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-2 py-1 border rounded text-sm"
+                      />
+                    )}
+                  </div>
                 ) : (
                   <div className="text-sm">
                     {item.scope === "ROLE"
-                      ? item.role?.name || item.roleId
-                      : item.targetUser?.username || item.targetUserId}
+                      ? item.role?.name || item.roleId || "No role selected"
+                      : item.targetUser?.username ||
+                        item.targetUserId ||
+                        "No user selected"}
                   </div>
                 )}
               </td>
@@ -295,6 +306,7 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
                       )
                     }
                     className="w-20 px-2 py-1 border rounded text-sm"
+                    step={item.commissionType === "PERCENT" ? "0.1" : "1"}
                   />
                 ) : item.commissionType === "PERCENT" ? (
                   `${item.commissionValue}%`
@@ -364,6 +376,9 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
                           )
                         }
                         className="w-12 px-1 py-1 border rounded text-sm"
+                        step="0.1"
+                        min="0"
+                        max="100"
                       />
                     </div>
                     <div className="flex items-center gap-1">
@@ -392,6 +407,9 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
                           )
                         }
                         className="w-12 px-1 py-1 border rounded text-sm"
+                        step="0.1"
+                        min="0"
+                        max="100"
                       />
                     </div>
                   </div>
@@ -409,7 +427,7 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
               </td>
 
               {/* Actions */}
-              {currentUser.role === "ADMIN" && (
+              {currentUser.role === "SUPER ADMIN" && (
                 <td className="px-6 py-4">
                   {editingId === item.id ? (
                     <div className="flex gap-2">
@@ -472,7 +490,7 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
   );
 };
 
-// ConfirmCard component (keep as is)
+// ConfirmCard component
 function ConfirmCard({ actionType, isClose, isSubmit }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

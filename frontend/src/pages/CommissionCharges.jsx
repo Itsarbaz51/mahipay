@@ -1,44 +1,60 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+
 import AddCommission from "../components/forms/AddCommission";
-import { getUserCommissions } from "../redux/slices/commissionSlice";
 import CommissionTable from "../components/tabels/CommissionTable";
+import { getCommissionSettingsByRoleOrUser } from "../redux/slices/commissionSlice";
 
-const CommissionCharges = () => {
+const CommissionManagement = () => {
   const dispatch = useDispatch();
-  const { id } = useSelector((state) => state.auth.currentUser);
-  const { commissions } = useSelector((state) => state.commission);
-
   const [chargesData, setChargesData] = useState([]);
-  useEffect(() => {
-    dispatch(getUserCommissions(id));
-  }, [dispatch, id]);
 
+  // Get commission settings from Redux store
+  const commissionSettings = useSelector(
+    (state) => state.commission.commissionSettings
+  );
+  const isLoading = useSelector((state) => state.commission.isLoading);
+
+  // Fetch commission settings on component mount
   useEffect(() => {
-    if (commissions && Array.isArray(commissions)) {
-      setChargesData(commissions);
+    // You can pass specific roleId or userId here
+    dispatch(getCommissionSettingsByRoleOrUser("", ""));
+  }, [dispatch]);
+
+  // Update local state when Redux state changes
+  useEffect(() => {
+    if (commissionSettings) {
+      setChargesData(
+        Array.isArray(commissionSettings) ? commissionSettings : []
+      );
     }
-  }, [commissions]);
-
-  const currentUser = useSelector((state) => state.auth?.currentUser);
+  }, [commissionSettings]);
 
   return (
-    <div>
-      {/* Form */}
-      {currentUser.role === "ADMIN" && (
-        <AddCommission
-          chargesData={chargesData}
-          setChargesData={setChargesData}
-        />
-      )}
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        Commission Management
+      </h1>
 
-      {/* Table */}
+      {/* Add Commission Form */}
+      <AddCommission
+        chargesData={chargesData}
+        setChargesData={setChargesData}
+      />
+
+      {/* Commission Table */}
       <CommissionTable
         chargesData={chargesData}
         setChargesData={setChargesData}
       />
+
+      {isLoading && (
+        <div className="text-center py-4">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default CommissionCharges;
+export default CommissionManagement;

@@ -14,7 +14,6 @@ import Home from "../pages/landing/Home";
 import About from "../pages/landing/About";
 import Contact from "../pages/landing/Contact";
 import Login from "../pages/auth/Login";
-import Register from "../pages/auth/Register";
 
 // 🔹 Protected Pages
 import Dashboard from "../pages/Dashboard";
@@ -24,12 +23,12 @@ import CommissionCharges from "../pages/CommissionCharges";
 
 import AllKycTable from "../components/tabels/AllKycTable";
 import PayoutTable from "../components/tabels/PayoutTable";
-import Setting from "../components/Setting";
 import EmployeeTable from "../components/tabels/EmployeeTable";
 import MembersTable from "../components/tabels/MembersTable";
 import WalletTable from "../components/tabels/Wallet";
 import KYCVerification from "../components/forms/KYCForm";
 import AddFundRequest from "../components/forms/AddFundRequest";
+import Settings from "../components/Settings";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -41,7 +40,6 @@ export const createRouter = () => {
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
           <Route path="login" element={<Login />} />
-          <Route path="register" element={<Register />} />
         </Route>
 
         {/* ---------------- PROTECTED ROUTES ---------------- */}
@@ -61,7 +59,7 @@ export const createRouter = () => {
           <Route path="add-fund" element={<AddFundRequest />} />
           <Route path="all-kyc" element={<AllKycTable />} />
           <Route path="members" element={<MembersTable />} />
-          <Route path="settings" element={<Setting />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="employee-management" element={<EmployeeTable />} />
           <Route path="wallet" element={<WalletTable />} />
         </Route>
