@@ -1,20 +1,19 @@
 import { useState } from "react";
 import { Search, Edit, Save, X, Trash } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  updateCommission,
-  deleteCommission,
-} from "../../redux/slices/commissionSlice";
+import { toast } from "react-toastify";
+import { createOrUpdateCommissionSetting } from "../../redux/slices/commissionSlice";
 
-// constants
+// constants - updated to match your backend
+const scopes = ["ROLE", "USER"];
+const commissionTypes = ["FLAT", "PERCENT"];
+const services = ["NEFT", "IMPS"]; // You might want to fetch these from your backend
 const roles = ["STATE_HOLDER", "MASTER_DISTRIBUTOR", "DISTRIBUTOR", "AGENT"];
-const services = ["NEFT", "IMPS"];
-const types = ["FIXED", "PERCENT"];
 
 const CommissionTable = ({ chargesData, setChargesData }) => {
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [confirmItem, setConfirmItem] = useState(null); // item for confirmation modal
+  const [confirmItem, setConfirmItem] = useState(null);
 
   const dispatch = useDispatch();
   const currentUser = useSelector((state) => state.auth?.currentUser);
@@ -23,11 +22,15 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return true;
     return (
-      String(item.from).includes(q) ||
-      String(item.to).includes(q) ||
-      String(item.value).includes(q) ||
-      String(item.role).toLowerCase().includes(q) ||
-      String(item.service).toLowerCase().includes(q)
+      String(item.commissionValue).includes(q) ||
+      String(item.role?.name || "")
+        .toLowerCase()
+        .includes(q) ||
+      String(item.service?.name || "")
+        .toLowerCase()
+        .includes(q) ||
+      String(item.commissionType).toLowerCase().includes(q) ||
+      String(item.scope).toLowerCase().includes(q)
     );
   });
 
@@ -38,8 +41,14 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
           ? {
               ...item,
               [field]:
-                field === "from" || field === "to" || field === "value"
+                field === "commissionValue" ||
+                field === "minAmount" ||
+                field === "maxAmount" ||
+                field === "tdsPercent" ||
+                field === "gstPercent"
                   ? Number(value)
+                  : field === "applyTDS" || field === "applyGST"
+                  ? value === "true"
                   : value,
             }
           : item
@@ -52,20 +61,28 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
     if (!item) return;
 
     try {
-      await dispatch(
-        updateCommission(id, {
-          from: item.from,
-          to: item.to,
-          value: item.value,
-          type: item.type,
-          role: item.role,
-          service: item.service,
-        })
-      );
+      const payload = {
+        scope: item.scope,
+        roleId: item.roleId,
+        targetUserId: item.targetUserId,
+        serviceId: item.serviceId,
+        commissionType: item.commissionType,
+        commissionValue: item.commissionValue,
+        minAmount: item.minAmount,
+        maxAmount: item.maxAmount,
+        applyTDS: item.applyTDS,
+        tdsPercent: item.tdsPercent,
+        applyGST: item.applyGST,
+        gstPercent: item.gstPercent,
+        effectiveFrom: item.effectiveFrom,
+        effectiveTo: item.effectiveTo,
+      };
+
+      await dispatch(createOrUpdateCommissionSetting(payload));
+      setEditingId(null);
     } catch (err) {
       console.error("Update failed", err);
     }
-    setEditingId(null);
   };
 
   const handleCancel = () => setEditingId(null);
@@ -75,13 +92,28 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
   const handleDeleteConfirmed = async () => {
     if (!confirmItem) return;
     try {
-      await dispatch(deleteCommission(confirmItem.id));
+      // Note: Your current backend doesn't have delete functionality
+      // You'll need to add this to your service or handle it differently
+      // For now, we'll just remove from local state
       setChargesData((prev) => prev.filter((c) => c.id !== confirmItem.id));
+      toast.success("Commission setting removed locally");
     } catch (err) {
       console.error("Delete failed", err);
-      alert("Failed to delete slab");
+      alert("Failed to delete commission setting");
     }
     setConfirmItem(null);
+  };
+
+  // Format currency display
+  const formatCurrency = (value) => {
+    if (!value) return "-";
+    return `₹${value}`;
+  };
+
+  // Format percentage display
+  const formatPercentage = (value) => {
+    if (!value) return "-";
+    return `${value}%`;
   };
 
   return (
@@ -92,10 +124,10 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search by role, service, type..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 border rounded-md"
+            className="pl-10 pr-4 py-2 border rounded-md w-80"
           />
         </div>
       </div>
@@ -105,12 +137,15 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
         <thead className="bg-gray-50 border-b border-gray-300">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium">#</th>
-            <th className="px-6 py-3 text-left text-xs font-medium">From</th>
-            <th className="px-6 py-3 text-left text-xs font-medium">To</th>
-            <th className="px-6 py-3 text-left text-xs font-medium">Value</th>
-            <th className="px-6 py-3 text-left text-xs font-medium">Type</th>
+            <th className="px-6 py-3 text-left text-xs font-medium">Scope</th>
+            <th className="px-6 py-3 text-left text-xs font-medium">
+              Role/User
+            </th>
             <th className="px-6 py-3 text-left text-xs font-medium">Service</th>
-            <th className="px-6 py-3 text-left text-xs font-medium">Role</th>
+            <th className="px-6 py-3 text-left text-xs font-medium">Type</th>
+            <th className="px-6 py-3 text-left text-xs font-medium">Value</th>
+            <th className="px-6 py-3 text-left text-xs font-medium">Min/Max</th>
+            <th className="px-6 py-3 text-left text-xs font-medium">TDS/GST</th>
             {currentUser.role === "ADMIN" && (
               <th className="px-6 py-3 text-left text-xs font-medium">
                 Actions
@@ -120,102 +155,275 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
         </thead>
         <tbody>
           {filteredData.map((item, index) => (
-            <tr key={item.id} className="hover:bg-gray-50">
-              <td className="px-6 py-3">{index + 1}</td>
-              <td className="px-6 py-3">
-                {editingId === item.id ? (
-                  <input
-                    type="number"
-                    value={item.from}
-                    onChange={(e) =>
-                      updateChargeData(item.id, "from", e.target.value)
-                    }
-                    className="w-24 px-2 py-1 border rounded"
-                  />
-                ) : (
-                  item.from
-                )}
-              </td>
-              <td className="px-6 py-3">
-                {editingId === item.id ? (
-                  <input
-                    type="number"
-                    value={item.to}
-                    onChange={(e) =>
-                      updateChargeData(item.id, "to", e.target.value)
-                    }
-                    className="w-24 px-2 py-1 border rounded"
-                  />
-                ) : (
-                  item.to
-                )}
-              </td>
-              <td className="px-6 py-3">
-                {editingId === item.id ? (
-                  <input
-                    type="number"
-                    value={item.value}
-                    onChange={(e) =>
-                      updateChargeData(item.id, "value", e.target.value)
-                    }
-                    className="w-24 px-2 py-1 border rounded"
-                  />
-                ) : (
-                  `₹${item.value}`
-                )}
-              </td>
-              <td className="px-6 py-3">
+            <tr
+              key={item.id}
+              className="hover:bg-gray-50 border-b border-gray-200"
+            >
+              <td className="px-6 py-4">{index + 1}</td>
+
+              {/* Scope */}
+              <td className="px-6 py-4">
                 {editingId === item.id ? (
                   <select
-                    value={item.type}
+                    value={item.scope}
                     onChange={(e) =>
-                      updateChargeData(item.id, "type", e.target.value)
+                      updateChargeData(item.id, "scope", e.target.value)
                     }
-                    className="px-2 py-1 border rounded"
+                    className="px-2 py-1 border rounded text-sm"
                   >
-                    {types.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                    {scopes.map((scope) => (
+                      <option key={scope} value={scope}>
+                        {scope}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  item.type
+                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                    {item.scope}
+                  </span>
                 )}
               </td>
-              <td className="px-6 py-3">{item.service}</td>
-              <td className="px-6 py-3">
+
+              {/* Role/User */}
+              <td className="px-6 py-4">
+                {editingId === item.id ? (
+                  item.scope === "ROLE" ? (
+                    <select
+                      value={item.roleId}
+                      onChange={(e) =>
+                        updateChargeData(item.id, "roleId", e.target.value)
+                      }
+                      className="px-2 py-1 border rounded text-sm"
+                    >
+                      <option value="">Select Role</option>
+                      {roles.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="User ID"
+                      value={item.targetUserId || ""}
+                      onChange={(e) =>
+                        updateChargeData(
+                          item.id,
+                          "targetUserId",
+                          e.target.value
+                        )
+                      }
+                      className="w-32 px-2 py-1 border rounded text-sm"
+                    />
+                  )
+                ) : (
+                  <div className="text-sm">
+                    {item.scope === "ROLE"
+                      ? item.role?.name || item.roleId
+                      : item.targetUser?.username || item.targetUserId}
+                  </div>
+                )}
+              </td>
+
+              {/* Service */}
+              <td className="px-6 py-4">
                 {editingId === item.id ? (
                   <select
-                    value={item.role}
+                    value={item.serviceId}
                     onChange={(e) =>
-                      updateChargeData(item.id, "role", e.target.value)
+                      updateChargeData(item.id, "serviceId", e.target.value)
                     }
-                    className="px-2 py-1 border rounded"
+                    className="px-2 py-1 border rounded text-sm"
                   >
-                    {roles.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
+                    <option value="">Select Service</option>
+                    {services.map((service) => (
+                      <option key={service} value={service}>
+                        {service}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  item.role
+                  item.service?.name || item.serviceId
                 )}
               </td>
+
+              {/* Commission Type */}
+              <td className="px-6 py-4">
+                {editingId === item.id ? (
+                  <select
+                    value={item.commissionType}
+                    onChange={(e) =>
+                      updateChargeData(
+                        item.id,
+                        "commissionType",
+                        e.target.value
+                      )
+                    }
+                    className="px-2 py-1 border rounded text-sm"
+                  >
+                    {commissionTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${
+                      item.commissionType === "PERCENT"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-purple-100 text-purple-800"
+                    }`}
+                  >
+                    {item.commissionType}
+                  </span>
+                )}
+              </td>
+
+              {/* Commission Value */}
+              <td className="px-6 py-4">
+                {editingId === item.id ? (
+                  <input
+                    type="number"
+                    value={item.commissionValue}
+                    onChange={(e) =>
+                      updateChargeData(
+                        item.id,
+                        "commissionValue",
+                        e.target.value
+                      )
+                    }
+                    className="w-20 px-2 py-1 border rounded text-sm"
+                  />
+                ) : item.commissionType === "PERCENT" ? (
+                  `${item.commissionValue}%`
+                ) : (
+                  formatCurrency(item.commissionValue)
+                )}
+              </td>
+
+              {/* Min/Max Amount */}
+              <td className="px-6 py-4">
+                {editingId === item.id ? (
+                  <div className="space-y-1">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={item.minAmount || ""}
+                      onChange={(e) =>
+                        updateChargeData(item.id, "minAmount", e.target.value)
+                      }
+                      className="w-20 px-2 py-1 border rounded text-sm"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={item.maxAmount || ""}
+                      onChange={(e) =>
+                        updateChargeData(item.id, "maxAmount", e.target.value)
+                      }
+                      className="w-20 px-2 py-1 border rounded text-sm"
+                    />
+                  </div>
+                ) : (
+                  <div className="text-xs">
+                    <div>Min: {formatCurrency(item.minAmount)}</div>
+                    <div>Max: {formatCurrency(item.maxAmount)}</div>
+                  </div>
+                )}
+              </td>
+
+              {/* TDS/GST */}
+              <td className="px-6 py-4">
+                {editingId === item.id ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={item.applyTDS || false}
+                        onChange={(e) =>
+                          updateChargeData(
+                            item.id,
+                            "applyTDS",
+                            e.target.checked
+                          )
+                        }
+                        className="h-3 w-3"
+                      />
+                      <span className="text-xs">TDS</span>
+                      <input
+                        type="number"
+                        placeholder="%"
+                        value={item.tdsPercent || ""}
+                        onChange={(e) =>
+                          updateChargeData(
+                            item.id,
+                            "tdsPercent",
+                            e.target.value
+                          )
+                        }
+                        className="w-12 px-1 py-1 border rounded text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={item.applyGST || false}
+                        onChange={(e) =>
+                          updateChargeData(
+                            item.id,
+                            "applyGST",
+                            e.target.checked
+                          )
+                        }
+                        className="h-3 w-3"
+                      />
+                      <span className="text-xs">GST</span>
+                      <input
+                        type="number"
+                        placeholder="%"
+                        value={item.gstPercent || ""}
+                        onChange={(e) =>
+                          updateChargeData(
+                            item.id,
+                            "gstPercent",
+                            e.target.value
+                          )
+                        }
+                        className="w-12 px-1 py-1 border rounded text-sm"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs">
+                    {item.applyTDS && (
+                      <div>TDS: {formatPercentage(item.tdsPercent)}</div>
+                    )}
+                    {item.applyGST && (
+                      <div>GST: {formatPercentage(item.gstPercent)}</div>
+                    )}
+                    {!item.applyTDS && !item.applyGST && <div>-</div>}
+                  </div>
+                )}
+              </td>
+
+              {/* Actions */}
               {currentUser.role === "ADMIN" && (
-                <td className="px-6 py-3">
+                <td className="px-6 py-4">
                   {editingId === item.id ? (
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleSave(item.id)}
-                        className="text-green-600 hover:text-green-800"
+                        className="text-green-600 hover:text-green-800 p-2 rounded bg-green-50 hover:bg-green-100"
+                        title="Save"
                       >
                         <Save className="h-4 w-4" />
                       </button>
                       <button
                         onClick={handleCancel}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded bg-gray-50 hover:bg-gray-100"
+                        title="Cancel"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -225,12 +433,14 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
                       <button
                         onClick={() => setEditingId(item.id)}
                         className="text-blue-600 hover:text-blue-700 p-2 rounded bg-blue-50 hover:bg-blue-100"
+                        title="Edit"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => confirmDelete(item)}
                         className="text-red-600 hover:text-red-700 p-2 rounded bg-red-50 hover:bg-red-100"
+                        title="Delete"
                       >
                         <Trash className="h-4 w-4" />
                       </button>
@@ -242,6 +452,13 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
           ))}
         </tbody>
       </table>
+
+      {/* Empty State */}
+      {filteredData.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No commission settings found
+        </div>
+      )}
 
       {/* ConfirmCard modal */}
       {confirmItem && (
@@ -255,7 +472,7 @@ const CommissionTable = ({ chargesData, setChargesData }) => {
   );
 };
 
-// ConfirmCard component
+// ConfirmCard component (keep as is)
 function ConfirmCard({ actionType, isClose, isSubmit }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -264,7 +481,7 @@ function ConfirmCard({ actionType, isClose, isSubmit }) {
         <p className="mb-4">
           Are you sure you want to{" "}
           <span className="font-semibold">{actionType}</span> this commission
-          slab?
+          setting?
         </p>
         <div className="flex justify-end space-x-3">
           <button onClick={isClose} className="px-4 py-2 border rounded-lg">

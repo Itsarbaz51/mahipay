@@ -12,29 +12,37 @@ const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { currentUser, error, success, isLoading } = useSelector(
-    (state) => state.auth
-  );
-
-  console.log(currentUser?.user.status);
+  const { currentUser, error, success, isLoading, isAuthenticated } =
+    useSelector((state) => state.auth);
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    const payload = { emailOrUsername: emailOrPhone, password };
+
+    if (!emailOrPhone || !password) {
+      return;
+    }
+
+    const payload = {
+      emailOrUsername: emailOrPhone.trim(),
+      password,
+    };
 
     try {
-      await dispatch(login(payload)).unwrap();
+      await dispatch(login(payload));
     } catch (err) {
       console.error("Login failed:", err);
     }
   };
 
   useEffect(() => {
-    if (success && currentUser) {
-      if (currentUser?.user.isKycVerified === false) navigate("/kyc-submit");
-      else if (currentUser?.user.status === "ACTIVE") navigate("/dashboard");
+    if (isAuthenticated && currentUser) {
+      if (currentUser.isKycVerified === false) {
+        navigate("/kyc-submit");
+      } else if (currentUser.status === "ACTIVE") {
+        navigate("/dashboard");
+      }
     }
-  }, [success, currentUser, navigate]);
+  }, [isAuthenticated, currentUser, navigate]);
 
   return (
     <div className="flex items-center justify-center bg-gray-50 min-h-screen">
@@ -46,6 +54,10 @@ const Login = () => {
 
         {error && (
           <p className="text-red-500 text-sm text-center mb-4">{error}</p>
+        )}
+
+        {success && (
+          <p className="text-green-500 text-sm text-center mb-4">{success}</p>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -60,6 +72,7 @@ const Login = () => {
               autoComplete="username"
               required
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+              placeholder="Enter email or username"
             />
           </div>
 
@@ -74,6 +87,7 @@ const Login = () => {
               autoComplete="current-password"
               required
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500"
+              placeholder="Enter password"
             />
             <button
               type="button"
@@ -87,7 +101,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full cursor-pointer bg-black/90 text-white py-2 px-4 rounded-md hover:bg-black transition duration-200 disabled:bg-gray-400"
+            className="w-full cursor-pointer bg-black/90 text-white py-2 px-4 rounded-md hover:bg-black transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isLoading ? "Logging in..." : "Login"}
           </button>

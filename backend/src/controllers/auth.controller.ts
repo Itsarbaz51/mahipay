@@ -16,49 +16,6 @@ const cookieOptions: import("express").CookieOptions = {
 };
 
 class AuthController {
-  static register = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      logger.error("Parent ID missing during registration");
-      throw ApiError.internal("Parent id is missing");
-    }
-
-    const data: any = { ...req.body };
-
-    if (req.file) {
-      data.profileImage = req.file.path;
-    }
-
-    const { user, accessToken } = await AuthServices.register({
-      ...data,
-      parentId: userId,
-    });
-
-    if (!user || !accessToken) {
-      logger.error("User creation failed during registration");
-      throw ApiError.internal("User creation failed!");
-    }
-
-    // await AuthServices.createAndSendEmailVerification(user);
-
-    const safeUser = Helper.serializeUser(user);
-
-    logger.info("User registration completed successfully", {
-      userId: user.id,
-    });
-
-    return res
-      .status(201)
-      .json(
-        ApiResponse.success(
-          { user: safeUser, accessToken },
-          "User created successfully",
-          201
-        )
-      );
-  });
-
   static login = asyncHandler(async (req: Request, res: Response) => {
     const { user, accessToken, refreshToken } = await AuthServices.login(
       req.body,
@@ -175,34 +132,9 @@ class AuthController {
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
 
-  static updateProfile = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id || req.body;
-
-    if (!userId) {
-      throw ApiError.unauthorized("User not authenticated");
-    }
-
-    const updateData = req.body;
-    const user = await AuthServices.updateProfile(userId, updateData);
-
-    const safeUser = Helper.serializeUser(user);
-
-    logger.info("User profile updated successfully", { userId });
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          { user: safeUser },
-          "Profile updated successfully",
-          200
-        )
-      );
-  });
-
   static updateCredentials = asyncHandler(
     async (req: Request, res: Response) => {
-      const userId = req.user?.id;
+      const { userId } = req.params;
 
       if (!userId) {
         throw ApiError.unauthorized("User not authenticated");
@@ -225,36 +157,6 @@ class AuthController {
       return res
         .status(200)
         .json(ApiResponse.success(null, result.message, 200));
-    }
-  );
-
-  static updateProfileImage = asyncHandler(
-    async (req: Request, res: Response) => {
-      const userId = req.user?.id;
-
-      if (!userId) {
-        throw ApiError.unauthorized("User not authenticated");
-      }
-
-      if (!req.file) {
-        throw ApiError.badRequest("Profile image is required");
-      }
-
-      const user = await AuthServices.updateProfileImage(userId, req.file.path);
-
-      const safeUser = Helper.serializeUser(user);
-
-      logger.info("User profile image updated successfully", { userId });
-
-      return res
-        .status(200)
-        .json(
-          ApiResponse.success(
-            { user: safeUser },
-            "Profile image updated successfully",
-            200
-          )
-        );
     }
   );
 }

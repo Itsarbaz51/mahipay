@@ -11,9 +11,19 @@ import {
   Wallet,
   BadgeIndianRupee,
 } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import { logout } from "../redux/slices/authSlice";
 
-const Sidebar = ({ currentUser, onLogout }) => {
+const Sidebar = () => {
   const location = useLocation();
+  const dispatch = useDispatch();
+
+  // Get current user from Redux store
+  const { currentUser, isAuthenticated } = useSelector((state) => state.auth);
+
+  const handleLogout = () => {
+    dispatch(logout());
+  };
 
   const menuItems = [
     // --- MAIN ---
@@ -95,9 +105,15 @@ const Sidebar = ({ currentUser, onLogout }) => {
     },
   ];
 
-  const user = currentUser?.user || {};
-  const role = user.role?.name || "User";
+  // Safe data extraction with fallbacks
+  const userData = currentUser || {};
+  const role = userData.role?.name || userData.role || "USER";
   const isAdmin = role === "ADMIN";
+  const firstName = userData.firstName || "";
+  const lastName = userData.lastName || "";
+  const username = userData.username || "";
+  const profileImage = userData.profileImage || "";
+  const walletBalance = userData.wallets?.[0]?.balance || 0;
 
   // Filter menus by role
   const mainItems = menuItems.filter((item) =>
@@ -151,14 +167,36 @@ const Sidebar = ({ currentUser, onLogout }) => {
     );
 
   // Get initials
-  const initials = user.firstName
-    ? user.firstName[0].toUpperCase()
-    : user.name
-    ? user.name[0].toUpperCase()
+  const initials = firstName
+    ? firstName[0].toUpperCase()
+    : username
+    ? username[0].toUpperCase()
     : "U";
 
+  // Show loading state if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="w-64 flex flex-col fixed h-screen border-r border-gray-300 bg-white">
+        <div className="p-6 border-b border-gray-300">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg flex items-center justify-center">
+              <Play className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Payment System</h2>
+              <p className="text-xs text-gray-600">Loading...</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-64 flex flex-col fixed h-screen border-r border-gray-300 bg-white">
+    <div className="w-64 flex flex-col fixed h-screen border-r border-gray-300 bg-white z-50">
       {/* Header */}
       <div className="p-6 border-b border-gray-300">
         <div className="flex items-center gap-3">
@@ -176,10 +214,10 @@ const Sidebar = ({ currentUser, onLogout }) => {
       <div className="p-4">
         <div className="backdrop-blur-sm rounded-xl p-4 border text-black border-gray-300">
           <div className="flex items-center mb-3">
-            {user.profileImage ? (
+            {profileImage ? (
               <img
-                src={user.profileImage}
-                alt={user.firstName || "User"}
+                src={profileImage}
+                alt={firstName || "User"}
                 className="h-12 w-12 rounded-full object-contain border border-gray-300 shadow-sm"
               />
             ) : (
@@ -190,10 +228,14 @@ const Sidebar = ({ currentUser, onLogout }) => {
 
             <div className="ml-3 flex-1 min-w-0">
               <p className="font-medium text-sm truncate capitalize">
-                {user.firstName + " " + user.lastName || "User"}
+                {firstName && lastName
+                  ? `${firstName} ${lastName}`.trim()
+                  : firstName
+                  ? firstName
+                  : username || "User"}
               </p>
               <p className="text-xs capitalize text-gray-500 truncate">
-                {user.username || "username"}
+                {username || "username"}
               </p>
             </div>
           </div>
@@ -205,7 +247,7 @@ const Sidebar = ({ currentUser, onLogout }) => {
               <Wallet className="h-3 w-3 text-gray-500" />
             </div>
             <p className="text-sm font-semibold mt-1 text-gray-800">
-              ₹{Number(user.walletBalance || 0).toLocaleString()}
+              ₹{(walletBalance / 100).toLocaleString()}
             </p>
           </div>
         </div>
@@ -222,7 +264,7 @@ const Sidebar = ({ currentUser, onLogout }) => {
       {/* Logout */}
       <div className="p-4 border-t border-gray-300">
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           className="w-full cursor-pointer hover:bg-red-100 flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 group"
         >
           <LogOut className="h-5 w-5 mr-3 text-red-600 group-hover:scale-105 transition-transform duration-200" />

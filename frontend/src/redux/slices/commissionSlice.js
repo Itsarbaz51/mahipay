@@ -8,7 +8,8 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 axios.defaults.baseURL = baseURL;
 
 const initialState = {
-  commissions: [],
+  commissionSettings: [],
+  commissionEarnings: [],
   isLoading: false,
   error: null,
   success: null,
@@ -32,15 +33,19 @@ const commissionSlice = createSlice({
     commissionFail: (state, action) => {
       state.isLoading = false;
       state.error = action.payload;
-      if (action.payload) toast.error(state.error);
-      state.error = null;
+      if (action.payload) toast.error(action.payload);
     },
-    setCommissions: (state, action) => {
+    setCommissionSettings: (state, action) => {
       state.isLoading = false;
-      state.commissions = action.payload?.data || action.payload;
+      state.commissionSettings = action.payload?.data || action.payload;
+    },
+    setCommissionEarnings: (state, action) => {
+      state.isLoading = false;
+      state.commissionEarnings = action.payload?.data || action.payload;
     },
     resetCommission: (state) => {
-      state.commissions = [];
+      state.commissionSettings = [];
+      state.commissionEarnings = [];
       state.isLoading = false;
       state.error = null;
       state.success = null;
@@ -52,19 +57,56 @@ export const {
   commissionRequest,
   commissionSuccess,
   commissionFail,
-  setCommissions,
+  setCommissionSettings,
+  setCommissionEarnings,
   resetCommission,
 } = commissionSlice.actions;
 
-// ---------------- API Actions ------------------
+// ---------------- Commission Setting Actions ------------------
 
-// Add commission
-export const addCommission = (payload) => async (dispatch) => {
+// Create or update commission setting
+export const createOrUpdateCommissionSetting =
+  (payload) => async (dispatch) => {
+    try {
+      dispatch(commissionRequest());
+      const { data } = await axios.post(`/api/v1/commissions/setting`, payload);
+      dispatch(commissionSuccess(data));
+      return data;
+    } catch (error) {
+      const errMsg = error?.response?.data?.message || error?.message;
+      dispatch(commissionFail(errMsg));
+      throw error;
+    }
+  };
+
+// Get commission settings by role or user
+export const getCommissionSettingsByRoleOrUser =
+  (roleId, userId = null) =>
+  async (dispatch) => {
+    try {
+      dispatch(commissionRequest());
+      const params = userId ? { userId } : {};
+      const { data } = await axios.get(
+        `/api/v1/commissions/setting/${roleId}`,
+        { params }
+      );
+      dispatch(setCommissionSettings(data));
+      return data;
+    } catch (error) {
+      const errMsg = error?.response?.data?.message || error?.message;
+      dispatch(commissionFail(errMsg));
+      throw error;
+    }
+  };
+
+// ---------------- Commission Earning Actions ------------------
+
+// Create commission earning
+export const createCommissionEarning = (payload) => async (dispatch) => {
   try {
     dispatch(commissionRequest());
-    const { data } = await axios.post(`/commission/add-commission`, payload);
+    const { data } = await axios.post(`/api/v1/commissions/earn`, payload);
     dispatch(commissionSuccess(data));
-    // dispatch(getRoleCommission(payload.role));
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
@@ -73,63 +115,22 @@ export const addCommission = (payload) => async (dispatch) => {
   }
 };
 
-// Get commission by userId
-export const getUserCommissions = (userId) => async (dispatch) => {
-  try {
-    dispatch(commissionRequest());
-    const { data } = await axios.get(
-      `/commission/get-user-commissions/${userId}`
-    );
-    dispatch(setCommissions(data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(commissionFail(errMsg));
-  }
-};
-
-// Get commission by role
-export const getRoleCommission = (role) => async (dispatch) => {
-  try {
-    dispatch(commissionRequest());
-    const { data } = await axios.get(`/commission/role/${role}`);
-    dispatch(setCommissions(data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(commissionFail(errMsg));
-  }
-};
-
-// Update commission
-export const updateCommission = (id, payload) => async (dispatch) => {
-  try {
-    dispatch(commissionRequest());
-    const { data } = await axios.put(
-      `/commission/update-commission/${id}`,
-      payload
-    );
-    dispatch(commissionSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(commissionFail(errMsg));
-  }
-};
-
-// Delete commission
-export const deleteCommission = (id) => async (dispatch) => {
-  console.log(id);
-
-  try {
-    dispatch(commissionRequest());
-    const { data } = await axios.delete(`/commission/delete-commissions/${id}`);
-    dispatch(commissionSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(commissionFail(errMsg));
-  }
-};
+// Get all commission earnings with optional filters
+export const getCommissionEarnings =
+  (filters = {}) =>
+  async (dispatch) => {
+    try {
+      dispatch(commissionRequest());
+      const { data } = await axios.get(`/api/v1/commissions`, {
+        params: filters,
+      });
+      dispatch(setCommissionEarnings(data));
+      return data;
+    } catch (error) {
+      const errMsg = error?.response?.data?.message || error?.message;
+      dispatch(commissionFail(errMsg));
+      throw error;
+    }
+  };
 
 export default commissionSlice.reducer;

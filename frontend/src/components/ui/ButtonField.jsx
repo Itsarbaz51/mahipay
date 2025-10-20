@@ -4,12 +4,12 @@ import { useSelector } from "react-redux";
 function ButtonField({ isOpen, name, icon: Icon, type, isDisabled, btncss }) {
   const loading = useSelector(
     (state) =>
-      state.auth.isLoading ||
-      state.kyc.isLoading ||
-      state.user.isLoading ||
-      state.bank.isLoading ||
-      state.wallet.isLoading ||
-      state.commission.isLoading
+      state.auth?.isLoading ||
+      state.kyc?.isLoading ||
+      state.user?.isLoading ||
+      state.bank?.isLoading ||
+      state.wallet?.isLoading ||
+      state.commission?.isLoading
   );
   return (
     <button

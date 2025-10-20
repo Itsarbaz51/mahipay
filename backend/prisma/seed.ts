@@ -49,7 +49,7 @@ async function main() {
   const services = await Prisma.service.findMany();
 
   if (services.length > 0) {
-    const rolePermissionsData = services.map((s) => ({
+    const rolePermissionsData = services.map((s: any) => ({
       roleId: superAdminRole.id,
       serviceId: s.id,
       canView: true,

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Search,
   User,
@@ -8,14 +8,21 @@ import {
   Users,
   X,
   MoreVertical,
+  Eye,
+  EyeOff,
+  RefreshCw,
 } from "lucide-react";
+import { toast } from "react-toastify";
 
 import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  getAllUsers,
+  getAllUsersByParentId,
   getUserById,
-  updateUserStates,
+  updateUserStatus,
+  setCurrentUser,
+  clearUserError,
+  clearUserSuccess,
 } from "../../redux/slices/userSlice";
 
 import HeaderSection from "../ui/HeaderSection";
@@ -25,50 +32,162 @@ import Pagination from "../ui/Pagination";
 import EmptyState from "../ui/EmptyState";
 import ActionsMenu from "../ui/ActionsMenu";
 import UserProfileView from "../../pages/UserProfileView";
+import EditCredentialsModal from "../forms/EditCredentialsModal";
+import EditProfileImageModal from "../forms/EditProfileImageModal";
 
 const MembersTable = () => {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showViewProfile, setShowViewProfile] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
-  const menuRef = useRef(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 10;
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showEditPin, setShowEditPin] = useState(false);
+  const [showPasswords, setShowPasswords] = useState({});
+  const [showPins, setShowPins] = useState({});
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const dispatch = useDispatch();
+  const searchTimeoutRef = useRef(null);
+  const initialLoadRef = useRef(false); // Track initial load
+
   const {
-    users: usersData,
-    isLoading,
-    selectedUser: viewedUser,
-  } = useSelector((state) => state.user);
+    users = [],
+    isLoading = false,
+    currentUser: viewedUser = null,
+    pagination = {
+      page: 1,
+      limit: 10,
+      total: 0,
+      totalPages: 0,
+    },
+    error: userError,
+    success: userSuccess,
+  } = useSelector((state) => state.users || {});
 
-  const users = Array.isArray(usersData) ? usersData : [];
+  const currentPage = pagination.page;
+  const totalPages = pagination.totalPages;
+  const totalUsers = pagination.total;
+  const limit = pagination.limit;
 
+  // FIXED: Load users function - SINGLE SOURCE OF TRUTH
+  const loadUsers = useCallback(
+    async (searchTerm = "", forceRefresh = false, isSearch = false) => {
+      try {
+        const params = {
+          page: isSearch ? 1 : currentPage,
+          limit,
+          sort: "desc",
+          status: "ALL",
+          search: searchTerm,
+        };
+
+        if (forceRefresh) {
+          params.timestamp = Date.now();
+          params.refresh = true;
+        }
+
+        await dispatch(getAllUsersByParentId(params));
+      } catch (error) {
+        console.error("Failed to load users:", error);
+      }
+    },
+    [dispatch, currentPage, limit]
+  );
+
+  // FIXED: Toast handling - NO API CALLS HERE
   useEffect(() => {
-    dispatch(getAllUsers({ page: currentPage, limit })).then((res) => {
-      const meta = res?.data;
-      setTotalPages(meta?.totalPages || 1);
-    });
-  }, [dispatch, currentPage]);
+    if (userError) {
+      toast.error(userError);
+      dispatch(clearUserError());
+    }
 
+    if (userSuccess) {
+      // Only show generic success messages
+      if (
+        userSuccess &&
+        !userSuccess.toLowerCase().includes("registered") &&
+        !userSuccess.toLowerCase().includes("updated") &&
+        !userSuccess.toLowerCase().includes("created") &&
+        !userSuccess.toLowerCase().includes("added")
+      ) {
+        toast.success(userSuccess);
+      }
+      dispatch(clearUserSuccess());
+    }
+  }, [userError, userSuccess, dispatch]);
+
+  // FIXED: Initial load - RUNS ONLY ONCE
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setOpenMenuId(null);
+    if (!initialLoadRef.current) {
+      initialLoadRef.current = true;
+      console.log("🚀 Initial load - API call 1");
+      loadUsers();
+    }
+  }, []); // Empty dependency array - runs only once on mount
+
+  // FIXED: Search with proper debouncing - ONLY TRIGGERS AFTER INITIAL LOAD
+  useEffect(() => {
+    // Skip initial render and empty search on mount
+    if (!initialLoadRef.current) return;
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      console.log("🔍 Search triggered - API call 2");
+      loadUsers(search, true, true);
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [search, loadUsers]);
+
+  // FIXED: Refresh trigger - ONLY TRIGGERS AFTER INITIAL LOAD
+  useEffect(() => {
+    if (refreshTrigger > 0 && initialLoadRef.current) {
+      console.log("🔄 Refresh triggered - API call 3");
+      loadUsers(search, true);
+    }
+  }, [refreshTrigger, loadUsers, search]);
+
+  // FIXED: Manual refresh - SIMPLIFIED
+  const handleManualRefresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
   }, []);
+
+  // FIXED: Page change - DIRECT DISPATCH (NO loadUsers CALL)
+  const handlePageChange = useCallback(
+    (page) => {
+      if (page >= 1 && page <= totalPages) {
+        console.log("📄 Page change - API call 4");
+        dispatch(
+          getAllUsersByParentId({
+            page,
+            limit,
+            sort: "desc",
+            status: "ALL",
+            search,
+            timestamp: Date.now(),
+          })
+        );
+      }
+    },
+    [dispatch, totalPages, limit, search]
+  );
 
   const getRoleColor = (roleName) => {
     switch (roleName) {
+      case "STATE HEAD":
+        return "bg-purple-100 text-purple-800 border-purple-300";
       case "STATE HOLDER":
         return "bg-purple-100 text-purple-800 border-purple-300";
       case "MASTER DISTRIBUTOR":
@@ -84,6 +203,8 @@ const MembersTable = () => {
 
   const getRoleDisplayName = (roleName) => {
     switch (roleName) {
+      case "STATE HEAD":
+        return "State Head";
       case "STATE HOLDER":
         return "State Holder";
       case "MASTER DISTRIBUTOR":
@@ -97,21 +218,81 @@ const MembersTable = () => {
     }
   };
 
-  const confirmAction = () => {
+  const maskSensitiveData = (data, type = "password") => {
+    if (!data) return "••••••";
+    return "•".repeat(6);
+  };
+
+  const togglePasswordVisibility = (userId) => {
+    setShowPasswords((prev) => ({
+      ...prev,
+      [userId]: !prev[userId],
+    }));
+  };
+
+  const togglePinVisibility = (userId) => {
+    setShowPins((prev) => ({
+      ...prev,
+      [userId]: !prev[userId],
+    }));
+  };
+
+  const confirmAction = async () => {
     if (actionType && selectedUser) {
-      dispatch(updateUserStates(selectedUser.user.id, selectedUser.userData));
+      try {
+        const newStatus =
+          selectedUser.status === "ACTIVE" ? "IN_ACTIVE" : "ACTIVE";
+        await dispatch(updateUserStatus(selectedUser.id, newStatus));
+        // Refresh after status change
+        setTimeout(() => {
+          handleManualRefresh();
+        }, 500);
+      } catch (error) {
+        console.error("Failed to update user status:", error);
+      }
     }
     setShowActionModal(false);
     setSelectedUser(null);
   };
 
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+  const handleViewUser = async (user) => {
+    try {
+      await dispatch(getUserById(user.id));
+      setShowViewProfile(true);
+      setOpenMenuId(null);
+    } catch (error) {
+      console.error("Failed to load user details:", error);
+      dispatch(setCurrentUser(user));
+      setShowViewProfile(true);
+      setOpenMenuId(null);
     }
   };
 
-  const filteredUsers = users?.filter(
+  const handleFormClose = () => {
+    setShowForm(false);
+    setSelectedUser(null);
+  };
+
+  const handleFormSuccess = () => {
+    setShowForm(false);
+    setSelectedUser(null);
+    handleManualRefresh();
+  };
+
+  const handleEditProfileSuccess = () => {
+    setShowEditProfile(false);
+    setSelectedUser(null);
+    handleManualRefresh();
+  };
+
+  const handleCredentialsSuccess = () => {
+    setShowEditPassword(false);
+    setShowEditPin(false);
+    setSelectedUser(null);
+    handleManualRefresh();
+  };
+
+  const filteredUsers = users.filter(
     (user) =>
       user.firstName?.toLowerCase().includes(search.toLowerCase()) ||
       user.lastName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -125,7 +306,7 @@ const MembersTable = () => {
         title="Members Management"
         tagLine="Manage your team members and their access levels"
         icon={Users}
-        totalCount={`${filteredUsers?.length || 0} Members`}
+        totalCount={`${totalUsers || 0} Members`}
       />
 
       {/* Search + Add Member */}
@@ -149,8 +330,25 @@ const MembersTable = () => {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+
+            {/* Refresh Button */}
+            <button
+              onClick={handleManualRefresh}
+              disabled={isLoading}
+              className={`px-4 py-3 border border-gray-300 rounded-lg flex items-center gap-2 transition-colors ${
+                isLoading
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+              }`}
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+              />
+              {isLoading ? "Refreshing..." : "Refresh"}
+            </button>
+
             <ButtonField
-              name={`Add Member`}
+              name="Add Member"
               isOpen={() => {
                 setSelectedUser(null);
                 setShowForm(true);
@@ -180,6 +378,12 @@ const MembersTable = () => {
                 Role
               </th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
+                Password
+              </th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
+                Transaction PIN
+              </th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Wallet
               </th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
@@ -194,10 +398,10 @@ const MembersTable = () => {
           <tbody className="divide-y divide-gray-100">
             {isLoading ? (
               <EmptyState type="loading" />
-            ) : filteredUsers?.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <EmptyState type={search ? "search" : "empty"} search={search} />
             ) : (
-              filteredUsers?.map((user, index) => (
+              filteredUsers.map((user, index) => (
                 <tr key={user.id} className="hover:bg-blue-50 transition-all">
                   <td className="px-6 py-5">
                     {(currentPage - 1) * limit + index + 1}
@@ -225,7 +429,7 @@ const MembersTable = () => {
 
                       <div>
                         <p className="text-sm font-semibold text-gray-900 mb-1">
-                          {user.firstName + " " + user.lastName}
+                          {user.firstName + " " + (user.lastName || "")}
                         </p>
                         <div className="flex items-center text-xs text-gray-500">
                           <Mail className="w-3 h-3 mr-1" />
@@ -254,15 +458,58 @@ const MembersTable = () => {
 
                   <td className="px-6 py-5">
                     <div className="flex items-center space-x-2">
+                      <span className="text-sm font-mono">
+                        {showPasswords[user.id]
+                          ? user.password
+                          : maskSensitiveData(user.password)}
+                      </span>
+                      <button
+                        onClick={() => togglePasswordVisibility(user.id)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        {showPasswords[user.id] ? (
+                          <EyeOff size={14} />
+                        ) : (
+                          <Eye size={14} />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-mono">
+                        {showPins[user.id]
+                          ? user.transactionPin
+                          : maskSensitiveData(user.transactionPin, "pin")}
+                      </span>
+                      <button
+                        onClick={() => togglePinVisibility(user.id)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        {showPins[user.id] ? (
+                          <EyeOff size={14} />
+                        ) : (
+                          <Eye size={14} />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-5">
+                    <div className="flex items-center space-x-2">
                       <Wallet className="w-4 h-4 text-gray-400" />
                       <span
                         className={`text-sm font-semibold ${
-                          user.walletBalance > 0
+                          (user.wallets?.[0]?.balance || 0) > 0
                             ? "text-green-600"
                             : "text-red-500"
                         }`}
                       >
-                        ₹{user.walletBalance?.toLocaleString() || 0}
+                        ₹
+                        {(
+                          (user.wallets?.[0]?.balance || 0) / 100
+                        ).toLocaleString() || 0}
                       </span>
                     </div>
                   </td>
@@ -275,7 +522,7 @@ const MembersTable = () => {
                           : "bg-green-100 text-green-800 border-green-300"
                       }`}
                     >
-                      {user.status === "IN_ACTIVE" ? "Inactive" : user.status}
+                      {user.status === "IN_ACTIVE" ? "Inactive" : "Active"}
                     </span>
                   </td>
 
@@ -297,21 +544,32 @@ const MembersTable = () => {
                       {openMenuId === user.id && (
                         <ActionsMenu
                           user={user}
-                          onView={(user) => {
-                            dispatch(getUserById(user.id));
-                            setShowViewProfile(true);
-                            setOpenMenuId(null);
-                          }}
+                          onView={handleViewUser}
                           onEdit={(user) => {
                             setSelectedUser(user);
                             setShowForm(true);
                             setOpenMenuId(null);
                           }}
+                          onEditProfile={(user) => {
+                            setSelectedUser(user);
+                            setShowEditProfile(true);
+                            setOpenMenuId(null);
+                          }}
+                          onEditPassword={(user) => {
+                            setSelectedUser(user);
+                            setShowEditPassword(true);
+                            setOpenMenuId(null);
+                          }}
+                          onEditPin={(user) => {
+                            setSelectedUser(user);
+                            setShowEditPin(true);
+                            setOpenMenuId(null);
+                          }}
                           onSettings={(user) => {
-                            alert("Settings clicked for " + user.firstName);
+                            // Handle settings
                           }}
                           onLoginAs={(user) => {
-                            alert("Log In as " + user.firstName);
+                            // Handle login as
                           }}
                           onToggleStatus={(user) => {
                             setActionType(
@@ -319,8 +577,9 @@ const MembersTable = () => {
                                 ? "Activate"
                                 : "Deactivate"
                             );
-                            setSelectedUser({ user, userData: {} });
+                            setSelectedUser(user);
                             setShowActionModal(true);
+                            setOpenMenuId(null);
                           }}
                           onClose={() => setOpenMenuId(null)}
                         />
@@ -342,10 +601,13 @@ const MembersTable = () => {
       />
 
       {/* Profile Modal */}
-      {showViewProfile && viewedUser && (
+      {showViewProfile && (
         <UserProfileView
-          userData={viewedUser}
-          onClose={() => setShowViewProfile(false)}
+          userData={viewedUser || selectedUser}
+          onClose={() => {
+            setShowViewProfile(false);
+            dispatch(setCurrentUser(null));
+          }}
         />
       )}
 
@@ -385,13 +647,49 @@ const MembersTable = () => {
       {showForm && (
         <div className="fixed inset-0 flex justify-center items-center bg-black/50 z-50">
           <AddMember
-            onClose={() => {
-              setShowForm(false);
-              setSelectedUser(null);
-            }}
+            onClose={handleFormClose}
+            onSuccess={handleFormSuccess}
             editData={selectedUser}
           />
         </div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && selectedUser && (
+        <EditProfileImageModal
+          user={selectedUser}
+          onClose={() => {
+            setShowEditProfile(false);
+            setSelectedUser(null);
+          }}
+          onSuccess={handleEditProfileSuccess}
+        />
+      )}
+
+      {/* Edit Password Modal */}
+      {showEditPassword && selectedUser && (
+        <EditCredentialsModal
+          user={selectedUser}
+          type="password"
+          onClose={() => {
+            setShowEditPassword(false);
+            setSelectedUser(null);
+          }}
+          onSuccess={handleCredentialsSuccess}
+        />
+      )}
+
+      {/* Edit PIN Modal */}
+      {showEditPin && selectedUser && (
+        <EditCredentialsModal
+          user={selectedUser}
+          type="pin"
+          onClose={() => {
+            setShowEditPin(false);
+            setSelectedUser(null);
+          }}
+          onSuccess={handleCredentialsSuccess}
+        />
       )}
     </div>
   );

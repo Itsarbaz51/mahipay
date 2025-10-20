@@ -13,7 +13,7 @@ const store = configureStore({
     auth: authReducer,
     kyc: kycReducer,
     address: AddressReducer,
-    user: userReducer,
+    users: userReducer,
     bank: bankReducer,
     wallet: walletReducer,
     roles: roleReducer,

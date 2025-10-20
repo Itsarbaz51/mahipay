@@ -1,168 +1,410 @@
 import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-
-axios.defaults.withCredentials = true;
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-axios.defaults.baseURL = baseURL;
 
 const initialState = {
   users: [],
-  selectedUser: null,
+  currentUser: null,
+  usersByRole: [],
+  childrenUsers: [],
   isLoading: false,
+  isSubmitting: false,
   error: null,
   success: null,
+  pagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  },
+  filters: {
+    search: "",
+    status: "ALL",
+    role: "ALL",
+  },
 };
-const usersSlice = createSlice({
+
+const userSlice = createSlice({
   name: "users",
   initialState,
   reducers: {
-    usersRequest: (state) => {
+    // Loading states
+    userRequest: (state) => {
       state.isLoading = true;
+      state.error = null;
+    },
+    userSubmitRequest: (state) => {
+      state.isSubmitting = true;
       state.error = null;
       state.success = null;
     },
-    usersSuccess: (state, action) => {
+    userSuccess: (state, action) => {
       state.isLoading = false;
-      state.users = action.payload?.data || action.payload;
+      state.isSubmitting = false;
       state.success = action.payload?.message || null;
       state.error = null;
     },
-    updateUserSuccess: (state, action) => {
+    userFail: (state, action) => {
       state.isLoading = false;
-      const updatedUser = action.payload?.data || action.payload;
-      state.users = state.users.map((u) =>
-        u.id === updatedUser.id ? updatedUser : u
-      );
-    },
-    userSelect: (state, action) => {
-      state.selectedUser = action.payload;
-    },
-    usersFail: (state, action) => {
-      state.isLoading = false;
+      state.isSubmitting = false;
       state.error = action.payload;
-      if (action.payload) toast.error(state.error);
     },
-    resetUsers: (state) => {
-      state.users = [];
-      state.selectedUser = null;
-      state.isLoading = false;
-      state.success = null;
+
+    // Data management
+    clearUserError: (state) => {
       state.error = null;
+    },
+    clearUserSuccess: (state) => {
+      state.success = null;
+    },
+    setUsers: (state, action) => {
+      state.users = action.payload;
+    },
+    setCurrentUser: (state, action) => {
+      state.currentUser = action.payload;
+    },
+    setUsersByRole: (state, action) => {
+      state.usersByRole = action.payload;
+    },
+    setChildrenUsers: (state, action) => {
+      state.childrenUsers = action.payload;
+    },
+
+    // Update specific user in lists
+    updateUserInList: (state, action) => {
+      const updatedUser = action.payload;
+
+      // Update in users array
+      const userIndex = state.users.findIndex(
+        (user) => user.id === updatedUser.id
+      );
+      if (userIndex !== -1) {
+        state.users[userIndex] = { ...state.users[userIndex], ...updatedUser };
+      }
+
+      // Update in usersByRole array
+      const roleIndex = state.usersByRole.findIndex(
+        (user) => user.id === updatedUser.id
+      );
+      if (roleIndex !== -1) {
+        state.usersByRole[roleIndex] = {
+          ...state.usersByRole[roleIndex],
+          ...updatedUser,
+        };
+      }
+
+      // Update in childrenUsers array
+      const childrenIndex = state.childrenUsers.findIndex(
+        (user) => user.id === updatedUser.id
+      );
+      if (childrenIndex !== -1) {
+        state.childrenUsers[childrenIndex] = {
+          ...state.childrenUsers[childrenIndex],
+          ...updatedUser,
+        };
+      }
+
+      // Update currentUser if it's the same user
+      if (state.currentUser?.id === updatedUser.id) {
+        state.currentUser = { ...state.currentUser, ...updatedUser };
+      }
+    },
+
+    // Pagination and filters
+    updatePagination: (state, action) => {
+      state.pagination = { ...state.pagination, ...action.payload };
+    },
+    setUserData: (state, action) => {
+      const { users, total, page, limit, totalPages } = action.payload;
+      if (users) state.users = users;
+      if (total !== undefined) state.pagination.total = total;
+      if (page !== undefined) state.pagination.page = page;
+      if (limit !== undefined) state.pagination.limit = limit;
+      if (totalPages !== undefined) state.pagination.totalPages = totalPages;
+    },
+    setFilters: (state, action) => {
+      state.filters = { ...state.filters, ...action.payload };
+    },
+    clearFilters: (state) => {
+      state.filters = {
+        search: "",
+        status: "ALL",
+        role: "ALL",
+      };
     },
   },
 });
 
 export const {
-  usersRequest,
-  usersSuccess,
-  usersFail,
-  userSelect,
-  resetUsers,
-  updateUserSuccess,
-} = usersSlice.actions;
+  userRequest,
+  userSubmitRequest,
+  userSuccess,
+  userFail,
+  clearUserError,
+  clearUserSuccess,
+  setUsers,
+  setCurrentUser,
+  setUsersByRole,
+  setChildrenUsers,
+  updateUserInList,
+  updatePagination,
+  setUserData,
+  setFilters,
+  clearFilters,
+} = userSlice.actions;
 
-// ---------------- API Actions ------------------
+// Async Actions
+export const register = (userData) => async (dispatch) => {
+  try {
+    dispatch(userSubmitRequest());
+    const config =
+      userData instanceof FormData
+        ? {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        : {};
 
-// get all users
-export const getAllUsers =
-  (params = {}) =>
-  async (dispatch) => {
+    const { data } = await axios.post(`/users/register`, userData, config);
+
+    dispatch(userSuccess(data));
+
+    // SINGLE TOAST - Only show success toast here
+    if (data.message) {
+      toast.success(data.message || "User registered successfully!");
+    }
+
+    return data;
+  } catch (error) {
+    const errMsg =
+      error?.response?.data?.message || error?.message || "Registration failed";
+    dispatch(userFail(errMsg));
+
+    // SINGLE TOAST - Only show error toast here
+    toast.error(errMsg);
+    throw new Error(errMsg);
+  }
+};
+
+export const updateUserProfileImage =
+  (userId, formData) => async (dispatch) => {
     try {
-      dispatch(usersRequest());
+      dispatch(userSubmitRequest());
+      const { data } = await axios.put(
+        `/users/${userId}/profile-image`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
-      const body = {
-        page: params.page || 1,
-        limit: params.limit || 10,
-        sort: params.sort || "desc",
-        status: params.status || "ALL",
-      };
+      dispatch(userSuccess(data));
+      dispatch(updateUserInList(data.data.user));
 
-      const { data } = await axios.post(`users`, body);
+      // SINGLE TOAST
+      if (data.message) {
+        toast.success(data.message || "Profile image updated successfully!");
+      }
 
-      dispatch(usersSuccess(data?.data?.users || []));
       return data;
     } catch (error) {
-      const errMsg = error?.response?.data?.message || error.message;
-      dispatch(usersFail(errMsg));
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Profile image update failed";
+      dispatch(userFail(errMsg));
+
+      // SINGLE TOAST
+      toast.error(errMsg);
+      throw new Error(errMsg);
     }
   };
 
-// update user status
-export const updateUserStates = (id, userData) => async (dispatch) => {
+export const updateProfile = (userId, profileData) => async (dispatch) => {
   try {
-    dispatch(usersRequest());
-    const { data } = await axios.patch(
-      `/users/user-status-update/${id}`,
-      userData
+    dispatch(userSubmitRequest());
+
+    const config =
+      profileData instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {};
+
+    const { data } = await axios.put(
+      `/users/${userId}/profile`,
+      profileData,
+      config
     );
-    dispatch(usersSuccess(data));
-    dispatch(getAllUsers());
+
+    dispatch(userSuccess(data));
+    dispatch(updateUserInList(data.data.user));
+
+    // SINGLE TOAST
+    if (data.message) {
+      toast.success(data.message || "Profile updated successfully!");
+    }
+
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(usersFail(errMsg));
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Profile update failed";
+    dispatch(userFail(errMsg));
+
+    // SINGLE TOAST
+    toast.error(errMsg);
+    throw new Error(errMsg);
   }
 };
 
-// get single user
 export const getUserById = (userId) => async (dispatch) => {
   try {
-    dispatch(usersRequest());
-    const { data } = await axios.get(`users/${userId}`);
-    dispatch(userSelect(data));
-    dispatch(getAllUsers());
+    dispatch(userRequest());
+    const { data } = await axios.get(`/users/${userId}`);
+
+    dispatch(setCurrentUser(data.data.user));
+    dispatch(userSuccess(data));
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(usersFail(errMsg));
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to fetch user";
+    dispatch(userFail(errMsg));
+    throw new Error(errMsg);
   }
 };
 
-// create user
-export const createUser = (userData) => async (dispatch) => {
+export const getCurrentUserProfile = () => async (dispatch) => {
   try {
-    dispatch(usersRequest());
-    const { data } = await axios.post("auth/register", userData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    dispatch(usersSuccess(data));
-    toast.success(data.message);
+    dispatch(userRequest());
+    const { data } = await axios.get(`/users/me`);
+
+    dispatch(setCurrentUser(data.data.user));
+    dispatch(userSuccess(data));
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(usersFail(errMsg));
-    throw error;
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to fetch profile";
+    dispatch(userFail(errMsg));
+    throw new Error(errMsg);
   }
 };
 
-// update user
-export const updateUser = (userId, userPayload) => async (dispatch) => {
+export const getAllUsersByRole = (roleId) => async (dispatch) => {
   try {
-    dispatch(usersRequest());
-    const { data } = await axios.put(`/users/update/${userId}`, userPayload);
-    toast.success("User updated successfully!");
-    dispatch(getAllUsers());
+    dispatch(userRequest());
+    const { data } = await axios.get(`/users/role/${roleId}`);
+
+    dispatch(setUsersByRole(data.data.users));
+    dispatch(userSuccess(data));
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(usersFail(errMsg));
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to fetch users by role";
+    dispatch(userFail(errMsg));
+    throw new Error(errMsg);
   }
 };
 
-// delete user
-export const deleteUser = (userId) => async (dispatch) => {
+export const getAllUsersByParentId =
+  (filters = {}) =>
+  async (dispatch) => {
+    try {
+      dispatch(userRequest());
+      dispatch(setFilters(filters));
+
+      const { data } = await axios.post(`/users`, filters);
+
+      dispatch(
+        setUserData({
+          users: data.data.users,
+          total: data.data.total,
+          page: data.data.page,
+          limit: data.data.limit,
+          totalPages: data.data.totalPages,
+        })
+      );
+
+      dispatch(userSuccess(data));
+      // toast.success(data.message);
+
+      return data;
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch users";
+      dispatch(userFail(errMsg));
+      // toast.userFail(errMsg);
+
+      throw new Error(errMsg);
+    }
+  };
+
+export const getAllUsersByChildrenId = (userId) => async (dispatch) => {
   try {
-    dispatch(usersRequest());
-    const { data } = await axios.delete(`/users/delete/${userId}`);
-    toast.success("User deleted successfully!");
-    dispatch(getAllUsers());
+    dispatch(userRequest());
+    const { data } = await axios.get(`/users/children/${userId}`);
+
+    dispatch(setChildrenUsers(data.data.users));
+    dispatch(userSuccess(data));
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(usersFail(errMsg));
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to fetch children users";
+    dispatch(userFail(errMsg));
+    throw new Error(errMsg);
   }
 };
 
-export default usersSlice.reducer;
+export const updateUserStatus = (userId, status) => async (dispatch) => {
+  try {
+    dispatch(userSubmitRequest());
+    const { data } = await axios.patch(`/users/${userId}/status`, { status });
+
+    dispatch(updateUserInList(data.data.user));
+    dispatch(userSuccess(data));
+
+    // SINGLE TOAST
+    const action = status === "ACTIVE" ? "activated" : "deactivated";
+    toast.success(`User ${action} successfully!`);
+
+    return data;
+  } catch (error) {
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to update user status";
+    dispatch(userFail(errMsg));
+
+    // SINGLE TOAST
+    toast.error(errMsg);
+    throw new Error(errMsg);
+  }
+};
+
+export const searchUsers = (searchTerm) => async (dispatch) => {
+  try {
+    dispatch(userRequest());
+    dispatch(setFilters({ search: searchTerm }));
+
+    const { data } = await axios.post(`/users/parent`, { search: searchTerm });
+
+    dispatch(setUsers(data.data.users));
+    dispatch(userSuccess(data));
+    return data;
+  } catch (error) {
+    const errMsg =
+      error?.response?.data?.message || error?.message || "Search failed";
+    dispatch(userFail(errMsg));
+    throw new Error(errMsg);
+  }
+};
+
+export default userSlice.reducer;

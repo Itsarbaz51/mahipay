@@ -11,33 +11,137 @@ import {
 } from "lucide-react";
 import HeaderSection from "../components/ui/HeaderSection";
 import StateCard from "../components/ui/StateCard";
+import { useSelector } from "react-redux";
+
+// Dummy data for development/testing
+const DUMMY_DATA = {
+  transactions: [
+    {
+      id: 1,
+      userId: 1,
+      type: "payin",
+      amount: 500000, // ₹5,000.00 (in paise)
+      status: "success",
+      commission: 2500, // ₹25.00
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 2,
+      userId: 2,
+      type: "payout",
+      amount: 300000, // ₹3,000.00
+      status: "success",
+      commission: 1500, // ₹15.00
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 3,
+      userId: 1,
+      type: "payin",
+      amount: 750000, // ₹7,500.00
+      status: "success",
+      commission: 3750, // ₹37.50
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 4,
+      userId: 3,
+      type: "payout",
+      amount: 200000, // ₹2,000.00
+      status: "failed",
+      commission: 0,
+      createdAt: new Date().toISOString(),
+    },
+  ],
+  users: [
+    {
+      id: 1,
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      role: "admin",
+      parentId: null,
+      wallets: [{ balance: 1250000 }], // ₹12,500.00
+    },
+    {
+      id: 2,
+      firstName: "Jane",
+      lastName: "Smith",
+      email: "jane@example.com",
+      role: "agent",
+      parentId: 1,
+      wallets: [{ balance: 500000 }], // ₹5,000.00
+    },
+    {
+      id: 3,
+      firstName: "Bob",
+      lastName: "Johnson",
+      email: "bob@example.com",
+      role: "user",
+      parentId: 2,
+      wallets: [{ balance: 250000 }], // ₹2,500.00
+    },
+  ],
+  commissionSettings: [
+    {
+      id: 1,
+      level: "admin",
+      type: "percentage",
+      value: 0.5, // 0.5%
+      minAmount: 100000, // ₹1,000.00
+      maxAmount: 10000000, // ₹100,000.00
+    },
+    {
+      id: 2,
+      level: "agent",
+      type: "percentage",
+      value: 0.3, // 0.3%
+      minAmount: 100000,
+      maxAmount: 5000000, // ₹50,000.00
+    },
+  ],
+};
 
 const Dashboard = ({
-  currentUser,
-  transactions,
-  users,
-  commissionSettings,
+  transactions = DUMMY_DATA.transactions,
+  users = DUMMY_DATA.users,
+  commissionSettings = DUMMY_DATA.commissionSettings,
 }) => {
   const navigate = useNavigate();
 
+  // Get current user from Redux store
+  const { currentUser, isAuthenticated } = useSelector((state) => state.auth);
+
+  // Safe data extraction with fallbacks
+  const userData = currentUser || users[0]; // Fallback to first dummy user if no currentUser
+  const userRole = userData.role?.name || userData.role || "user";
+  const userName =
+    `${userData.firstName || ""} ${userData.lastName || ""}`.trim() || "User";
+  const walletBalance = userData.wallets?.[0]?.balance || 0;
+
   const getUserStats = () => {
+    // If no current user in Redux, use the dummy user data
+    const effectiveUser = currentUser || userData;
+
     const userTransactions = transactions.filter((t) => {
-      if (currentUser.role === "super_admin") return true;
-      if (currentUser.role === "admin") {
+      if (userRole === "SUPER ADMIN" || userRole === "super_admin") return true;
+      if (userRole === "ADMIN" || userRole === "admin") {
         const agentIds = users
-          .filter((u) => u.parent_id === currentUser.id)
+          .filter((u) => u.parentId === effectiveUser.id)
           .map((u) => u.id);
-        return agentIds.includes(t.user_id) || t.user_id === currentUser.id;
+        return agentIds.includes(t.userId) || t.userId === effectiveUser.id;
       }
-      return t.user_id === currentUser.id;
+      return t.userId === effectiveUser.id;
     });
 
     const totalPayin = userTransactions
       .filter((t) => t.type === "payin" && t.status === "success")
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
     const totalPayout = userTransactions
       .filter((t) => t.type === "payout" && t.status === "success")
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
     const totalCommission = userTransactions.reduce(
       (sum, t) => sum + (t.commission || 0),
       0
@@ -52,10 +156,18 @@ const Dashboard = ({
   };
 
   const stats = getUserStats();
+
+  const formatCurrency = (amountInPaise) => {
+    return `₹${(amountInPaise / 100).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
   const statCards = [
     {
       title: "Wallet Balance",
-      value: `₹${currentUser?.user.walletBalance?.toLocaleString()}`,
+      value: formatCurrency(walletBalance),
       subText: "Available funds",
       icon: Wallet,
       iconBg: "bg-emerald-100",
@@ -63,7 +175,7 @@ const Dashboard = ({
     },
     {
       title: "Total Payin",
-      value: `₹${stats.totalPayin.toLocaleString()}`,
+      value: formatCurrency(stats.totalPayin),
       subText: "Money received",
       icon: ArrowUpCircle,
       iconBg: "bg-blue-100",
@@ -71,7 +183,7 @@ const Dashboard = ({
     },
     {
       title: "Total Payout",
-      value: `₹${stats.totalPayout.toLocaleString()}`,
+      value: formatCurrency(stats.totalPayout),
       subText: "Money sent",
       icon: ArrowDownCircle,
       iconBg: "bg-orange-100",
@@ -79,7 +191,7 @@ const Dashboard = ({
     },
     {
       title: "Commission Earned",
-      value: `₹${stats.totalCommission.toLocaleString()}`,
+      value: formatCurrency(stats.totalCommission),
       subText: "Total earnings",
       icon: DollarSign,
       iconBg: "bg-purple-100",
@@ -87,12 +199,37 @@ const Dashboard = ({
     },
   ];
 
+  // Get managed users count
+  const getManagedUsersCount = () => {
+    const effectiveUser = currentUser || userData;
+    
+    if (userRole === "SUPER ADMIN" || userRole === "super_admin") {
+      return users.length - 1; // Exclude self
+    }
+    if (userRole === "ADMIN" || userRole === "admin") {
+      return users.filter((u) => u.parentId === effectiveUser.id).length;
+    }
+    return 0;
+  };
+
+  // Show loading state if not authenticated (optional - you might want to redirect instead)
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600 mt-4">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Header Section */}
       <HeaderSection
-        title={`Welcome back, ${currentUser?.user.firstName + " "+ currentUser?.user.lastName}`}
-        tagLine={`${currentUser?.user.role.name} Dashboard`}
+        title={`Welcome back, ${userName}`}
+        tagLine={`${userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()} Dashboard`}
       />
 
       {/* Stats Cards */}
@@ -103,7 +240,10 @@ const Dashboard = ({
       </div>
 
       {/* Quick Actions Section */}
-      {currentUser.role !== "agent" && (
+      {(userRole === "ADMIN" ||
+        userRole === "SUPER ADMIN" ||
+        userRole === "admin" ||
+        userRole === "super_admin") && (
         <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-gray-800">Quick Actions</h3>
@@ -184,13 +324,7 @@ const Dashboard = ({
           </div>
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <p className="text-2xl font-bold text-gray-700">
-              {users?.filter((u) =>
-                currentUser.role === "super_admin"
-                  ? true
-                  : currentUser.role === "admin"
-                  ? u.parent_id === currentUser.id
-                  : false
-              ).length || 0}
+              {getManagedUsersCount()}
             </p>
             <p className="text-sm text-gray-600">Managed Users</p>
           </div>

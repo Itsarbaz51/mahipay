@@ -1,6 +1,6 @@
 import { UserStatus } from "@prisma/client";
 import Prisma from "../db/db.js";
-import type { User } from "../types/auth.types.js";
+import type { RegisterPayload, User } from "../types/auth.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
 import {
@@ -8,14 +8,323 @@ import {
   setCache,
   cacheUser,
   getCachedUser,
-} from "../utils/redisCasheHelper.js";
+  clearPattern,
+} from "../utils/redisCasheHelper.js"; // Updated import path
 import logger from "../utils/WinstonLogger.js";
+import S3Service from "../utils/S3Service.js";
 
 class UserServices {
   private static readonly USER_CACHE_TTL = 600; // 5 minutes
 
+  // ===================== REGISTER =====================
+  static async register(
+    payload: RegisterPayload
+  ): Promise<{ user: User; accessToken: string }> {
+    const {
+      username,
+      firstName,
+      lastName,
+      profileImage,
+      email,
+      phoneNumber,
+      transactionPin,
+      password,
+      roleId,
+      parentId,
+    } = payload;
+
+    const cacheKey = `user_check:${email}:${phoneNumber}:${username}`;
+    let profileImageUrl = "";
+
+    try {
+      // Check cache first
+      const cachedCheck = await getCache(cacheKey);
+
+      if (!cachedCheck) {
+        const existingUser = await Prisma.user.findFirst({
+          where: {
+            OR: [{ email }, { phoneNumber }, { username }],
+          },
+        });
+
+        if (existingUser) {
+          await setCache(cacheKey, "exists", 60);
+          throw ApiError.badRequest("User already exists");
+        }
+
+        await setCache(cacheKey, "not_exists", 60);
+      } else if (cachedCheck === "exists") {
+        throw ApiError.badRequest("User already exists");
+      }
+
+      // Validate role
+      const role = await Prisma.role.findUnique({ where: { id: roleId } });
+      if (!role) throw ApiError.badRequest("Invalid roleId");
+
+      const hashedPassword = await Helper.hashPassword(password);
+      const hashedPin = await Helper.hashPassword(transactionPin);
+
+      // Parent hierarchy setup
+      let hierarchyLevel = 0;
+      let hierarchyPath = "";
+
+      if (parentId) {
+        const parent = await Prisma.user.findUnique({
+          where: { id: parentId },
+        });
+        if (!parent) throw ApiError.badRequest("Invalid parentId");
+        hierarchyLevel = parent.hierarchyLevel + 1;
+        hierarchyPath = parent.hierarchyPath
+          ? `${parent.hierarchyPath}/${parentId}`
+          : `${parentId}`;
+      }
+
+      // Upload profile image if present
+      if (profileImage) {
+        try {
+          profileImageUrl =
+            (await S3Service.upload(profileImage, "profile")) ?? "";
+        } catch (uploadErr) {
+          console.warn("Profile image upload failed:", uploadErr);
+        }
+      }
+
+      // Apply proper casing to names
+      const formattedFirstName = this.formatName(firstName);
+      const formattedLastName = this.formatName(lastName);
+
+      // Create user
+      const user = await Prisma.user.create({
+        data: {
+          username,
+          firstName: formattedFirstName,
+          lastName: formattedLastName,
+          profileImage: profileImageUrl,
+          email,
+          phoneNumber,
+          roleId,
+          password: hashedPassword,
+          transactionPin: hashedPin,
+          isAuthorized: false,
+          isKycVerified: false,
+          status: "ACTIVE",
+          hierarchyLevel,
+          hierarchyPath,
+          parentId,
+          refreshToken: null,
+        },
+        include: {
+          role: { select: { id: true, name: true, level: true } },
+          wallets: true,
+          parent: { select: { id: true, username: true } },
+          children: { select: { id: true, username: true } },
+        },
+      });
+
+      // Create primary wallet
+      await Prisma.wallet.create({
+        data: {
+          userId: user.id,
+          balance: BigInt(0),
+          currency: "INR",
+          isPrimary: true,
+        },
+      });
+
+      const accessToken = Helper.generateAccessToken({
+        id: user.id,
+        email: user.email,
+        role: user.role.name,
+        roleLevel: user.role.level,
+      });
+
+      // Cache user using your existing utility
+      await cacheUser(user.id, Helper.serializeUser(user), this.USER_CACHE_TTL);
+
+      // Clear relevant cache patterns
+      await this.clearUserRelatedCache(user.id, parentId, roleId);
+
+      // Audit log
+      await Prisma.auditLog.create({
+        data: { userId: user.id, action: "REGISTER", metadata: {} },
+      });
+
+      logger.info("User registered successfully", { userId: user.id, email });
+
+      return { user, accessToken };
+    } catch (err: any) {
+      logger.error("Registration error", {
+        email,
+        error: err.message,
+        stack: err.stack,
+      });
+
+      if (err instanceof ApiError) throw err;
+      throw ApiError.internal("Failed to register user. Please try again.");
+    } finally {
+      Helper.deleteOldImage(profileImage);
+    }
+  }
+
+  // ===================== UPDATE PROFILE =====================
+  static async updateProfile(
+    userId: string,
+    updateData: {
+      username?: string;
+      firstName?: string;
+      lastName?: string;
+      phoneNumber?: string;
+    }
+  ): Promise<User> {
+    const { username, phoneNumber, firstName, lastName } = updateData;
+
+    // Check if username or phoneNumber already exists (excluding current user)
+    if (username || phoneNumber) {
+      const existingUser = await Prisma.user.findFirst({
+        where: {
+          AND: [
+            { id: { not: userId } },
+            {
+              OR: [
+                ...(username ? [{ username }] : []),
+                ...(phoneNumber ? [{ phoneNumber }] : []),
+              ],
+            },
+          ],
+        },
+      });
+
+      if (existingUser) {
+        if (existingUser.username === username) {
+          throw ApiError.badRequest("Username already taken");
+        }
+        if (existingUser.phoneNumber === phoneNumber) {
+          throw ApiError.badRequest("Phone number already registered");
+        }
+      }
+    }
+
+    // Apply proper casing to names if provided
+    const formattedData = { ...updateData };
+    if (firstName) {
+      formattedData.firstName = this.formatName(firstName);
+    }
+    if (lastName) {
+      formattedData.lastName = this.formatName(lastName);
+    }
+
+    const updatedUser = await Prisma.user.update({
+      where: { id: userId },
+      data: formattedData,
+      include: {
+        role: { select: { id: true, name: true, level: true } },
+        wallets: true,
+        parent: { select: { id: true, username: true } },
+        children: { select: { id: true, username: true } },
+      },
+    });
+
+    // Update cache and clear related cache
+    await cacheUser(
+      userId,
+      Helper.serializeUser(updatedUser),
+      this.USER_CACHE_TTL
+    );
+
+    await this.clearUserRelatedCache(
+      userId,
+      updatedUser.parentId,
+      updatedUser.roleId
+    );
+
+    await Prisma.auditLog.create({
+      data: {
+        userId,
+        action: "UPDATE_PROFILE",
+        metadata: { updatedFields: Object.keys(updateData) },
+      },
+    });
+
+    logger.info("Profile updated successfully", { userId });
+
+    return updatedUser;
+  }
+
+  // ===================== UPDATE PROFILE IMAGE =====================
+  static async updateProfileImage(
+    userId: string,
+    profileImagePath: string
+  ): Promise<User> {
+    const user = await Prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: { select: { id: true, name: true, level: true } },
+        wallets: true,
+      },
+    });
+
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    // Delete old profile image from S3 if exists
+    if (user.profileImage) {
+      try {
+        await S3Service.delete({ fileUrl: user.profileImage });
+      } catch (error) {
+        logger.error("Failed to delete old profile image", {
+          userId,
+          profileImage: user.profileImage,
+          error,
+        });
+      }
+    }
+
+    // Upload new profile image
+    const profileImageUrl =
+      (await S3Service.upload(profileImagePath, "profile")) ?? "";
+
+    Helper.deleteOldImage(profileImagePath);
+
+    const updatedUser = await Prisma.user.update({
+      where: { id: userId },
+      data: { profileImage: profileImageUrl },
+      include: {
+        role: { select: { id: true, name: true, level: true } },
+        wallets: true,
+        parent: { select: { id: true, username: true } },
+        children: { select: { id: true, username: true } },
+      },
+    });
+
+    // Update cache and clear related cache
+    await cacheUser(
+      userId,
+      Helper.serializeUser(updatedUser),
+      this.USER_CACHE_TTL
+    );
+
+    await this.clearUserRelatedCache(
+      userId,
+      updatedUser.parentId,
+      updatedUser.roleId
+    );
+
+    await Prisma.auditLog.create({
+      data: {
+        userId,
+        action: "UPDATE_PROFILE_IMAGE",
+        metadata: { newImage: profileImageUrl },
+      },
+    });
+
+    logger.info("Profile image updated successfully", { userId });
+
+    return updatedUser;
+  }
+
   static async getUserById(userId: string): Promise<User | null> {
-    // Try cache first
+    // Try cache first using your existing utility
     const cachedUser = await getCachedUser<User>(userId);
 
     if (cachedUser) {
@@ -40,7 +349,7 @@ class UserServices {
 
     const safeUser = Helper.serializeUser(user);
 
-    // Cache the user
+    // Cache the user using your existing utility
     await cacheUser(userId, safeUser, this.USER_CACHE_TTL);
 
     logger.debug("User fetched from database and cached", { userId });
@@ -69,7 +378,7 @@ class UserServices {
     const users = await Prisma.user.findMany({
       where: {
         roleId,
-        status: "ACTIVE", // Only active users
+        status: "ACTIVE",
       },
       include: {
         role: { select: { id: true, name: true, level: true } },
@@ -82,7 +391,7 @@ class UserServices {
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
 
-    // Cache the results for 5 minutes
+    // Cache the results using your existing utility
     await setCache(cacheKey, safeUsers, this.USER_CACHE_TTL);
 
     logger.debug("Users by role fetched from database", {
@@ -126,12 +435,6 @@ class UserServices {
       ...(isAll ? {} : { status }),
     };
 
-    const cacheKey = `users:parent:${parentId}:page:${page}:limit:${limit}:sort:${sort}:status:${status}`;
-    const cached = await getCache<{ users: User[]; total: number }>(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
     const [users, total] = await Promise.all([
       Prisma.user.findMany({
         where: queryWhere,
@@ -149,7 +452,6 @@ class UserServices {
     ]);
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
-    await setCache(cacheKey, { users: safeUsers, total }, this.USER_CACHE_TTL);
 
     return { users: safeUsers, total };
   }
@@ -182,14 +484,12 @@ class UserServices {
       return cachedUsers;
     }
 
-    // Get all users where hierarchyPath includes the current user's ID
-    // This finds all descendants in the hierarchy
     const users = await Prisma.user.findMany({
       where: {
         hierarchyPath: {
           contains: userId,
         },
-        status: "ACTIVE", // Only active users
+        status: "ACTIVE",
       },
       include: {
         role: { select: { id: true, name: true, level: true } },
@@ -197,12 +497,12 @@ class UserServices {
         parent: { select: { id: true, username: true } },
         children: { select: { id: true, username: true } },
       },
-      orderBy: { hierarchyLevel: "asc" }, // Order by hierarchy level
+      orderBy: { hierarchyLevel: "asc" },
     });
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
 
-    // Cache the results for 5 minutes
+    // Cache the results using your existing utility
     await setCache(cacheKey, safeUsers, this.USER_CACHE_TTL);
 
     logger.debug("Children users fetched from database", {
@@ -236,11 +536,11 @@ class UserServices {
     const count = await Prisma.user.count({
       where: {
         parentId,
-        status: "ACTIVE", // Only active users
+        status: "ACTIVE",
       },
     });
 
-    // Cache the count for 5 minutes
+    // Cache the count using your existing utility
     await setCache(cacheKey, count, this.USER_CACHE_TTL);
 
     logger.debug("Users count by parent fetched from database", {
@@ -285,11 +585,11 @@ class UserServices {
         hierarchyPath: {
           contains: userId,
         },
-        status: "ACTIVE", // Only active users
+        status: "ACTIVE",
       },
     });
 
-    // Cache the count for 5 minutes
+    // Cache the count using your existing utility
     await setCache(cacheKey, count, this.USER_CACHE_TTL);
 
     logger.debug("Children count fetched from database", {
@@ -298,6 +598,67 @@ class UserServices {
     });
 
     return { count };
+  }
+
+  // ===================== HELPER METHODS =====================
+
+  /**
+   * Format name with proper casing (First Letter Capital)
+   */
+  private static formatName(name: string): string {
+    if (!name) return name;
+
+    return name
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+      .trim();
+  }
+
+  /**
+   * Clear all cache related to user operations
+   */
+  private static async clearUserRelatedCache(
+    userId: string,
+    parentId: string | null,
+    roleId: string
+  ): Promise<void> {
+    try {
+      const patternsToClear = [
+        "user_check:*",
+        `users:role:${roleId}`,
+        `users:children:${userId}`,
+        `users:children:count:${userId}`,
+      ];
+
+      // Add parent-related cache patterns if parent exists
+      if (parentId) {
+        patternsToClear.push(
+          `users:parent:${parentId}:*`,
+          `users:parent:count:${parentId}`
+        );
+      }
+
+      // Clear all patterns using your existing utility
+      await Promise.all(
+        patternsToClear.map((pattern) => clearPattern(pattern))
+      );
+
+      logger.debug("User-related cache cleared successfully", {
+        userId,
+        parentId,
+        roleId,
+        patternsCleared: patternsToClear,
+      });
+    } catch (error) {
+      logger.error("Failed to clear user-related cache", {
+        userId,
+        parentId,
+        roleId,
+        error,
+      });
+    }
   }
 }
 

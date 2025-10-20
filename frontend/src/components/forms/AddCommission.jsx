@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useDispatch } from "react-redux";
-import { addCommission } from "../../redux/slices/commissionSlice";
 import InputField from "../ui/InputField";
 import SelectField from "../ui/SelectField";
 import ButtonField from "../ui/ButtonField";
+import { createOrUpdateCommissionSetting } from "../../redux/slices/commissionSlice";
 
 const roles = ["STATE_HOLDER", "MASTER_DISTRIBUTOR", "DISTRIBUTOR", "AGENT"];
 const services = ["NEFT", "IMPS"];
@@ -51,7 +51,7 @@ const AddCommission = ({ chargesData, setChargesData }) => {
     try {
       setLoading(true);
       const result = await dispatch(
-        addCommission({
+        createOrUpdateCommissionSetting({
           role: newSlab.role,
           service: newSlab.service,
           from: Number(newSlab.from),
