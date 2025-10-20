@@ -7,6 +7,7 @@ import walletReducer from "./slices/walletSlice.js";
 import commissionReducer from "./slices/commissionSlice.js";
 import roleReducer from "./slices/roleSlice.js";
 import AddressReducer from "./slices/addressSlice.js";
+import permissionReducer from "./slices/permissionSlice.js";
 
 const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ const store = configureStore({
     wallet: walletReducer,
     roles: roleReducer,
     commission: commissionReducer,
+    permission: permissionReducer,
   },
 });
 

@@ -6,6 +6,7 @@ import {
   Settings,
   LogIn,
   Power,
+  Shield,
 } from "lucide-react";
 
 const ActionsMenu = ({
@@ -19,6 +20,7 @@ const ActionsMenu = ({
   onLoginAs,
   onToggleStatus,
   onClose,
+  onPermission,
 }) => {
   const menuItems = [
     {
@@ -46,6 +48,12 @@ const ActionsMenu = ({
       label: "Change Password",
       onClick: () => onEditPassword(user),
       color: "text-orange-600",
+    },
+    {
+      icon: Shield,
+      label: "Add Permission",
+      onClick: () => onPermission(user),
+      color: "text-indigo-600",
     },
     {
       icon: CreditCard,

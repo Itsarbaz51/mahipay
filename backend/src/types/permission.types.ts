@@ -17,7 +17,7 @@ export interface CheckRolePermissionPayload {
 
 export interface CheckUserPermissionPayload {
   userId: string;
-  serviceId: string;
+  serviceId: string[]; // Array of service UUIDs
   canView?: boolean;
   canEdit?: boolean;
   canSetCommission?: boolean;
