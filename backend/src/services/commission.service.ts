@@ -5,6 +5,7 @@ import type {
 } from "../types/commission.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
+import { PrismaClient, CommissionType } from "@prisma/client";
 
 export class CommissionSettingService {
   static async createOrUpdateCommissionSetting(
@@ -37,7 +38,7 @@ export class CommissionSettingService {
     }
 
     // 2️⃣ Validate related entities
-    const service = await Prisma.service.findUnique({
+    const service = await Prisma.serviceProvider.findUnique({
       where: { id: serviceId },
     });
     if (!service) throw ApiError.notFound("Service not found");
@@ -72,7 +73,7 @@ export class CommissionSettingService {
       roleId: roleId ?? null,
       targetUserId: targetUserId ?? null,
       serviceId,
-      commissionType,
+      commissionType: CommissionType.PERCENTAGE || CommissionType.FLAT,
       commissionValue,
       minAmount: minAmount ?? null,
       maxAmount: maxAmount ?? null,
@@ -100,24 +101,68 @@ export class CommissionSettingService {
     return safeResult;
   }
 
-  static async getCommissionSettingsByRoleOrUser(
-    roleId?: string,
-    userId?: string
-  ) {
+  static async getCommissionSettingsByRoleOrUser(userId?: string) {
     const settings = await Prisma.commissionSetting.findMany({
       where: {
-        OR: [
-          ...(roleId ? [{ roleId }] : []),
-          ...(userId ? [{ targetUserId: userId }] : []),
-        ],
+        OR: [...(userId ? [{ targetUserId: userId }] : [])],
         isActive: true,
       },
       include: {
-        service: { select: { id: true, name: true, code: true, status: true } },
+        service: { select: { id: true, code: true, isActive: true } },
         role: { select: { id: true, name: true } },
         targetUser: { select: { id: true, username: true, email: true } },
       },
       orderBy: { updatedAt: "desc" },
+    });
+
+    const safeResult = Helper.serializeUser(settings);
+
+    return safeResult;
+  }
+
+  static async getCommissionSettingsByCreatedBy(userId: string) {
+    const settings = await Prisma.commissionSetting.findMany({
+      where: {
+        createdBy: userId,
+        isActive: true,
+      },
+      include: {
+        service: {
+          select: {
+            id: true,
+            type: true,
+            code: true,
+            isActive: true,
+          },
+        },
+        role: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        targetUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
     const safeResult = Helper.serializeUser(settings);
@@ -144,7 +189,7 @@ export class CommissionEarningService {
     const [user, fromUser, service, createdByUser] = await Promise.all([
       Prisma.user.findUnique({ where: { id: userId } }),
       Prisma.user.findUnique({ where: { id: fromUserId } }),
-      Prisma.service.findUnique({ where: { id: serviceId } }),
+      Prisma.serviceProvider.findUnique({ where: { id: serviceId } }),
       Prisma.user.findUnique({ where: { id: createdBy } }),
     ]);
 
@@ -186,7 +231,9 @@ export class CommissionEarningService {
       include: {
         user: { select: { id: true, username: true, email: true } },
         fromUser: { select: { id: true, username: true, email: true } },
-        service: { select: { id: true, name: true, code: true } },
+        service: {
+          select: { id: true, type: true, code: true, isActive: true },
+        },
         createdByUser: { select: { id: true, username: true } },
       },
     });
@@ -213,7 +260,9 @@ export class CommissionEarningService {
       include: {
         user: { select: { id: true, username: true, email: true } },
         fromUser: { select: { id: true, username: true, email: true } },
-        service: { select: { id: true, name: true, code: true } },
+        service: {
+          select: { id: true, type: true, code: true, isActive: true },
+        },
         createdByUser: { select: { id: true, username: true } },
       },
       orderBy: { createdAt: "desc" },

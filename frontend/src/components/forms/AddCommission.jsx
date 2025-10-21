@@ -1,21 +1,29 @@
-import { useState } from "react";
-import { Plus } from "lucide-react";
-import { useDispatch } from "react-redux";
-import InputField from "../ui/InputField";
-import SelectField from "../ui/SelectField";
-import ButtonField from "../ui/ButtonField";
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Search } from "lucide-react";
 import { createOrUpdateCommissionSetting } from "../../redux/slices/commissionSlice";
-import { toast } from "react-toastify";
+import { getAllRoles } from "../../redux/slices/roleSlice";
+import { getAllUsersByParentId } from "../../redux/slices/userSlice";
+import { getServiceProvidersByUser } from "../../redux/slices/serviceSlice";
 
 const scopes = ["ROLE", "USER"];
-const roles = ["STATE_HOLDER", "MASTER_DISTRIBUTOR", "DISTRIBUTOR", "AGENT"];
-const services = ["NEFT", "IMPS"];
 const commissionTypes = ["FLAT", "PERCENT"];
 
-const AddCommission = ({ chargesData, setChargesData }) => {
+const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
   const dispatch = useDispatch();
 
-  const [newCommission, setNewCommission] = useState({
+  // Get roles, users, and services from Redux store
+  const roles = useSelector((state) => state.roles?.roles || []);
+  const rolesLoading = useSelector((state) => state.roles?.isLoading || false);
+
+  const users = useSelector((state) => state.users?.users || []);
+  const usersLoading = useSelector((state) => state.users?.isLoading || false);
+
+  // Get services from service slice using getServiceProvidersByUser
+  const services = useSelector((state) => state.services?.serviceProviders || []);
+  const servicesLoading = useSelector((state) => state.service?.isLoading || false);
+
+  const [formData, setFormData] = useState({
     scope: "ROLE",
     roleId: "",
     targetUserId: "",
@@ -28,359 +36,669 @@ const AddCommission = ({ chargesData, setChargesData }) => {
     tdsPercent: "",
     applyGST: false,
     gstPercent: "",
-    effectiveFrom: new Date().toISOString().split("T")[0],
+    effectiveFrom: new Date().toISOString().split('T')[0], // Only date part for UI
     effectiveTo: "",
   });
+
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [message, setMessage] = useState({ type: "", text: "" });
+  const [userSearch, setUserSearch] = useState("");
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [filteredUsers, setFilteredUsers] = useState([]);
 
-  const handleAddCommission = async () => {
-    // Validate required fields
-    if (!newCommission.serviceId || !newCommission.commissionValue) {
-      alert("Please fill Service and Commission Value fields");
-      return;
+  // Fetch roles, users and services when component mounts
+  useEffect(() => {
+    dispatch(getAllRoles());
+    dispatch(getAllUsersByParentId({ search: "", status: "ACTIVE" }));
+    dispatch(getServiceProvidersByUser());
+  }, [dispatch]);
+
+  // Filter users based on search
+  useEffect(() => {
+    if (userSearch.trim() === "") {
+      setFilteredUsers(users.slice(0, 10));
+    } else {
+      const filtered = users
+        .filter(
+          (user) =>
+            user.username?.toLowerCase().includes(userSearch.toLowerCase()) ||
+            user.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+            user.firstName?.toLowerCase().includes(userSearch.toLowerCase()) ||
+            user.lastName?.toLowerCase().includes(userSearch.toLowerCase()) ||
+            user.phoneNumber?.includes(userSearch)
+        )
+        .slice(0, 10);
+      setFilteredUsers(filtered);
+    }
+  }, [userSearch, users]);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const handleScopeChange = (scope) => {
+    setFormData({
+      ...formData,
+      scope,
+      roleId: scope === "ROLE" ? formData.roleId : "",
+      targetUserId: scope === "USER" ? formData.targetUserId : "",
+    });
+    setUserSearch("");
+    setShowUserDropdown(false);
+  };
+
+  const handleUserSearch = (searchTerm) => {
+    setUserSearch(searchTerm);
+    if (searchTerm.trim() !== "") {
+      setShowUserDropdown(true);
+    } else {
+      setShowUserDropdown(false);
+    }
+  };
+
+  const handleUserSelect = (user) => {
+    setFormData({
+      ...formData,
+      targetUserId: user.id,
+    });
+    setUserSearch(
+      `${user.firstName} ${user.lastName || ""} (${user.username})`
+    );
+    setShowUserDropdown(false);
+  };
+
+  const handleUserSearchFocus = () => {
+    if (userSearch.trim() !== "" || users.length > 0) {
+      setShowUserDropdown(true);
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.serviceId) newErrors.serviceId = "Service is required";
+    if (!formData.commissionValue)
+      newErrors.commissionValue = "Commission value is required";
+
+    if (formData.scope === "ROLE" && !formData.roleId) {
+      newErrors.roleId = "Role is required for ROLE scope";
     }
 
-    // Validate scope-specific fields
-    if (newCommission.scope === "ROLE" && !newCommission.roleId) {
-      alert("Please select a Role for ROLE scope");
-      return;
+    if (formData.scope === "USER" && !formData.targetUserId) {
+      newErrors.targetUserId = "Please select a user for USER scope";
     }
 
-    if (newCommission.scope === "USER" && !newCommission.targetUserId) {
-      alert("Please enter User ID for USER scope");
-      return;
+    // Date validation
+    if (formData.effectiveFrom) {
+      const fromDate = new Date(formData.effectiveFrom);
+      if (isNaN(fromDate.getTime())) {
+        newErrors.effectiveFrom = "Invalid effective from date";
+      }
+    }
+
+    if (formData.effectiveTo) {
+      const toDate = new Date(formData.effectiveTo);
+      if (isNaN(toDate.getTime())) {
+        newErrors.effectiveTo = "Invalid effective to date";
+      }
+    }
+
+    // Check if effectiveTo is after effectiveFrom
+    if (formData.effectiveFrom && formData.effectiveTo) {
+      const fromDate = new Date(formData.effectiveFrom);
+      const toDate = new Date(formData.effectiveTo);
+      if (toDate <= fromDate) {
+        newErrors.effectiveTo = "Effective to date must be after effective from date";
+      }
     }
 
     // Check for duplicates
     const exists = chargesData.some(
       (item) =>
-        item.scope === newCommission.scope &&
-        item.serviceId === newCommission.serviceId &&
-        ((newCommission.scope === "ROLE" &&
-          item.roleId === newCommission.roleId) ||
-          (newCommission.scope === "USER" &&
-            item.targetUserId === newCommission.targetUserId))
+        item.scope === formData.scope &&
+        item.serviceId === formData.serviceId &&
+        ((formData.scope === "ROLE" && item.roleId === formData.roleId) ||
+          (formData.scope === "USER" &&
+            item.targetUserId === formData.targetUserId))
     );
 
     if (exists) {
-      alert(
-        "Commission setting already exists for this scope, service, and target"
-      );
+      newErrors.general =
+        "Commission setting already exists for this scope, service, and target";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Convert date to ISO string with timezone
+  const formatDateToISO = (dateString) => {
+    if (!dateString) return undefined;
+    
+    const date = new Date(dateString);
+    // Set to start of day in local timezone and convert to ISO
+    return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString();
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      setMessage({ type: "error", text: "Please fix validation errors" });
       return;
     }
 
-    try {
-      setLoading(true);
+    setLoading(true);
+    setMessage({ type: "", text: "" });
 
+    try {
       // Prepare payload according to backend schema
+      // Convert dates to ISO format
       const payload = {
-        scope: newCommission.scope,
-        serviceId: newCommission.serviceId,
-        commissionType: newCommission.commissionType,
-        commissionValue: Number(newCommission.commissionValue),
-        minAmount: newCommission.minAmount
-          ? Number(newCommission.minAmount)
+        scope: formData.scope,
+        serviceId: formData.serviceId,
+        commissionType: formData.commissionType,
+        commissionValue: Number(formData.commissionValue),
+        minAmount: formData.minAmount ? Number(formData.minAmount) : undefined,
+        maxAmount: formData.maxAmount ? Number(formData.maxAmount) : undefined,
+        applyTDS: formData.applyTDS,
+        tdsPercent: formData.tdsPercent
+          ? Number(formData.tdsPercent)
           : undefined,
-        maxAmount: newCommission.maxAmount
-          ? Number(newCommission.maxAmount)
+        applyGST: formData.applyGST,
+        gstPercent: formData.gstPercent
+          ? Number(formData.gstPercent)
           : undefined,
-        applyTDS: newCommission.applyTDS,
-        tdsPercent: newCommission.tdsPercent
-          ? Number(newCommission.tdsPercent)
-          : undefined,
-        applyGST: newCommission.applyGST,
-        gstPercent: newCommission.gstPercent
-          ? Number(newCommission.gstPercent)
-          : undefined,
-        effectiveFrom: newCommission.effectiveFrom,
-        effectiveTo: newCommission.effectiveTo || undefined,
+        effectiveFrom: formatDateToISO(formData.effectiveFrom), // Convert to ISO
+        effectiveTo: formData.effectiveTo ? formatDateToISO(formData.effectiveTo) : undefined,
       };
 
       // Add scope-specific field
-      if (newCommission.scope === "ROLE") {
-        payload.roleId = newCommission.roleId;
-      } else if (newCommission.scope === "USER") {
-        payload.targetUserId = newCommission.targetUserId;
+      if (formData.scope === "ROLE") {
+        payload.roleId = formData.roleId;
+      } else if (formData.scope === "USER") {
+        payload.targetUserId = formData.targetUserId;
       }
+
+      console.log("Submitting payload:", payload);
 
       const result = await dispatch(createOrUpdateCommissionSetting(payload));
 
-      const created =
-        result?.payload?.data || result?.payload || result?.data || null;
-
-      if (created && created.id) {
-        setChargesData((prev) => [...prev, created]);
-        toast.success("Commission setting added successfully");
-
-        // Reset form
-        setNewCommission({
-          scope: "ROLE",
-          roleId: "",
-          targetUserId: "",
-          serviceId: "",
-          commissionType: "FLAT",
-          commissionValue: "",
-          minAmount: "",
-          maxAmount: "",
-          applyTDS: false,
-          tdsPercent: "",
-          applyGST: false,
-          gstPercent: "",
-          effectiveFrom: new Date().toISOString().split("T")[0],
-          effectiveTo: "",
+      if (result?.payload?.data || result?.payload) {
+        setMessage({
+          type: "success",
+          text: "Commission setting added successfully!",
         });
+
+        // Auto-close on success after short delay
+        setTimeout(() => {
+          onSuccess();
+          onClose();
+        }, 1500);
       }
-    } catch (err) {
-      console.error("Add commission failed", err);
-      toast.error(err?.message || "Failed to add commission setting");
+    } catch (error) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Something went wrong";
+      setMessage({
+        type: "error",
+        text: errorMessage,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleScopeChange = (scope) => {
-    setNewCommission({
-      ...newCommission,
-      scope,
-      roleId: scope === "ROLE" ? newCommission.roleId : "",
-      targetUserId: scope === "USER" ? newCommission.targetUserId : "",
-    });
+  // Format role name for display
+  const formatRoleName = (roleName) => {
+    if (!roleName) return "";
+
+    // Convert snake_case to Title Case with spaces
+    return roleName
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Format service display name - Yeh UI mein show hoga
+  const formatServiceDisplayName = (service) => {
+    if (!service) return "";
+    
+    // Service name show karega UI mein
+    return service.type || service.code || "Unknown Service";
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-300 mb-6 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Add New Commission Setting
-      </h3>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
-        {/* Scope */}
-        <SelectField
-          name="scope"
-          label="Scope"
-          value={newCommission.scope}
-          handleChange={(e) => handleScopeChange(e.target.value)}
-          options={scopes.map((scope) => ({ value: scope, label: scope }))}
-        />
-
-        {/* Role (only for ROLE scope) */}
-        {newCommission.scope === "ROLE" && (
-          <SelectField
-            name="roleId"
-            label="Role"
-            value={newCommission.roleId}
-            handleChange={(e) =>
-              setNewCommission({ ...newCommission, roleId: e.target.value })
-            }
-            options={[
-              { value: "", label: "Select Role" },
-              ...roles.map((role) => ({ value: role, label: role })),
-            ]}
-          />
-        )}
-
-        {/* User ID (only for USER scope) */}
-        {newCommission.scope === "USER" && (
-          <InputField
-            name="targetUserId"
-            inputType="text"
-            placeholderName="User ID"
-            valueData={newCommission.targetUserId}
-            handleChange={(e) =>
-              setNewCommission({
-                ...newCommission,
-                targetUserId: e.target.value,
-              })
-            }
-          />
-        )}
-
-        {/* Service */}
-        <SelectField
-          name="serviceId"
-          label="Service"
-          value={newCommission.serviceId}
-          handleChange={(e) =>
-            setNewCommission({ ...newCommission, serviceId: e.target.value })
-          }
-          options={[
-            { value: "", label: "Select Service" },
-            ...services.map((service) => ({ value: service, label: service })),
-          ]}
-        />
-
-        {/* Commission Type */}
-        <SelectField
-          name="commissionType"
-          label="Commission Type"
-          value={newCommission.commissionType}
-          handleChange={(e) =>
-            setNewCommission({
-              ...newCommission,
-              commissionType: e.target.value,
-            })
-          }
-          options={commissionTypes.map((type) => ({
-            value: type,
-            label: type,
-          }))}
-        />
-
-        {/* Commission Value */}
-        <InputField
-          name="commissionValue"
-          inputType="number"
-          placeholderName={`Commission Value ${
-            newCommission.commissionType === "PERCENT" ? "(%)" : "(₹)"
-          }`}
-          valueData={newCommission.commissionValue}
-          handleChange={(e) =>
-            setNewCommission({
-              ...newCommission,
-              commissionValue: e.target.value,
-            })
-          }
-        />
-
-        {/* Min Amount */}
-        <InputField
-          name="minAmount"
-          inputType="number"
-          placeholderName="Min Amount (₹)"
-          valueData={newCommission.minAmount}
-          handleChange={(e) =>
-            setNewCommission({ ...newCommission, minAmount: e.target.value })
-          }
-        />
-
-        {/* Max Amount */}
-        <InputField
-          name="maxAmount"
-          inputType="number"
-          placeholderName="Max Amount (₹)"
-          valueData={newCommission.maxAmount}
-          handleChange={(e) =>
-            setNewCommission({ ...newCommission, maxAmount: e.target.value })
-          }
-        />
-
-        {/* TDS Settings */}
-        <div className="flex items-end space-x-2">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="applyTDS"
-              checked={newCommission.applyTDS}
-              onChange={(e) =>
-                setNewCommission({
-                  ...newCommission,
-                  applyTDS: e.target.checked,
-                })
-              }
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label
-              htmlFor="applyTDS"
-              className="ml-2 block text-sm text-gray-900"
-            >
-              Apply TDS
-            </label>
+    <div className="fixed inset-0 bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-fadeIn">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              Add New Commission Setting
+            </h2>
+            <p className="text-blue-100 text-sm mt-1">
+              Create a new commission setting for roles or users
+            </p>
           </div>
-          {newCommission.applyTDS && (
-            <InputField
-              name="tdsPercent"
-              inputType="number"
-              placeholderName="TDS %"
-              valueData={newCommission.tdsPercent}
-              handleChange={(e) =>
-                setNewCommission({
-                  ...newCommission,
-                  tdsPercent: e.target.value,
-                })
-              }
-              className="flex-1"
-            />
-          )}
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all duration-200"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* GST Settings */}
-        <div className="flex items-end space-x-2">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="applyGST"
-              checked={newCommission.applyGST}
-              onChange={(e) =>
-                setNewCommission({
-                  ...newCommission,
-                  applyGST: e.target.checked,
-                })
-              }
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label
-              htmlFor="applyGST"
-              className="ml-2 block text-sm text-gray-900"
+        {/* Body */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+          {message.text && (
+            <div
+              className={`mb-4 p-4 rounded-lg text-sm font-medium ${
+                message.type === "error"
+                  ? "bg-red-50 text-red-700 border border-red-200"
+                  : "bg-green-50 text-green-700 border border-green-200"
+              }`}
             >
-              Apply GST
-            </label>
-          </div>
-          {newCommission.applyGST && (
-            <InputField
-              name="gstPercent"
-              inputType="number"
-              placeholderName="GST %"
-              valueData={newCommission.gstPercent}
-              handleChange={(e) =>
-                setNewCommission({
-                  ...newCommission,
-                  gstPercent: e.target.value,
-                })
-              }
-              className="flex-1"
-            />
+              {message.text}
+            </div>
           )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Scope */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Scope *
+                </label>
+                <select
+                  name="scope"
+                  value={formData.scope}
+                  onChange={(e) => handleScopeChange(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  {scopes.map((scope) => (
+                    <option key={scope} value={scope}>
+                      {scope}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Role (only for ROLE scope) */}
+              {formData.scope === "ROLE" && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    name="roleId"
+                    value={formData.roleId}
+                    onChange={handleChange}
+                    disabled={rolesLoading}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                      errors.roleId
+                        ? "border-red-400 focus:ring-red-300 bg-red-50"
+                        : rolesLoading
+                        ? "bg-gray-100 cursor-not-allowed border-gray-300"
+                        : "border-gray-300 focus:ring-blue-400"
+                    }`}
+                  >
+                    <option value="">
+                      {rolesLoading ? "Loading roles..." : "Select Role"}
+                    </option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {formatRoleName(role.name) || role.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.roleId && (
+                    <p className="text-red-500 text-sm mt-1">{errors.roleId}</p>
+                  )}
+                  {rolesLoading && (
+                    <p className="text-blue-500 text-sm mt-1">
+                      Loading roles...
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* User Search (only for USER scope) */}
+              {formData.scope === "USER" && (
+                <div className="relative">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Select User *
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <input
+                      type="text"
+                      value={userSearch}
+                      onChange={(e) => handleUserSearch(e.target.value)}
+                      onFocus={handleUserSearchFocus}
+                      placeholder="Search users by name, username, email or phone..."
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none ${
+                        errors.targetUserId
+                          ? "border-red-400 focus:ring-red-300 bg-red-50"
+                          : usersLoading
+                          ? "bg-gray-100 cursor-not-allowed border-gray-300"
+                          : "border-gray-300 focus:ring-blue-400"
+                      }`}
+                      disabled={usersLoading}
+                    />
+                    {usersLoading && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {errors.targetUserId && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.targetUserId}
+                    </p>
+                  )}
+
+                  {/* User Dropdown */}
+                  {showUserDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {filteredUsers.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">
+                          {usersLoading ? "Loading users..." : "No users found"}
+                        </div>
+                      ) : (
+                        filteredUsers.map((user) => (
+                          <div
+                            key={user.id}
+                            onClick={() => handleUserSelect(user)}
+                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-medium text-gray-900">
+                              {user.firstName} {user.lastName || ""}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              @{user.username} • {user.email}
+                            </div>
+                            {user.phoneNumber && (
+                              <div className="text-sm text-gray-500">
+                                📞 {user.phoneNumber}
+                              </div>
+                            )}
+                            {user.role?.name && (
+                              <div className="text-xs text-blue-600 mt-1">
+                                {formatRoleName(user.role.name)}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {usersLoading && (
+                    <p className="text-blue-500 text-sm mt-1">
+                      Loading users...
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Service - Display name but store ID */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Service *
+                </label>
+                <select
+                  name="serviceId"
+                  value={formData.serviceId}
+                  onChange={handleChange}
+                  disabled={servicesLoading}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.serviceId
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : servicesLoading
+                      ? "bg-gray-100 cursor-not-allowed border-gray-300"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
+                >
+                  <option value="">
+                    {servicesLoading ? "Loading services..." : "Select Service"}
+                  </option>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {formatServiceDisplayName(service)}
+                    </option>
+                  ))}
+                </select>
+                {errors.serviceId && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.serviceId}
+                  </p>
+                )}
+                {servicesLoading && (
+                  <p className="text-blue-500 text-sm mt-1">
+                    Loading services...
+                  </p>
+                )}
+              </div>
+
+              {/* Commission Type */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Commission Type *
+                </label>
+                <select
+                  name="commissionType"
+                  value={formData.commissionType}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  {commissionTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Commission Value */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Commission Value *
+                </label>
+                <input
+                  type="number"
+                  name="commissionValue"
+                  value={formData.commissionValue}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.commissionValue
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
+                  placeholder={
+                    formData.commissionType === "PERCENT"
+                      ? "Percentage"
+                      : "Amount in ₹"
+                  }
+                  step={formData.commissionType === "PERCENT" ? "0.1" : "1"}
+                />
+                {errors.commissionValue && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.commissionValue}
+                  </p>
+                )}
+              </div>
+
+              {/* Min Amount */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Min Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  name="minAmount"
+                  value={formData.minAmount}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Optional"
+                />
+              </div>
+
+              {/* Max Amount */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Max Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  name="maxAmount"
+                  value={formData.maxAmount}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Optional"
+                />
+              </div>
+
+              {/* TDS Settings */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="applyTDS"
+                    name="applyTDS"
+                    checked={formData.applyTDS}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label
+                    htmlFor="applyTDS"
+                    className="ml-2 block text-sm font-semibold text-gray-700"
+                  >
+                    Apply TDS
+                  </label>
+                </div>
+                {formData.applyTDS && (
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      name="tdsPercent"
+                      value={formData.tdsPercent}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="TDS %"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* GST Settings */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="applyGST"
+                    name="applyGST"
+                    checked={formData.applyGST}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label
+                    htmlFor="applyGST"
+                    className="ml-2 block text-sm font-semibold text-gray-700"
+                  >
+                    Apply GST
+                  </label>
+                </div>
+                {formData.applyGST && (
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      name="gstPercent"
+                      value={formData.gstPercent}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="GST %"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Effective From */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Effective From *
+                </label>
+                <input
+                  type="date"
+                  name="effectiveFrom"
+                  value={formData.effectiveFrom}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.effectiveFrom
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
+                />
+                {errors.effectiveFrom && (
+                  <p className="text-red-500 text-sm mt-1">{errors.effectiveFrom}</p>
+                )}
+              </div>
+
+              {/* Effective To */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Effective To
+                </label>
+                <input
+                  type="date"
+                  name="effectiveTo"
+                  value={formData.effectiveTo}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.effectiveTo
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
+                  placeholder="Optional"
+                />
+                {errors.effectiveTo && (
+                  <p className="text-red-500 text-sm mt-1">{errors.effectiveTo}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-3 flex justify-end">
+              <button
+                type="submit"
+                disabled={loading || rolesLoading || usersLoading || servicesLoading}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "Creating..." : "Add Commission Setting"}
+              </button>
+            </div>
+          </form>
         </div>
-
-        {/* Effective From */}
-        <InputField
-          name="effectiveFrom"
-          inputType="date"
-          placeholderName="Effective From"
-          valueData={newCommission.effectiveFrom}
-          handleChange={(e) =>
-            setNewCommission({
-              ...newCommission,
-              effectiveFrom: e.target.value,
-            })
-          }
-        />
-
-        {/* Effective To */}
-        <InputField
-          name="effectiveTo"
-          inputType="date"
-          placeholderName="Effective To (Optional)"
-          valueData={newCommission.effectiveTo}
-          handleChange={(e) =>
-            setNewCommission({ ...newCommission, effectiveTo: e.target.value })
-          }
-        />
-      </div>
-
-      {/* Add Button */}
-      <div className="flex justify-end">
-        <ButtonField
-          type="submit"
-          isDisabled={loading}
-          icon={Plus}
-          onClick={handleAddCommission}
-          isOpen={null}
-          name={loading ? "Adding..." : "Add Commission Setting"}
-        />
       </div>
     </div>
   );
 };
 
-export default AddCommission;
+export default AddCommissionModal;

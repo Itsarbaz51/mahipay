@@ -35,7 +35,7 @@ CREATE TABLE `users` (
     `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `deleted_at` DATETIME(3) NULL,
     `role_id` VARCHAR(191) NOT NULL,
-    `refresh_token` VARCHAR(191) NULL,
+    `refresh_token` TEXT NULL,
     `password_reset_token` VARCHAR(191) NULL,
     `password_reset_expires` DATETIME(3) NULL,
     `email_verification_token` VARCHAR(191) NULL,
@@ -44,7 +44,6 @@ CREATE TABLE `users` (
 
     UNIQUE INDEX `users_email_key`(`email`),
     UNIQUE INDEX `users_phone_number_key`(`phone_number`),
-    UNIQUE INDEX `users_refresh_token_key`(`refresh_token`),
     INDEX `users_parent_id_idx`(`parent_id`),
     INDEX `users_hierarchy_level_idx`(`hierarchy_level`),
     PRIMARY KEY (`id`)
@@ -60,42 +59,16 @@ CREATE TABLE `user_kyc` (
     `dob` DATETIME(3) NOT NULL,
     `gender` ENUM('MALE', 'FEMALE', 'OTHER') NOT NULL,
     `status` ENUM('PENDING', 'VERIFIED', 'REJECT') NOT NULL DEFAULT 'PENDING',
+    `kyc_rejection_reason` VARCHAR(191) NULL DEFAULT '',
     `address_id` VARCHAR(191) NOT NULL,
     `pan_file` VARCHAR(191) NOT NULL,
     `aadhaar_file` VARCHAR(191) NOT NULL,
     `address_proof_file` VARCHAR(191) NOT NULL,
     `photo` VARCHAR(191) NOT NULL,
-    `businessKyc_id` VARCHAR(191) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `deleted_at` DATETIME(3) NULL,
 
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `business_kycs` (
-    `id` VARCHAR(191) NOT NULL,
-    `user_id` VARCHAR(191) NOT NULL,
-    `business_name` TEXT NOT NULL,
-    `business_type` ENUM('PROPRIETORSHIP', 'PARTNERSHIP', 'PRIVATE_LIMITED') NOT NULL,
-    `status` ENUM('PENDING', 'VERIFIED', 'REJECT') NOT NULL DEFAULT 'PENDING',
-    `address_id` VARCHAR(191) NOT NULL,
-    `pan_file` VARCHAR(191) NOT NULL,
-    `gst_file` VARCHAR(191) NOT NULL,
-    `udhyam_aadhar` VARCHAR(191) NULL,
-    `br_doc` VARCHAR(191) NULL,
-    `partnership_deed` VARCHAR(191) NULL,
-    `partner_kyc_numbers` INTEGER NULL,
-    `cin` VARCHAR(191) NULL,
-    `moa_file` VARCHAR(191) NULL,
-    `aoa_file` VARCHAR(191) NULL,
-    `director_kyc_numbers` INTEGER NULL DEFAULT 2,
-    `director_shareholding_file` VARCHAR(191) NULL,
-    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-    UNIQUE INDEX `business_kycs_user_id_key`(`user_id`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -226,109 +199,16 @@ CREATE TABLE `commission_earnings` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `services` (
-    `id` VARCHAR(191) NOT NULL,
-    `name` VARCHAR(191) NOT NULL,
-    `code` VARCHAR(191) NOT NULL,
-    `status` ENUM('ACTIVE', 'IN_ACTIVE', 'UNAVAILABLE') NOT NULL DEFAULT 'ACTIVE',
-    `icon` VARCHAR(191) NULL,
-    `description` LONGTEXT NULL,
-    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updated_at` DATETIME(3) NOT NULL,
-
-    UNIQUE INDEX `services_name_key`(`name`),
-    UNIQUE INDEX `services_code_key`(`code`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
 CREATE TABLE `service_providers` (
     `id` VARCHAR(191) NOT NULL,
-    `name` VARCHAR(191) NOT NULL,
-    `code` VARCHAR(191) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
+    `code` VARCHAR(191) NOT NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT true,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
+    `created_by` VARCHAR(191) NOT NULL,
 
-    UNIQUE INDEX `service_providers_name_key`(`name`),
     UNIQUE INDEX `service_providers_code_key`(`code`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `api_keys` (
-    `id` VARCHAR(191) NOT NULL,
-    `user_id` VARCHAR(191) NOT NULL,
-    `key` VARCHAR(191) NOT NULL,
-    `secret` VARCHAR(191) NOT NULL,
-    `label` VARCHAR(191) NULL,
-    `isActive` BOOLEAN NOT NULL DEFAULT true,
-    `expiresAt` DATETIME(3) NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
-
-    UNIQUE INDEX `api_keys_key_key`(`key`),
-    INDEX `api_keys_user_id_idx`(`user_id`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `api_key_services` (
-    `id` VARCHAR(191) NOT NULL,
-    `apiKeyId` VARCHAR(191) NOT NULL,
-    `serviceId` VARCHAR(191) NOT NULL,
-    `rateLimit` INTEGER NULL,
-    `callbackUrl` VARCHAR(191) NULL,
-
-    UNIQUE INDEX `api_key_services_apiKeyId_serviceId_key`(`apiKeyId`, `serviceId`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `api_key_ip_whitelists` (
-    `id` VARCHAR(191) NOT NULL,
-    `apiKeyId` VARCHAR(191) NOT NULL,
-    `ip` VARCHAR(191) NOT NULL,
-    `note` VARCHAR(191) NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-    INDEX `api_key_ip_whitelists_apiKeyId_idx`(`apiKeyId`),
-    UNIQUE INDEX `api_key_ip_whitelists_apiKeyId_ip_key`(`apiKeyId`, `ip`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `provider_credentials` (
-    `id` VARCHAR(191) NOT NULL,
-    `providerId` VARCHAR(191) NOT NULL,
-    `env` ENUM('PROD', 'STAGING') NOT NULL,
-    `keyName` VARCHAR(191) NOT NULL,
-    `keyVaultRef` VARCHAR(191) NOT NULL,
-    `meta` LONGTEXT NULL,
-    `isActive` BOOLEAN NOT NULL DEFAULT true,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
-
-    UNIQUE INDEX `provider_credentials_providerId_env_key`(`providerId`, `env`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `provider_ratecards` (
-    `id` VARCHAR(191) NOT NULL,
-    `provider_id` VARCHAR(191) NOT NULL,
-    `service_id` VARCHAR(191) NOT NULL,
-    `fixedCharge` BIGINT NULL,
-    `percentCharge` DOUBLE NULL,
-    `minCharge` BIGINT NULL,
-    `maxCharge` BIGINT NULL,
-    `effectiveFrom` DATETIME(3) NOT NULL,
-    `effectiveTo` DATETIME(3) NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
-
-    UNIQUE INDEX `provider_ratecards_provider_id_service_id_effectiveFrom_key`(`provider_id`, `service_id`, `effectiveFrom`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -410,7 +290,6 @@ CREATE TABLE `transactions` (
     `user_id` VARCHAR(191) NOT NULL,
     `wallet_id` VARCHAR(191) NOT NULL,
     `service_id` VARCHAR(191) NOT NULL,
-    `provider_id` VARCHAR(191) NULL,
     `amount` BIGINT NOT NULL,
     `providerCharge` BIGINT NULL,
     `commissionAmount` BIGINT NOT NULL,
@@ -499,7 +378,6 @@ CREATE TABLE `pii_consents` (
     `id` VARCHAR(191) NOT NULL,
     `user_id` VARCHAR(191) NOT NULL,
     `user_kyc_id` VARCHAR(191) NULL,
-    `business_kyc_id` VARCHAR(191) NULL,
     `piiType` VARCHAR(191) NOT NULL,
     `piiHash` VARCHAR(191) NOT NULL,
     `providedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -625,15 +503,6 @@ ALTER TABLE `user_kyc` ADD CONSTRAINT `user_kyc_user_id_fkey` FOREIGN KEY (`user
 ALTER TABLE `user_kyc` ADD CONSTRAINT `user_kyc_address_id_fkey` FOREIGN KEY (`address_id`) REFERENCES `addresses`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `user_kyc` ADD CONSTRAINT `user_kyc_businessKyc_id_fkey` FOREIGN KEY (`businessKyc_id`) REFERENCES `business_kycs`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `business_kycs` ADD CONSTRAINT `business_kycs_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `business_kycs` ADD CONSTRAINT `business_kycs_address_id_fkey` FOREIGN KEY (`address_id`) REFERENCES `addresses`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `bank_details` ADD CONSTRAINT `bank_details_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -655,7 +524,7 @@ ALTER TABLE `commission_settings` ADD CONSTRAINT `commission_settings_role_id_fk
 ALTER TABLE `commission_settings` ADD CONSTRAINT `commission_settings_target_user_id_fkey` FOREIGN KEY (`target_user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `commission_settings` ADD CONSTRAINT `commission_settings_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `commission_settings` ADD CONSTRAINT `commission_settings_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `commission_settings` ADD CONSTRAINT `commission_settings_created_by_fkey` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -667,34 +536,16 @@ ALTER TABLE `commission_earnings` ADD CONSTRAINT `commission_earnings_user_id_fk
 ALTER TABLE `commission_earnings` ADD CONSTRAINT `commission_earnings_from_user_id_fkey` FOREIGN KEY (`from_user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `commission_earnings` ADD CONSTRAINT `commission_earnings_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `commission_earnings` ADD CONSTRAINT `commission_earnings_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `commission_earnings` ADD CONSTRAINT `commission_earnings_created_by_fkey` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `api_keys` ADD CONSTRAINT `api_keys_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `service_providers` ADD CONSTRAINT `service_providers_created_by_fkey` FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `api_key_services` ADD CONSTRAINT `api_key_services_apiKeyId_fkey` FOREIGN KEY (`apiKeyId`) REFERENCES `api_keys`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `api_key_services` ADD CONSTRAINT `api_key_services_serviceId_fkey` FOREIGN KEY (`serviceId`) REFERENCES `services`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `api_key_ip_whitelists` ADD CONSTRAINT `api_key_ip_whitelists_apiKeyId_fkey` FOREIGN KEY (`apiKeyId`) REFERENCES `api_keys`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `provider_credentials` ADD CONSTRAINT `provider_credentials_providerId_fkey` FOREIGN KEY (`providerId`) REFERENCES `service_providers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `provider_ratecards` ADD CONSTRAINT `provider_ratecards_provider_id_fkey` FOREIGN KEY (`provider_id`) REFERENCES `service_providers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `provider_ratecards` ADD CONSTRAINT `provider_ratecards_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `user_permissions` ADD CONSTRAINT `user_permissions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `user_permissions` ADD CONSTRAINT `user_permissions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `user_permissions` ADD CONSTRAINT `user_permissions_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -703,7 +554,7 @@ ALTER TABLE `user_permissions` ADD CONSTRAINT `user_permissions_user_id_fkey` FO
 ALTER TABLE `role_permissions` ADD CONSTRAINT `role_permissions_role_id_fkey` FOREIGN KEY (`role_id`) REFERENCES `roles`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `role_permissions` ADD CONSTRAINT `role_permissions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `role_permissions` ADD CONSTRAINT `role_permissions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `settings` ADD CONSTRAINT `settings_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
@@ -718,10 +569,7 @@ ALTER TABLE `transactions` ADD CONSTRAINT `transactions_user_id_fkey` FOREIGN KE
 ALTER TABLE `transactions` ADD CONSTRAINT `transactions_wallet_id_fkey` FOREIGN KEY (`wallet_id`) REFERENCES `wallets`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `transactions` ADD CONSTRAINT `transactions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `services`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `transactions` ADD CONSTRAINT `transactions_provider_id_fkey` FOREIGN KEY (`provider_id`) REFERENCES `service_providers`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `transactions` ADD CONSTRAINT `transactions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `ledger_entries` ADD CONSTRAINT `ledger_entries_transaction_id_fkey` FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
@@ -740,9 +588,6 @@ ALTER TABLE `pii_consents` ADD CONSTRAINT `pii_consents_user_id_fkey` FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE `pii_consents` ADD CONSTRAINT `pii_consents_user_kyc_id_fkey` FOREIGN KEY (`user_kyc_id`) REFERENCES `user_kyc`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `pii_consents` ADD CONSTRAINT `pii_consents_business_kyc_id_fkey` FOREIGN KEY (`business_kyc_id`) REFERENCES `business_kycs`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `cc_senders` ADD CONSTRAINT `cc_senders_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

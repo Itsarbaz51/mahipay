@@ -69,7 +69,7 @@ export const createOrUpdateCommissionSetting =
   (payload) => async (dispatch) => {
     try {
       dispatch(commissionRequest());
-      const { data } = await axios.post(`/api/v1/commissions/setting`, payload);
+      const { data } = await axios.post(`/commissions/setting`, payload);
       dispatch(commissionSuccess(data));
       return data;
     } catch (error) {
@@ -86,10 +86,9 @@ export const getCommissionSettingsByRoleOrUser =
     try {
       dispatch(commissionRequest());
       const params = userId ? { userId } : {};
-      const { data } = await axios.get(
-        `/api/v1/commissions/setting/${roleId}`,
-        { params }
-      );
+      const { data } = await axios.get(`/commissions/setting/${roleId}`, {
+        params,
+      });
       dispatch(setCommissionSettings(data));
       return data;
     } catch (error) {
@@ -99,13 +98,26 @@ export const getCommissionSettingsByRoleOrUser =
     }
   };
 
+export const getCommissionSettingsByCreatedBy = () => async (dispatch) => {
+  try {
+    dispatch(commissionRequest());
+    const { data } = await axios.get(`/commissions/setting/created-by-me`);
+    dispatch(setCommissionSettings(data.data || data));
+    return data;
+  } catch (error) {
+    const errMsg = error?.response?.data?.message || error?.message;
+    dispatch(commissionFail(errMsg));
+    throw error;
+  }
+};
+
 // ---------------- Commission Earning Actions ------------------
 
 // Create commission earning
 export const createCommissionEarning = (payload) => async (dispatch) => {
   try {
     dispatch(commissionRequest());
-    const { data } = await axios.post(`/api/v1/commissions/earn`, payload);
+    const { data } = await axios.post(`/commissions/earn`, payload);
     dispatch(commissionSuccess(data));
     return data;
   } catch (error) {
@@ -121,7 +133,7 @@ export const getCommissionEarnings =
   async (dispatch) => {
     try {
       dispatch(commissionRequest());
-      const { data } = await axios.get(`/api/v1/commissions`, {
+      const { data } = await axios.get(`/commissions`, {
         params: filters,
       });
       dispatch(setCommissionEarnings(data));

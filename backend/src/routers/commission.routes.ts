@@ -10,22 +10,28 @@ import {
 const commissionRoutes = Router();
 
 // Commission Setting Routes
+commissionRoutes.get(
+  "/setting",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  CommissionSettingController.getByRoleOrUser
+);
+
+commissionRoutes.get(
+  "/setting/created-by-me",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  CommissionSettingController.getByCreatedBy
+);
 
 commissionRoutes.post(
   "/setting",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   validateRequest(
     CommissionValidationSchemas.createOrUpdateCommissionSettingSchema
   ),
   CommissionSettingController.createOrUpdate
-);
-
-commissionRoutes.get(
-  "/setting/:roleId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
-  CommissionSettingController.getByRoleOrUser
 );
 
 // Commission Earning Routes
@@ -33,7 +39,7 @@ commissionRoutes.get(
 commissionRoutes.post(
   "/earn",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   validateRequest(CommissionValidationSchemas.createCommissionEarningSchema),
   CommissionEarningController.create
 );
@@ -41,7 +47,7 @@ commissionRoutes.post(
 commissionRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   CommissionEarningController.getAll
 );
 

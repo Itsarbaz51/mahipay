@@ -5,6 +5,7 @@ import {
   CommissionEarningService,
   CommissionSettingService,
 } from "../services/commission.service.js";
+import { ApiError } from "../utils/ApiError.js";
 
 export class CommissionSettingController {
   static createOrUpdate = asyncHandler(async (req: Request, res: Response) => {
@@ -28,12 +29,32 @@ export class CommissionSettingController {
   });
 
   static getByRoleOrUser = asyncHandler(async (req: Request, res: Response) => {
-    const { roleId } = req.params;
-    const userId = req.query.userId as string | undefined;
+    const userId = req.user?.id;
 
     const settings =
-      await CommissionSettingService.getCommissionSettingsByRoleOrUser(
-        roleId,
+      await CommissionSettingService.getCommissionSettingsByRoleOrUser(userId);
+
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(
+          settings,
+          "Commission settings fetched successfully",
+          200
+        )
+      );
+  });
+
+  static getByCreatedBy = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    console.log();
+
+    if (!userId) {
+      return res.status(401).json(ApiError.internal("Unauthorized"));
+    }
+
+    const settings =
+      await CommissionSettingService.getCommissionSettingsByCreatedBy(
         userId
       );
 
