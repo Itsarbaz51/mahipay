@@ -1,144 +1,70 @@
 import Prisma from "../db/db.js";
 import type {
-  CreateServiceInput,
-  deactivateInput,
-  ProviderCredentialInput,
-  UpdateServiceInput,
+  CreateServiceProviderInput,
+  UpdateServiceProviderInput,
 } from "../types/serivce.type.js";
 import { ApiError } from "../utils/ApiError.js";
 import logger from "../utils/WinstonLogger.js";
-import type {
-  ServiceProviderInput,
-  ServiceProviderUpdateInput,
-  ProviderRateCardInput,
-} from "../types/serivce.type.js";
-
-export class ServiceService {
-  // ✅ Create a new service
-  static async create(data: CreateServiceInput) {
-    const [existingCode, existingName] = await Promise.all([
-      Prisma.service.findUnique({ where: { code: data.code } }),
-      Prisma.service.findUnique({ where: { name: data.name } }),
-    ]);
-
-    if (existingCode) throw ApiError.badRequest("Service code already exists");
-    if (existingName) throw ApiError.badRequest("Service name already exists");
-
-    const service = await Prisma.service.create({ data });
-
-    logger.info("Service created", { id: service.id });
-
-    return service;
-  }
-
-  // ✅ Get all services
-  static async getAll() {
-    const services = await Prisma.service.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    return services;
-  }
-
-  // ✅ Get service by ID
-  static async getById(id: string) {
-    const service = await Prisma.service.findUnique({ where: { id } });
-    if (!service) throw ApiError.notFound("Service not found");
-    return service;
-  }
-
-  // ✅ Update service
-  static async update(id: string, data: UpdateServiceInput) {
-    const existing = await Prisma.service.findUnique({ where: { id } });
-    if (!existing) throw ApiError.notFound("Service not found");
-
-    const updated = await Prisma.service.update({
-      where: { id },
-      data,
-    });
-
-    logger.info("Service updated", { id });
-    return updated;
-  }
-
-  // ✅ Soft delete or deactivate service
-  static async deactivate(id: string, statusInput: deactivateInput) {
-    const existing = await Prisma.service.findUnique({ where: { id } });
-    if (!existing) throw ApiError.notFound("Service not found");
-
-    if (!statusInput.status) {
-      throw ApiError.badRequest("Status is required to deactivate service");
-    }
-
-    const updated = await Prisma.service.update({
-      where: { id },
-      data: { status: statusInput.status },
-    });
-
-    logger.info("Service deactivated", { id });
-    return updated;
-  }
-}
 
 export class ServiceProviderService {
-  static async create(data: ServiceProviderInput) {
-    const existing = await Prisma.serviceProvider.findFirst({
-      where: {
-        OR: [{ name: data.name }, { code: data.code }],
-      },
+  static async create(
+    data: CreateServiceProviderInput & { createdBy: string }
+  ) {
+    const existingCode = await Prisma.serviceProvider.findUnique({
+      where: { code: data.code },
     });
 
-    if (existing) {
-      throw ApiError.badRequest(
-        `Service Provider with name/code already exists (${existing.name} - ${existing.code})`
-      );
+    if (existingCode) {
+      throw ApiError.badRequest("Service Provider code already exists");
     }
 
-    const provider = await Prisma.serviceProvider.create({
+    const serviceProvider = await Prisma.serviceProvider.create({
       data: {
-        name: data.name,
-        code: data.code,
         type: data.type,
+        code: data.code,
         isActive: data.isActive ?? true,
+        createdBy: data.createdBy,
       },
     });
 
-    logger.info("Service Provider created", { id: provider.id });
-    return provider;
+    logger.info("Service Provider created", { id: serviceProvider.id });
+    return serviceProvider;
   }
 
-  static async list() {
-    return Prisma.serviceProvider.findMany({
+  static async getAllByCreatedUser(userId: string) {
+    const serviceProviders = await Prisma.serviceProvider.findMany({
+      where: {
+        createdBy: userId,
+      },
       orderBy: { createdAt: "desc" },
     });
+    return serviceProviders;
   }
 
   static async getById(id: string) {
-    const provider = await Prisma.serviceProvider.findUnique({
+    const serviceProvider = await Prisma.serviceProvider.findUnique({
       where: { id },
-      include: {
-        credentials: true,
-        ratecards: true,
-      },
     });
 
-    if (!provider) throw ApiError.notFound("Service Provider not found");
-    return provider;
+    if (!serviceProvider) throw ApiError.notFound("Service Provider not found");
+    return serviceProvider;
   }
 
-  static async update(id: string, data: ServiceProviderUpdateInput) {
+  static async toggleActiveStatus(id: string, isActive: boolean) {
     const existing = await Prisma.serviceProvider.findUnique({ where: { id } });
     if (!existing) throw ApiError.notFound("Service Provider not found");
-
-    const cleanData = Object.fromEntries(
-      Object.entries(data).filter(([_, v]) => v !== undefined && v !== null)
-    );
 
     const updated = await Prisma.serviceProvider.update({
       where: { id },
-      data: cleanData,
+      data: {
+        isActive: isActive,
+      },
     });
 
-    logger.info("Service Provider updated", { id });
+    logger.info("Service Provider status updated", {
+      id,
+      isActive: isActive,
+    });
     return updated;
   }
 
@@ -146,182 +72,35 @@ export class ServiceProviderService {
     const existing = await Prisma.serviceProvider.findUnique({ where: { id } });
     if (!existing) throw ApiError.notFound("Service Provider not found");
 
-    const deleted = await Prisma.serviceProvider.delete({ where: { id } });
-    logger.info("Service Provider deleted", { id });
-    return deleted;
-  }
-}
-
-export class ProviderRateCardService {
-  static async createOrUpdate(data: ProviderRateCardInput) {
-    // Validate provider and service exist
-    const [provider, service] = await Promise.all([
-      Prisma.serviceProvider.findUnique({ where: { id: data.providerId } }),
-      Prisma.service.findUnique({ where: { id: data.serviceId } }),
+    // Check if provider has related records
+    const [
+      hasTransactions,
+      hasCommissionSettings,
+      hasCommissionEarnings,
+      hasUserPermissions,
+      hasRolePermissions,
+    ] = await Promise.all([
+      Prisma.transaction.count({ where: { serviceId: id } }),
+      Prisma.commissionSetting.count({ where: { serviceId: id } }),
+      Prisma.commissionEarning.count({ where: { serviceId: id } }),
+      Prisma.userPermission.count({ where: { serviceId: id } }),
+      Prisma.rolePermission.count({ where: { serviceId: id } }),
     ]);
 
-    if (!provider) throw ApiError.notFound("Service Provider not found");
-    if (!service) throw ApiError.notFound("Service not found");
+    if (
+      hasTransactions > 0 ||
+      hasCommissionSettings > 0 ||
+      hasCommissionEarnings > 0 ||
+      hasUserPermissions > 0 ||
+      hasRolePermissions > 0
+    ) {
+      throw ApiError.badRequest(
+        "Cannot delete Service Provider with existing related records"
+      );
+    }
 
-    const effectiveFromDate = data.effectiveFrom
-      ? new Date(data.effectiveFrom)
-      : new Date();
-    const effectiveToDate = data.effectiveTo
-      ? new Date(data.effectiveTo)
-      : null;
-
-    const prismaData = {
-      providerId: data.providerId,
-      serviceId: data.serviceId,
-      fixedCharge:
-        data.rateType === "FLAT" ? BigInt(data.rateValue * 100) : null,
-      percentCharge: data.rateType === "PERCENTAGE" ? data.rateValue : null,
-      minCharge: data.minAmount ? BigInt(data.minAmount * 100) : null,
-      maxCharge: data.maxAmount ? BigInt(data.maxAmount * 100) : null,
-      effectiveFrom: effectiveFromDate,
-      effectiveTo: effectiveToDate,
-      updatedAt: new Date(),
-    };
-
-    // Upsert by provider + service + effectiveFrom
-    const rateCard = await Prisma.providerRateCard.upsert({
-      where: {
-        providerId_serviceId_effectiveFrom: {
-          providerId: data.providerId,
-          serviceId: data.serviceId,
-          effectiveFrom: effectiveFromDate,
-        },
-      },
-      update: prismaData,
-      create: {
-        ...prismaData,
-        createdAt: new Date(),
-      },
-    });
-
-    logger.info("Provider rate card upserted", { id: rateCard.id });
-    return rateCard;
-  }
-
-  static async list() {
-    return Prisma.providerRateCard.findMany({
-      include: {
-        provider: true,
-        service: true,
-      },
-      orderBy: {
-        effectiveFrom: "desc",
-      },
-    });
-  }
-
-  static async getByProvider(providerId: string) {
-    const provider = await Prisma.serviceProvider.findUnique({
-      where: { id: providerId },
-    });
-    if (!provider) throw ApiError.notFound("Service Provider not found");
-
-    return Prisma.providerRateCard.findMany({
-      where: { providerId },
-      include: {
-        provider: true,
-        service: true,
-      },
-      orderBy: {
-        effectiveFrom: "desc",
-      },
-    });
-  }
-
-  static async getById(id: string) {
-    const rateCard = await Prisma.providerRateCard.findUnique({
-      where: { id },
-      include: {
-        provider: true,
-        service: true,
-      },
-    });
-
-    if (!rateCard) throw ApiError.notFound("Rate card not found");
-
-    return rateCard;
-  }
-}
-
-export class ProviderCredentialService {
-  static async upsertCredential(data: ProviderCredentialInput) {
-    const provider = await Prisma.serviceProvider.findUnique({
-      where: { id: data.providerId },
-    });
-    if (!provider) throw ApiError.notFound("Service Provider not found");
-
-    const credential = await Prisma.providerCredential.upsert({
-      where: {
-        providerId_env: {
-          providerId: data.providerId,
-          env: data.env,
-        },
-      },
-      update: {
-        keyName: data.keyName,
-        keyVaultRef: data.keyVaultRef,
-        meta: data.meta ? JSON.stringify(data.meta) : null,
-        isActive: data.isActive ?? true,
-        updatedAt: new Date(),
-      },
-      create: {
-        providerId: data.providerId,
-        env: data.env,
-        keyName: data.keyName,
-        keyVaultRef: data.keyVaultRef,
-        meta: data.meta ? JSON.stringify(data.meta) : null,
-        isActive: data.isActive ?? true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-
-    logger.info("Provider credential upserted", { id: credential.id });
-    return credential;
-  }
-
-  static async list() {
-    return Prisma.providerCredential.findMany({
-      include: { provider: true },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  static async getByProvider(providerId: string) {
-    const provider = await Prisma.serviceProvider.findUnique({
-      where: { id: providerId },
-    });
-    if (!provider) throw ApiError.notFound("Service Provider not found");
-
-    return Prisma.providerCredential.findMany({
-      where: { providerId },
-      include: { provider: true },
-    });
-  }
-
-  static async getById(id: string) {
-    const credential = await Prisma.providerCredential.findUnique({
-      where: { id },
-      include: { provider: true },
-    });
-
-    if (!credential) throw ApiError.notFound("Credential not found");
-    return credential;
-  }
-
-  static async delete(id: string) {
-    const existing = await Prisma.providerCredential.findUnique({
-      where: { id },
-    });
-    if (!existing) throw ApiError.notFound("Credential not found");
-
-    const deleted = await Prisma.providerCredential.delete({ where: { id } });
-    logger.info("Provider credential deleted", { id });
-    return deleted;
+    await Prisma.serviceProvider.delete({ where: { id } });
+    logger.info("Service Provider deleted", { id });
+    return { message: "Service Provider deleted successfully" };
   }
 }

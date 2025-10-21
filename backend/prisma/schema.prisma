@@ -15,12 +15,6 @@ enum UserStatus {
   DELETE
 }
 
-enum ServiceStatus {
-  ACTIVE
-  IN_ACTIVE
-  UNAVAILABLE
-}
-
 enum AccountType {
   PERSONAL
   BUSINESS
@@ -178,6 +172,7 @@ model User {
   ccSenders       CCSender[]
   ccBeneficiaries CCBeneficiary[]
   ccCollections   CCCollection[]
+  ServiceProvider ServiceProvider[]
 
   // Indexes for performance
   @@index([parentId])
@@ -329,8 +324,8 @@ model CommissionSetting {
   targetUserId String?         @map("target_user_id")
   targetUser   User?           @relation("CommissionTargetUser", fields: [targetUserId], references: [id])
 
-  serviceId String  @map("service_id")
-  service   Service @relation(fields: [serviceId], references: [id])
+  serviceId String          @map("service_id")
+  service   ServiceProvider @relation(fields: [serviceId], references: [id])
 
   commissionType  CommissionType @map("commission_type")
   commissionValue Decimal        @map("commission_value") @db.Decimal(12, 4)
@@ -368,8 +363,8 @@ model CommissionEarning {
   fromUserId String @map("from_user_id")
   fromUser   User   @relation("CommissionEarningFromUser", fields: [fromUserId], references: [id])
 
-  serviceId String  @map("service_id")
-  service   Service @relation(fields: [serviceId], references: [id])
+  serviceId String          @map("service_id")
+  service   ServiceProvider @relation(fields: [serviceId], references: [id])
 
   transactionId    String         @map("transaction_id") @db.VarChar(100)
   amount           BigInt
@@ -388,87 +383,33 @@ model CommissionEarning {
   @@map("commission_earnings")
 }
 
-// ==================== SERVICES  ====================
+// ==================== Service Providers ====================
 
-model Service {
-  id          String        @id @default(uuid())
-  name        String        @unique
-  code        String        @unique
-  status      ServiceStatus @default(ACTIVE)
-  icon        String?
-  description String?       @db.LongText
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+model ServiceProvider {
+  id            String   @id @default(uuid())
+  type          String // e.g., "AEPS", "BBPS", "DMT", "RECHARGE"
+  code          String   @unique
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String   @map("created_by")
+  createdByUser User     @relation(fields: [createdBy], references: [id])
 
-  providerRateCards ProviderRateCard[]
+  Transaction       Transaction[]
   CommissionSetting CommissionSetting[]
   CommissionEarning CommissionEarning[]
   UserPermission    UserPermission[]
   RolePermission    RolePermission[]
-  Transaction       Transaction[]
-
-  @@map("services")
-}
-
-// ==================== Service Providers & Credentials ====================
-
-model ServiceProvider {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  code      String   @unique
-  type      String // e.g., "AEPS", "BBPS", "DMT", "RECHARGE"
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  credentials ProviderCredential[]
-  ratecards   ProviderRateCard[]
-  Transaction Transaction[]
 
   @@map("service_providers")
-}
-
-model ProviderCredential {
-  id          String          @id @default(uuid())
-  providerId  String
-  provider    ServiceProvider @relation(fields: [providerId], references: [id])
-  env         Env
-  keyName     String
-  keyVaultRef String
-  meta        String?         @db.LongText
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  @@unique([providerId, env], name: "providerId_env")
-  @@map("provider_credentials")
-}
-
-model ProviderRateCard {
-  id            String          @id @default(uuid())
-  providerId    String          @map("provider_id")
-  provider      ServiceProvider @relation(fields: [providerId], references: [id])
-  serviceId     String          @map("service_id")
-  service       Service         @relation(fields: [serviceId], references: [id])
-  fixedCharge   BigInt? // paise
-  percentCharge Float? // percent (use Decimal if needed)
-  minCharge     BigInt?
-  maxCharge     BigInt?
-  effectiveFrom DateTime
-  effectiveTo   DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-
-  @@unique([providerId, serviceId, effectiveFrom], name: "providerId_serviceId_effectiveFrom")
-  @@map("provider_ratecards")
 }
 
 // ==================== User Service Permission  ====================
 
 model UserPermission {
-  id        String  @id @default(uuid())
-  serviceId String  @map("service_id")
-  service   Service @relation(fields: [serviceId], references: [id])
+  id        String          @id @default(uuid())
+  serviceId String          @map("service_id")
+  service   ServiceProvider @relation(fields: [serviceId], references: [id])
 
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
@@ -487,14 +428,14 @@ model UserPermission {
 // ==================== Role/Group Service Permission ====================
 
 model RolePermission {
-  id               String  @id @default(uuid())
-  roleId           String  @map("role_id")
-  role             Role    @relation(fields: [roleId], references: [id])
-  serviceId        String  @map("service_id")
-  service          Service @relation(fields: [serviceId], references: [id])
-  canView          Boolean @default(false) @map("can_view")
-  canEdit          Boolean @default(false) @map("can_edit")
-  canSetCommission Boolean @default(false) @map("can_set_commission")
+  id               String          @id @default(uuid())
+  roleId           String          @map("role_id")
+  role             Role            @relation(fields: [roleId], references: [id])
+  serviceId        String          @map("service_id")
+  service          ServiceProvider @relation(fields: [serviceId], references: [id])
+  canView          Boolean         @default(false) @map("can_view")
+  canEdit          Boolean         @default(false) @map("can_edit")
+  canSetCommission Boolean         @default(false) @map("can_set_commission")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -559,31 +500,29 @@ model LoginLogs {
 // ==================== Transactions & Ledger ====================
 
 model Transaction {
-  id               String           @id @default(uuid())
-  referenceId      String?          @map("reference_id")
-  externalRefId    String?          @map("external_ref_id") // ✅ Added for external provider reference
-  idempotencyKey   String?          @map("idempotency_key")
-  userId           String           @map("user_id")
-  user             User             @relation(fields: [userId], references: [id])
-  walletId         String           @map("wallet_id")
-  wallet           Wallet           @relation(fields: [walletId], references: [id])
-  serviceId        String           @map("service_id")
-  service          Service          @relation(fields: [serviceId], references: [id])
-  providerId       String?          @map("provider_id")
-  provider         ServiceProvider? @relation(fields: [providerId], references: [id])
+  id               String          @id @default(uuid())
+  referenceId      String?         @map("reference_id")
+  externalRefId    String?         @map("external_ref_id") // ✅ Added for external provider reference
+  idempotencyKey   String?         @map("idempotency_key")
+  userId           String          @map("user_id")
+  user             User            @relation(fields: [userId], references: [id])
+  walletId         String          @map("wallet_id")
+  wallet           Wallet          @relation(fields: [walletId], references: [id])
+  serviceId        String          @map("service_id")
+  service          ServiceProvider @relation(fields: [serviceId], references: [id])
   amount           BigInt
   providerCharge   BigInt?
   commissionAmount BigInt
   netAmount        BigInt
-  status           TxStatus         @default(PENDING)
+  status           TxStatus        @default(PENDING)
   rateLimit        Int?
   requestPayload   Json?
   responsePayload  Json?
-  completedAt      DateTime?        @map("completed_at")
+  completedAt      DateTime?       @map("completed_at")
   errorCode        String?
-  errorMessage     String?          @db.LongText
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  errorMessage     String?         @db.LongText
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   ledgerEntries LedgerEntry[]
   Refund        Refund[]

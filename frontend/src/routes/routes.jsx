@@ -19,7 +19,6 @@ import Login from "../pages/auth/Login";
 import Dashboard from "../pages/Dashboard";
 import TransactionHistory from "../pages/TransactionHistory";
 import Reports from "../pages/Reports";
-import CommissionCharges from "../pages/CommissionManagement";
 
 import AllKycTable from "../components/tabels/AllKycTable";
 import PayoutTable from "../components/tabels/PayoutTable";
@@ -29,6 +28,7 @@ import WalletTable from "../components/tabels/Wallet";
 import KYCVerification from "../components/forms/KYCForm";
 import AddFundRequest from "../components/forms/AddFundRequest";
 import Settings from "../components/Settings";
+import CommissionManagement from "../pages/CommissionManagement";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -54,7 +54,7 @@ export const createRouter = () => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="transactions" element={<TransactionHistory />} />
           <Route path="payout" element={<PayoutTable />} />
-          <Route path="commission" element={<CommissionCharges />} />
+          <Route path="commission" element={<CommissionManagement />} />
           <Route path="reports" element={<Reports />} />
           <Route path="add-fund" element={<AddFundRequest />} />
           <Route path="all-kyc" element={<AllKycTable />} />
