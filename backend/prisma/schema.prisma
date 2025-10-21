@@ -411,8 +411,10 @@ model UserPermission {
   serviceId String          @map("service_id")
   service   ServiceProvider @relation(fields: [serviceId], references: [id])
 
-  userId String @map("user_id")
-  user   User   @relation(fields: [userId], references: [id])
+  userId    String  @map("user_id")
+  user      User    @relation(fields: [userId], references: [id])
+
+  serviceIds String @map("service_ids") // ✅ stored as comma-separated string
 
   canView          Boolean @default(false) @map("can_view")
   canEdit          Boolean @default(false) @map("can_edit")
@@ -421,9 +423,10 @@ model UserPermission {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  @@unique([userId, serviceId])
+  @@unique([userId]) // Only one permission record per user
   @@map("user_permissions")
 }
+
 
 // ==================== Role/Group Service Permission ====================
 

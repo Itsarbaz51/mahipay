@@ -69,6 +69,7 @@ export const protectedRoute = [
   "/wallet",
   "/all-kyc",
   "/add-fund",
+  "/permission",
 ];
 
 import {
@@ -143,7 +144,8 @@ export const navbarTitleConfig = {
   },
 };
 
-{/* <select class="form-control" id="bankselect">
+{
+  /* <select class="form-control" id="bankselect">
   <option>select</option>
   <option value="SBIN0000001">STATE BANK OF INDIA</option>
   <option value="BARB0HEADOF">BANK OF BARODA</option>
@@ -931,4 +933,5 @@ export const navbarTitleConfig = {
   <option value="YESB0ICMB02">INDORE CLOTH MARKET CO-OP BANK</option>
   <option value="IBKL01543SR">SRIRAMANAGAR PATTANA SAHAKARA BANK</option>
   <option value="HDFC0CNSBLN">NANDANI SAHAKARI BANK</option>
-</select>; */}
+</select>; */
+}

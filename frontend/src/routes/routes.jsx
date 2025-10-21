@@ -29,6 +29,7 @@ import KYCVerification from "../components/forms/KYCForm";
 import AddFundRequest from "../components/forms/AddFundRequest";
 import Settings from "../components/Settings";
 import CommissionManagement from "../pages/CommissionManagement";
+// import PermissionsManager from "../components/PermissionsManager";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -62,6 +63,7 @@ export const createRouter = () => {
           <Route path="settings" element={<Settings />} />
           <Route path="employee-management" element={<EmployeeTable />} />
           <Route path="wallet" element={<WalletTable />} />
+          {/* <Route path="permission" element={<PermissionsManager />} /> */}
         </Route>
 
         <Route

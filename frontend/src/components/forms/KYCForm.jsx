@@ -230,14 +230,14 @@ const FileUpload = ({
 const KYCStatusCard = ({ kycDetail }) => {
   const getStatusConfig = (status) => {
     switch (status) {
-      case "APPROVE":
+      case "VERIFIED":
         return {
           icon: CheckCircle,
           color: "text-green-600",
           bgColor: "bg-green-50",
           borderColor: "border-green-200",
-          title: "KYC Approved",
-          message: "Your KYC verification has been approved successfully.",
+          title: "KYC VERIFIED",
+          message: "Your KYC verification has been VERIFIED successfully.",
         };
       case "REJECT":
         return {
@@ -764,7 +764,7 @@ export default function KYCWithAddressForm() {
           {/* KYC Status Card */}
           <KYCStatusCard kycDetail={kycDetail} />
 
-          {/* Additional info for approved KYC */}
+          {/* Additional info for VERIFIED KYC */}
           {kycDetail.status === "APPROVE" && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">

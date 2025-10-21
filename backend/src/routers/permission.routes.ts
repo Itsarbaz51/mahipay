@@ -13,7 +13,7 @@ const permissionRoutes = Router();
 permissionRoutes.post(
   "/role-upsert",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   validateRequest(PermissionValidationSchemas.createRolePermission),
   RolePermissionController.createOrUpdate
 );
@@ -21,14 +21,14 @@ permissionRoutes.post(
 permissionRoutes.get(
   "/role-permission/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   RolePermissionController.getByRole
 );
 
 permissionRoutes.delete(
   "/role-permission/delete/:roleId/:serviceId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   RolePermissionController.delete
 );
 
@@ -36,7 +36,7 @@ permissionRoutes.delete(
 permissionRoutes.post(
   "/user-upsert",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   validateRequest(PermissionValidationSchemas.createUserPermission),
   UserPermissionController.createOrUpdate
 );
@@ -45,7 +45,7 @@ permissionRoutes.post(
 permissionRoutes.get(
   "/user-permission/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   UserPermissionController.getByUser
 );
 
@@ -53,7 +53,7 @@ permissionRoutes.get(
 permissionRoutes.delete(
   "/user-permission/delete/:userId/:serviceId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   UserPermissionController.delete
 );
 

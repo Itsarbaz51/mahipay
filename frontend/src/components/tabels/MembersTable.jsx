@@ -34,6 +34,12 @@ import ActionsMenu from "../ui/ActionsMenu";
 import UserProfileView from "../../pages/UserProfileView";
 import EditCredentialsModal from "../forms/EditCredentialsModal";
 import EditProfileImageModal from "../forms/EditProfileImageModal";
+import PermissionForm from "../forms/PermissionForm";
+import {
+  getAllPermissions,
+  getPermissionById,
+  upsertPermission,
+} from "../../redux/slices/permissionSlice";
 
 const MembersTable = () => {
   const [search, setSearch] = useState("");
@@ -54,6 +60,91 @@ const MembersTable = () => {
   const dispatch = useDispatch();
   const searchTimeoutRef = useRef(null);
   const initialLoadRef = useRef(false); // Track initial load
+
+  // --- Permission Modal States ---
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [permissionUser, setPermissionUser] = useState(null);
+  const [existingPermissions, setExistingPermissions] = useState([]);
+  const [permissionMode, setPermissionMode] = useState("add");
+
+  const {currentPermission} = useSelector((state) => state.permission)
+
+  useEffect(() => {
+    const loadPermissions = async () => {
+      try {
+        if (showPermissionModal === true) {
+          const result = await dispatch(getAllPermissions());
+          if (result.payload?.data?.permissions) {
+            setExistingPermissions(result.payload.data.permissions);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load permissions:", error);
+      }
+    };
+
+    loadPermissions();
+  }, [dispatch]);
+
+  // Static service list
+  const [services] = useState([
+    { id: "6a779af5-31ea-464e-8577-eb3045559e88", name: "Payment Gateway" },
+    { id: "6a779af5-31ea-464e-8577-eb3045559e85", name: "Analytics Dashboard" },
+    { id: "6a779af5-31ea-464e-8577-eb3045559e86", name: "User Management" },
+    { id: "6a779af5-31ea-464e-8577-eb3045559e87", name: "Billing System" },
+    { id: "6a779af5-31ea-464e-8577-eb3045559e89", name: "Reporting Tool" },
+  ]);
+
+  // --- Open Permission Modal (Updated) ---
+  const handleAddPermission = async (user) => {
+    setPermissionUser(user);
+
+    try {
+      // Try to fetch existing permissions for this user
+      const result = await dispatch(getPermissionById(user.id));
+      if (result.payload?.data) {
+        setPermissionMode("edit");
+      } else {
+        setPermissionMode("add");
+      }
+    } catch (error) {
+      // If no permissions found, use add mode
+      setPermissionMode("add");
+      console.log("No existing permissions found, using add mode");
+    }
+
+    setShowPermissionModal(true);
+  };
+
+  // --- Submit Permission (Updated) ---
+  const handlePermissionSubmit = (permissionData) => {
+    if (!permissionUser) return;
+
+    const finalData = {
+      userId: permissionUser.id,
+      ...permissionData,
+    };
+
+    dispatch(upsertPermission(finalData, "user-upsert")).then(() => {
+      // Refresh permissions list after successful update
+      dispatch(getAllPermissions());
+    });
+
+    const message =
+      permissionMode === "add"
+        ? `Permissions added for ${permissionUser.firstName}`
+        : `Permissions updated for ${permissionUser.firstName}`;
+
+    toast.success(message);
+    handleClosePermissionModal();
+  };
+
+  // --- Close Modal (Updated) ---
+  const handleClosePermissionModal = () => {
+    setShowPermissionModal(false);
+    setPermissionUser(null);
+    setPermissionMode("add"); // Reset to add mode
+  };
 
   const {
     users = [],
@@ -561,8 +652,14 @@ const MembersTable = () => {
                             setOpenMenuId(null);
                           }}
                           onEditPin={(user) => {
+                            console.log("user", user);
+
                             setSelectedUser(user);
                             setShowEditPin(true);
+                            setOpenMenuId(null);
+                          }}
+                          onPermission={(user) => {
+                            handleAddPermission(user);
                             setOpenMenuId(null);
                           }}
                           onSettings={(user) => {
@@ -689,6 +786,21 @@ const MembersTable = () => {
             setSelectedUser(null);
           }}
           onSuccess={handleCredentialsSuccess}
+        />
+      )}
+      {console.log(existingPermissions)}
+      
+
+      {/* Permission Modal */}
+      {showPermissionModal && permissionUser && (
+        <PermissionForm
+          mode={permissionMode}
+          onSubmit={handlePermissionSubmit}
+          onCancel={handleClosePermissionModal}
+          selectedUser={permissionUser}
+          services={services}
+          setSelectedUser={setPermissionUser}
+          existingPermissions={existingPermissions}
         />
       )}
     </div>
