@@ -49,6 +49,28 @@ export class ServiceProviderController {
     }
   );
 
+  static getAllByCreatedUserAndStatus = asyncHandler(
+    async (req: Request, res: Response) => {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        throw ApiError.unauthorized("User not authenticated");
+      }
+
+      const serviceProviders =
+        await ServiceProviderService.getAllByCreatedUserAndStatus(userId);
+      return res
+        .status(200)
+        .json(
+          ApiResponse.success(
+            serviceProviders,
+            "Service Providers fetched successfully",
+            200
+          )
+        );
+    }
+  );
+
   static getById = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("Service Provider ID is required");

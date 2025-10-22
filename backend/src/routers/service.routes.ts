@@ -21,6 +21,12 @@ serviceRoutes.get(
   ServiceProviderController.getAllByCreatedUser
 );
 
+serviceRoutes.get(
+  "/providers/status",
+  AuthMiddleware.isAuthenticated,
+  ServiceProviderController.getAllByCreatedUserAndStatus
+);
+
 // Get service provider by ID
 serviceRoutes.get(
   "/providers/:id",

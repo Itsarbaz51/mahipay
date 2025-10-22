@@ -41,6 +41,17 @@ export class ServiceProviderService {
     return serviceProviders;
   }
 
+  static async getAllByCreatedUserAndStatus(userId: string) {
+    const serviceProviders = await Prisma.serviceProvider.findMany({
+      where: {
+        createdBy: userId,
+        isActive: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return serviceProviders;
+  }
+
   static async getById(id: string) {
     const serviceProvider = await Prisma.serviceProvider.findUnique({
       where: { id },
