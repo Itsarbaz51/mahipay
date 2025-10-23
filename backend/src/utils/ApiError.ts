@@ -19,8 +19,8 @@ class ApiError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 
-  static badRequest(message: string = "Bad Request", errors: any[] = []) {
-    return new ApiError(message, 400, errors);
+  static badRequest(message: string = "Bad Request", status: number  = 400, errors: any[] = []) {
+    return new ApiError(message, status, errors);
   }
 
   static unauthorized(message: string = "Unauthorized", errors: any[] = []) {
@@ -37,6 +37,13 @@ class ApiError extends Error {
 
   static conflict(message: string = "Conflict", errors: any[] = []) {
     return new ApiError(message, 409, errors);
+  }
+
+  static insufficientFunds(
+    message: string = "Insufficient funds",
+    errors: any[] = []
+  ) {
+    return new ApiError(message, 400, errors);
   }
 
   static internal(

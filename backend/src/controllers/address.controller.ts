@@ -35,7 +35,7 @@ class AddressController {
     );
     const { id } = req.params;
     if (!id) {
-      throw ApiError.badRequest("Invalid request", ["Address ID is required"]);
+      throw ApiError.badRequest("Address ID is required");
     }
     const dbUpdateData = await AddressServices.updateUserAddress(
       validatedData,
@@ -50,7 +50,7 @@ class AddressController {
   static destroy = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) {
-      throw ApiError.badRequest("Invalid request", ["Address ID is required"]);
+      throw ApiError.badRequest("Address ID is requir");
     }
     const dbDeleteData = await AddressServices.deleteUserAddress(id);
     res
@@ -93,7 +93,7 @@ class StateController {
     const { id } = req.params;
 
     if (!id) {
-      throw ApiError.badRequest("Invalid request", ["State ID is required"]);
+      throw ApiError.badRequest("State ID is required");
     }
 
     const dbUpdateData = await AddressServices.updateState(validatedData, id);
@@ -146,7 +146,7 @@ class CityController {
     );
     const { id } = req.params;
     if (!id) {
-      throw ApiError.badRequest("Invalid request", ["City ID is required"]);
+      throw ApiError.badRequest("City ID is required");
     }
     const dbUpdateData = await AddressServices.updateCity(validatedData, id);
     res
@@ -158,7 +158,7 @@ class CityController {
   static destroy = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) {
-      throw ApiError.badRequest("Invalid request", ["City ID is required"]);
+      throw ApiError.badRequest("City ID is required");
     }
     const dbDeleteData = await AddressServices.deleteCity(id);
     res

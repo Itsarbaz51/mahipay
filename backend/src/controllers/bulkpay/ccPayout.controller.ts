@@ -1,121 +1,119 @@
+// src/controllers/CCPayoutController.ts
 import type { Request, Response } from "express";
+import CCPayoutService from "../../services/bulkpay/ccPayout.service.js";
 import asyncHandler from "../../utils/AsyncHandler.js";
-import CCPayoutValidationSchemas from "../../validations/bulkpay/ccPayoutValidation.schemas.js";
-import CCPayoutServices from "../../services/bulkpay/ccPayout.service.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 
-class CCSenderController {
-  static create = asyncHandler(async (req: Request, res: Response) => {
+export class CCPayoutController {
+  private payoutService: CCPayoutService;
+
+  constructor() {
+    this.payoutService = new CCPayoutService();
+  }
+
+  createSender = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.id;
+    const reqIp = req.ip!;
 
     if (!userId) {
-      throw ApiError.internal("Failed to get user id");
+      throw ApiError.internal("Failed to get user ID in createSender");
     }
 
-    const sender = await CCPayoutServices.createSender(userId, req.body);
+    const result = await this.payoutService.createSender(
+      userId,
+      reqIp,
+      req.body
+    );
 
     res
       .status(201)
-      .json(ApiResponse.success(sender, "Sender created successfully", 201));
+      .json(ApiResponse.success(result, "Sender created successfully", 201));
   });
 
-  static uploadCardImage = asyncHandler(async (req: Request, res: Response) => {
-    const validatedData =
-      await CCPayoutValidationSchemas.UploadCardImage.parseAsync({
-        senderId: req.body.senderId,
-        cardImageType: req.body.cardImageType,
-      });
+  uploadCardImage = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { senderId, cardImageType } = req.body;
+
+    if (!userId) {
+      throw ApiError.internal("Failed to get user ID in uploadCardImage");
+    }
 
     if (!req.file) {
       throw ApiError.badRequest("Card image file is required");
     }
 
-    const updatedSender = await CCPayoutServices.uploadCardImage(
-      validatedData.senderId,
-      validatedData.cardImageType,
-      req.file
-    );
-
-    res
-      .status(200)
-      .json(
-        ApiResponse.success(updatedSender, "Card image uploaded successfully")
-      );
-  });
-
-  static list = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req?.user?.id;
-
-    if (!userId) {
-      throw ApiError.internal("Failed to get user id");
-    }
-
-    const result = await CCPayoutServices.listSenders(userId, req.body);
-
-    res
-      .status(200)
-      .json(
-        ApiResponse.success(result.senders, "Senders fetched successfully", 200)
-      );
-  });
-}
-
-class CCBeneficiaryController {
-  static create = asyncHandler(async (req: Request, res: Response) => {
-    const validatedData =
-      await CCPayoutValidationSchemas.CreateBeneficiary.parseAsync(req.body);
-
-    const userId = req?.user?.id;
-    if (!userId) {
-      throw ApiError.internal("Failed to get user id");
-    }
-
-    const beneficiary = await CCPayoutServices.createBeneficiary(
+    const result = await this.payoutService.uploadCardImage(
       userId,
-      validatedData
+      senderId,
+      cardImageType,
+      req.file
     );
 
     res
       .status(201)
       .json(
-        ApiResponse.success(
-          beneficiary,
-          "Beneficiary created successfully",
-          201
-        )
+        ApiResponse.success(result, "Card image uploaded successfully", 201)
       );
   });
 
-  static list = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req?.user?.id;
+  listSenders = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
 
     if (!userId) {
-      throw ApiError.internal("Failed to get user id");
+      throw ApiError.internal("Failed to get user ID in listSenders");
     }
 
-    const result = await CCPayoutServices.listBeneficiaries(userId, req.body);
+    const result = await this.payoutService.listSenders(userId, req.query);
+
+    res
+      .status(200)
+      .json(ApiResponse.success(result, "Senders retrieved successfully", 200));
+  });
+
+  createBeneficiary = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw ApiError.internal("Failed to get user ID in createBeneficiary");
+    }
+
+    const result = await this.payoutService.createBeneficiary(userId, req.body);
+
+    res
+      .status(201)
+      .json(
+        ApiResponse.success(result, "Beneficiary created successfully", 201)
+      );
+  });
+
+  listBeneficiaries = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw ApiError.internal("Failed to get user ID in listBeneficiaries");
+    }
+
+    const result = await this.payoutService.listBeneficiaries(
+      userId,
+      req.query
+    );
 
     res
       .status(200)
       .json(
-        ApiResponse.success(
-          result.beneficiaries,
-          "Beneficiaries fetched successfully",
-          200
-        )
+        ApiResponse.success(result, "Beneficiaries retrieved successfully", 200)
       );
   });
-}
 
-class CCCollectionController {
-  static create = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req?.user?.id;
+  createCollection = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
     if (!userId) {
-      throw ApiError.internal("Failed to get user id");
+      throw ApiError.internal("Failed to get user ID in createCollection");
     }
 
-    const collection = await CCPayoutServices.createCollection(
+    const result = await this.payoutService.createCardCollection(
       userId,
       req.body
     );
@@ -123,29 +121,49 @@ class CCCollectionController {
     res
       .status(201)
       .json(
-        ApiResponse.success(collection, "Collection created successfully", 201)
+        ApiResponse.success(result, "Card collection created successfully", 201)
       );
   });
 
-  static list = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req?.user?.id;
+  listCollections = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
 
     if (!userId) {
-      throw ApiError.internal("Failed to get user id");
+      throw ApiError.internal("Failed to get user ID in listCollections");
     }
 
-    const result = await CCPayoutServices.listCollections(userId, req.body);
+    const result = await this.payoutService.listCollections(userId, req.query);
 
     res
       .status(200)
       .json(
-        ApiResponse.success(
-          result.collections,
-          "Collections fetched successfully",
-          200
-        )
+        ApiResponse.success(result, "Collections retrieved successfully", 200)
+      );
+  });
+
+  webhookHandler = asyncHandler(async (req: Request, res: Response) => {
+    const result = await this.payoutService.handleWebhook(req.body);
+
+    res
+      .status(200)
+      .json(ApiResponse.success(result, "Webhook handled successfully", 200));
+  });
+
+  getDashboard = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw ApiError.internal("Failed to get user ID in getDashboard");
+    }
+
+    const result = await this.payoutService.getDashboardStats(userId);
+
+    res
+      .status(200)
+      .json(
+        ApiResponse.success(result, "Dashboard data fetched successfully", 200)
       );
   });
 }
 
-export { CCSenderController, CCBeneficiaryController, CCCollectionController };
+export default CCPayoutController;

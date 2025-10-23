@@ -1,63 +1,4 @@
-import type { TxStatus } from "@prisma/client";
-
-export enum CardType {
-  VISA = "VISA",
-  RUPAY = "RUPAY",
-  MASTER = "MASTER",
-}
-
-export enum SenderStatus {
-  ACTIVE = "ACTIVE",
-  INACTIVE = "INACTIVE",
-  PENDING = "PENDING",
-  REJECTED = "REJECTED",
-}
-
-export enum BeneficiaryStatus {
-  PENDING = "PENDING",
-  ACTIVE = "ACTIVE",
-  FAILED = "FAILED",
-  SUCCESS = "SUCCESS",
-}
-
-export enum CollectionStatus {
-  PENDING = "PENDING",
-  SUCCESS = "SUCCESS",
-  FAILED = "FAILED",
-  PROCESSING = "PROCESSING",
-  CANCELLED = "CANCELLED",
-}
-
-export enum SettlementType {
-  INSTANT = "INSTANT",
-  T_PLUS_1 = "T_PLUS_1",
-}
-
-// Sender Types
-export interface CCSender {
-  id: string;
-  senderId: string;
-  referenceId: string;
-  userId: string;
-  name: string;
-  nameInPan: string;
-  pan: string;
-  aadhar?: string;
-  phone: string;
-  cardNo: string;
-  cvv: string;
-  expiry: string;
-  cardFrontImage?: string;
-  cardBackImage?: string;
-  cardType: CardType;
-  charge?: number;
-  gst?: number;
-  isActive: boolean;
-  status: SenderStatus;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
+// src/types/bulkpay/ccPayout.types.ts
 export interface CreateSenderInput {
   referenceId: string;
   name: string;
@@ -69,112 +10,6 @@ export interface CreateSenderInput {
   expiry: string;
 }
 
-export interface UpdateSenderInput {
-  cardFrontImage?: string;
-  cardBackImage?: string;
-  status?: SenderStatus;
-}
-
-export interface ListSendersQuery {
-  page?: number;
-  limit?: number;
-  referenceId?: string;
-  senderId?: string;
-}
-
-// Beneficiary Types
-export interface CCBeneficiary {
-  id: string;
-  beneficiaryId: string;
-  reference: string;
-  userId: string;
-  name: string;
-  accountHolderName?: string;
-  accountNumber: string;
-  ifsc: string;
-  status: BeneficiaryStatus;
-  message?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CreateBeneficiaryInput {
-  reference: string;
-  name: string;
-  accountNumber: string;
-  ifsc: string;
-}
-
-export interface ListBeneficiariesQuery {
-  page?: number;
-  limit?: number;
-  status?: BeneficiaryStatus;
-  reference?: string;
-  beneficiaryId?: string;
-}
-
-// Collection Types
-export interface CCCollection {
-  id: string;
-  collectionId: string;
-  reference: string;
-  userId: string;
-  senderId: string;
-  beneficiaryId: string;
-  amount: number;
-  type: SettlementType;
-  redirectUrl: string;
-  cardType: CardType;
-  additionalCharge?: number;
-  collectionUrl?: string;
-  status: CollectionStatus;
-  message?: string;
-  utr?: string;
-  charge?: number;
-  gst?: number;
-  createdAt: Date;
-  updatedAt: Date;
-  payouts: CCPayout[];
-}
-
-export interface CreateCollectionInput {
-  reference: string;
-  beneficiaryId: string;
-  senderId: string;
-  amount: number;
-  type: SettlementType;
-  redirectUrl: string;
-  cardType: CardType;
-  additionalCharge?: number;
-}
-
-export interface ListCollectionsQuery {
-  page?: number;
-  limit?: number;
-  beneficiaryId?: string;
-  reference?: string;
-  collectionId?: string;
-}
-
-// Payout Types
-export interface CCPayout {
-  id: string;
-  collectionId: string;
-  transactionId: string;
-  amount: number;
-  accountNumber: string;
-  ifsc: string;
-  beneficiaryName: string;
-  status: TxStatus;
-  message?: string;
-  paymentMode: string;
-  utr?: string;
-  holderName?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Bulkpe API Response Types
 export interface BulkpeSenderResponse {
   senderId: string;
   referenceId: string;
@@ -187,6 +22,14 @@ export interface BulkpeSenderResponse {
   charge: number;
   gst: number;
   isActive: boolean;
+  [key: string]: any; // Add index signature for JSON compatibility
+}
+
+export interface CreateBeneficiaryInput {
+  reference: string;
+  name: string;
+  accountNumber: string;
+  ifsc: string;
 }
 
 export interface BulkpeBeneficiaryResponse {
@@ -200,6 +43,18 @@ export interface BulkpeBeneficiaryResponse {
   message: string;
   createdAt: string;
   updatedAt: string;
+  [key: string]: any; // Add index signature for JSON compatibility
+}
+
+export interface CreateCollectionInput {
+  reference: string;
+  beneficiaryId: string;
+  senderId: string;
+  amount: number;
+  type: 1 | 2; // 1 for instant, 2 for T+1
+  redirectUrl: string;
+  cardType: "visa" | "rupay" | "master";
+  additionalCharge?: number;
 }
 
 export interface BulkpeCollectionResponse {
@@ -210,24 +65,36 @@ export interface BulkpeCollectionResponse {
   message: string;
   utr: string;
   senderId: string;
-  beneficiaryId: string;
   collectionUrl: string;
   createdAt: string;
   updatedAt: string;
-  type: number;
+  type: 1 | 2;
   charge: number;
   gst: number;
-  additionalCharge: number;
-  payouts: Array<{
-    transactionId: string;
-    amount: number;
-    accountNumber: string;
-    ifsc: string;
-    beneficiaryName: string;
-    status: string;
-    message: string;
-    paymentMode: string;
-    utr: string;
-    holderName: string;
-  }>;
+  payouts: PayoutDetail[];
+  [key: string]: any; // Add index signature for JSON compatibility
+}
+
+export interface PayoutDetail {
+  transactionId: string;
+  amount: number;
+  accountNumber: string;
+  ifsc: string;
+  beneficiaryName: string;
+  status: string;
+  message: string;
+  paymentMode: string;
+  utr: string;
+  holderName: string;
+  [key: string]: any; // Add index signature for JSON compatibility
+}
+
+export interface WebhookPayload {
+  collectionId: string;
+  status: "SUCCESS" | "FAILED" | "PENDING" | "PROCESSING";
+  message: string;
+  utr?: string;
+  payouts: PayoutDetail[];
+  timestamp: string;
+  [key: string]: any; // Add index signature for JSON compatibility
 }

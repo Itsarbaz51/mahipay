@@ -1,14 +1,16 @@
-import axios from "axios";
+// src/services/BulkpeAPIClient.ts
 import type { AxiosInstance } from "axios";
+import axios from "axios";
 import FormData from "form-data";
-import { ApiError } from "./ApiError.js";
+import { ApiError } from "../../utils/ApiError.js";
 import type {
   BulkpeBeneficiaryResponse,
   BulkpeCollectionResponse,
   BulkpeSenderResponse,
   CreateBeneficiaryInput,
+  CreateCollectionInput,
   CreateSenderInput,
-} from "../types/bulkpay/ccPayout.types.js";
+} from "../../types/bulkpay/ccPayout.types.js";
 
 export class BulkpeAPIClient {
   private client: AxiosInstance;
@@ -37,15 +39,15 @@ export class BulkpeAPIClient {
       (response) => response,
       (error) => {
         if (error.response) {
-          throw new ApiError(
-            error.response.status,
+          throw ApiError.badRequest(
             error.response.data?.message || "Bulkpe API error",
+            error.response.status,
             error.response.data?.errors
           );
         } else if (error.request) {
-          throw new ApiError("Bulkpe API unavailable");
+          throw ApiError.internal("Bulkpe API unavailable");
         } else {
-          throw new ApiError("Internal server error");
+          throw ApiError.internal("Internal server error");
         }
       }
     );
@@ -57,7 +59,9 @@ export class BulkpeAPIClient {
     const response = await this.client.post("/createSender", payload);
 
     if (!response.data.status) {
-      throw new ApiError(response.data.message || "Failed to create sender");
+      throw ApiError.internal(
+        response.data.message || "Failed to create sender"
+      );
     }
 
     return response.data.data;
@@ -87,7 +91,7 @@ export class BulkpeAPIClient {
     });
 
     if (!response.data.status) {
-      throw new ApiError(
+      throw ApiError.badRequest(
         response.data.message || "Failed to upload card image"
       );
     }
@@ -99,7 +103,9 @@ export class BulkpeAPIClient {
     const response = await this.client.post("/listSenders", query);
 
     if (!response.data.status) {
-      throw new ApiError(response.data.message || "Failed to list senders");
+      throw ApiError.badRequest(
+        response.data.message || "Failed to list senders"
+      );
     }
 
     return response.data;
@@ -111,7 +117,7 @@ export class BulkpeAPIClient {
     const response = await this.client.post("/createBeneficiary", payload);
 
     if (!response.data.status) {
-      throw new ApiError(
+      throw ApiError.badRequest(
         response.data.message || "Failed to create beneficiary"
       );
     }
@@ -123,7 +129,7 @@ export class BulkpeAPIClient {
     const response = await this.client.post("/listBeneficiary", query);
 
     if (!response.data.status) {
-      throw new ApiError(
+      throw ApiError.badRequest(
         response.data.message || "Failed to list beneficiaries"
       );
     }
@@ -131,14 +137,16 @@ export class BulkpeAPIClient {
     return response.data;
   }
 
-  async createCollection(payload: any): Promise<BulkpeCollectionResponse> {
+  async createCollection(
+    payload: CreateCollectionInput
+  ): Promise<BulkpeCollectionResponse> {
     const response = await this.client.post(
       "/createCardCollectionUrl",
       payload
     );
 
     if (!response.data.status) {
-      throw new ApiError(
+      throw ApiError.badRequest(
         response.data.message || "Failed to create collection"
       );
     }
@@ -150,7 +158,9 @@ export class BulkpeAPIClient {
     const response = await this.client.post("/listCardCollection", query);
 
     if (!response.data.status) {
-      throw new ApiError(response.data.message || "Failed to list collections");
+      throw ApiError.badRequest(
+        response.data.message || "Failed to list collections"
+      );
     }
 
     return response.data;

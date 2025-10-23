@@ -1,6 +1,42 @@
 import { useSelector } from "react-redux";
 import { Navigate, useLocation } from "react-router-dom";
 
+const ROLE_PERMISSIONS = {
+  ADMIN: [
+    "/dashboard",
+    "/wallet",
+    "/employee-management",
+    "/reports",
+    "/permission",
+    "/settings",
+    "/members",
+    "/commission",
+    "/add-fund",
+  ],
+  STATE_HEAD: [
+    "/dashboard",
+    "/kyc-submit",
+    "/members",
+    "/commission",
+    "/add-fund",
+  ],
+  MASTER_DISTRIBUTOR: [
+    "/dashboard",
+    "/kyc-submit",
+    "/members",
+    "/commission",
+    "/add-fund",
+  ],
+  DISTRIBUTOR: [
+    "/dashboard",
+    "/kyc-submit",
+    "/members",
+    "/commission",
+    "/add-fund",
+  ],
+  RETAILER: ["/dashboard", "/kyc-submit", "/commission", "/add-fund"], // Retailer restricted
+};
+
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, currentUser, isLoading } = useSelector(
     (state) => state.auth
@@ -25,6 +61,14 @@ const ProtectedRoute = ({ children }) => {
     location.pathname !== "/kyc-submit"
   ) {
     return <Navigate to="/kyc-submit" replace state={{ from: location }} />;
+  }
+
+  const role = currentUser?.role?.name || currentUser?.role || "USER";
+  const allowedPaths = ROLE_PERMISSIONS[role] || [];
+  const currentPath = location.pathname;
+
+  if (!allowedPaths.some((p) => currentPath.startsWith(p))) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
