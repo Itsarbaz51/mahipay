@@ -1,11 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-
-axios.defaults.withCredentials = true;
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-axios.defaults.baseURL = baseURL;
 
 const initialState = {
   commissionSettings: [],
@@ -13,6 +8,15 @@ const initialState = {
   isLoading: false,
   error: null,
   success: null,
+  pagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  },
+  filters: {
+    search: "",
+  },
 };
 
 const commissionSlice = createSlice({
@@ -28,20 +32,34 @@ const commissionSlice = createSlice({
       state.isLoading = false;
       state.success = action.payload?.message || null;
       state.error = null;
-      if (action.payload?.message) toast.success(action.payload.message);
     },
     commissionFail: (state, action) => {
       state.isLoading = false;
       state.error = action.payload;
-      if (action.payload) toast.error(action.payload);
     },
     setCommissionSettings: (state, action) => {
-      state.isLoading = false;
       state.commissionSettings = action.payload?.data || action.payload;
     },
     setCommissionEarnings: (state, action) => {
-      state.isLoading = false;
       state.commissionEarnings = action.payload?.data || action.payload;
+    },
+    setCommissionData: (state, action) => {
+      const { commissionSettings, total, page, limit, totalPages } =
+        action.payload;
+      if (commissionSettings) state.commissionSettings = commissionSettings;
+      if (total !== undefined) state.pagination.total = total;
+      if (page !== undefined) state.pagination.page = page;
+      if (limit !== undefined) state.pagination.limit = limit;
+      if (totalPages !== undefined) state.pagination.totalPages = totalPages;
+    },
+    updatePagination: (state, action) => {
+      state.pagination = { ...state.pagination, ...action.payload };
+    },
+    clearCommissionError: (state) => {
+      state.error = null;
+    },
+    clearCommissionSuccess: (state) => {
+      state.success = null;
     },
     resetCommission: (state) => {
       state.commissionSettings = [];
@@ -59,17 +77,33 @@ export const {
   commissionFail,
   setCommissionSettings,
   setCommissionEarnings,
+  setCommissionData,
+  updatePagination,
+  clearCommissionError,
+  clearCommissionSuccess,
   resetCommission,
 } = commissionSlice.actions;
 
-// ---------------- Commission Setting Actions ------------------
-
-// Create or update commission setting
-export const createOrUpdateCommissionSetting =
-  (payload) => async (dispatch) => {
+// Get commission settings by created by with pagination
+export const getCommissionSettingsByCreatedBy =
+  (filters = {}) =>
+  async (dispatch) => {
     try {
       dispatch(commissionRequest());
-      const { data } = await axios.post(`/commissions/setting`, payload);
+      const { data } = await axios.get(`/commissions/setting/created-by-me`, {
+        params: filters,
+      });
+
+      dispatch(
+        setCommissionData({
+          commissionSettings: data.data?.commissions || data.data || data,
+          total: data.data?.total || data.total || 0,
+          page: data.data?.page || data.page || 1,
+          limit: data.data?.limit || data.limit || 10,
+          totalPages: data.data?.totalPages || data.totalPages || 0,
+        })
+      );
+
       dispatch(commissionSuccess(data));
       return data;
     } catch (error) {
@@ -79,68 +113,24 @@ export const createOrUpdateCommissionSetting =
     }
   };
 
-// Get commission settings by role or user
-export const getCommissionSettingsByRoleOrUser =
-  (roleId, userId = null) =>
-  async (dispatch) => {
+// Create or update commission setting
+export const createOrUpdateCommissionSetting =
+  (payload) => async (dispatch) => {
     try {
       dispatch(commissionRequest());
-      const params = userId ? { userId } : {};
-      const { data } = await axios.get(`/commissions/setting/${roleId}`, {
-        params,
-      });
-      dispatch(setCommissionSettings(data));
+      const { data } = await axios.post(`/commissions/setting`, payload);
+
+      dispatch(commissionSuccess(data));
+
+      if (data.message) {
+        toast.success(data.message);
+      }
+
       return data;
     } catch (error) {
       const errMsg = error?.response?.data?.message || error?.message;
       dispatch(commissionFail(errMsg));
-      throw error;
-    }
-  };
-
-export const getCommissionSettingsByCreatedBy = () => async (dispatch) => {
-  try {
-    dispatch(commissionRequest());
-    const { data } = await axios.get(`/commissions/setting/created-by-me`);
-    dispatch(setCommissionSettings(data.data || data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(commissionFail(errMsg));
-    throw error;
-  }
-};
-
-// ---------------- Commission Earning Actions ------------------
-
-// Create commission earning
-export const createCommissionEarning = (payload) => async (dispatch) => {
-  try {
-    dispatch(commissionRequest());
-    const { data } = await axios.post(`/commissions/earn`, payload);
-    dispatch(commissionSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(commissionFail(errMsg));
-    throw error;
-  }
-};
-
-// Get all commission earnings with optional filters
-export const getCommissionEarnings =
-  (filters = {}) =>
-  async (dispatch) => {
-    try {
-      dispatch(commissionRequest());
-      const { data } = await axios.get(`/commissions`, {
-        params: filters,
-      });
-      dispatch(setCommissionEarnings(data));
-      return data;
-    } catch (error) {
-      const errMsg = error?.response?.data?.message || error?.message;
-      dispatch(commissionFail(errMsg));
+      toast.error(errMsg);
       throw error;
     }
   };

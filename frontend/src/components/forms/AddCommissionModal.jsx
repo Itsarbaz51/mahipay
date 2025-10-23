@@ -7,9 +7,9 @@ import { getAllUsersByParentId } from "../../redux/slices/userSlice";
 import { getServiceProvidersByUser } from "../../redux/slices/serviceSlice";
 
 const scopes = ["ROLE", "USER"];
-const commissionTypes = ["FLAT", "PERCENT"];
+const commissionTypes = ["FLAT", "PERCENTAGE"];
 
-const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
+const AddCommissionModal = ({ onClose, onSuccess, editData }) => {
   const dispatch = useDispatch();
 
   // Get roles, users, and services from Redux store
@@ -19,9 +19,12 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
   const users = useSelector((state) => state.users?.users || []);
   const usersLoading = useSelector((state) => state.users?.isLoading || false);
 
-  // Get services from service slice using getServiceProvidersByUser
-  const services = useSelector((state) => state.services?.serviceProviders || []);
-  const servicesLoading = useSelector((state) => state.service?.isLoading || false);
+  const services = useSelector(
+    (state) => state.services?.serviceProviders || []
+  );
+  const servicesLoading = useSelector(
+    (state) => state.service?.isLoading || false
+  );
 
   const [formData, setFormData] = useState({
     scope: "ROLE",
@@ -36,7 +39,7 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
     tdsPercent: "",
     applyGST: false,
     gstPercent: "",
-    effectiveFrom: new Date().toISOString().split('T')[0], // Only date part for UI
+    effectiveFrom: new Date().toISOString().split("T")[0],
     effectiveTo: "",
   });
 
@@ -46,6 +49,41 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
   const [userSearch, setUserSearch] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [filteredUsers, setFilteredUsers] = useState([]);
+
+  // Prefill form if editData exists
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        scope: editData.scope || "ROLE",
+        roleId: editData.roleId || "",
+        targetUserId: editData.targetUserId || "",
+        serviceId: editData.serviceId || "",
+        commissionType: editData.commissionType || "FLAT",
+        commissionValue: editData.commissionValue || "",
+        minAmount: editData.minAmount || "",
+        maxAmount: editData.maxAmount || "",
+        applyTDS: editData.applyTDS || false,
+        tdsPercent: editData.tdsPercent || "",
+        applyGST: editData.applyGST || false,
+        gstPercent: editData.gstPercent || "",
+        effectiveFrom: editData.effectiveFrom
+          ? new Date(editData.effectiveFrom).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        effectiveTo: editData.effectiveTo
+          ? new Date(editData.effectiveTo).toISOString().split("T")[0]
+          : "",
+      });
+
+      // Prefill user search if editing USER scope
+      if (editData.scope === "USER" && editData.targetUser) {
+        setUserSearch(
+          `${editData.targetUser.firstName || ""} ${
+            editData.targetUser.lastName || ""
+          }`.trim() + ` (${editData.targetUser.username || ""})`
+        );
+      }
+    }
+  }, [editData]);
 
   // Fetch roles, users and services when component mounts
   useEffect(() => {
@@ -94,6 +132,10 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
     });
     setUserSearch("");
     setShowUserDropdown(false);
+
+    // Clear related errors
+    if (errors.roleId) setErrors({ ...errors, roleId: "" });
+    if (errors.targetUserId) setErrors({ ...errors, targetUserId: "" });
   };
 
   const handleUserSearch = (searchTerm) => {
@@ -111,9 +153,14 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
       targetUserId: user.id,
     });
     setUserSearch(
-      `${user.firstName} ${user.lastName || ""} (${user.username})`
+      `${user.firstName || ""} ${user.lastName || ""}`.trim() +
+        ` (${user.username || ""})`
     );
     setShowUserDropdown(false);
+
+    if (errors.targetUserId) {
+      setErrors({ ...errors, targetUserId: "" });
+    }
   };
 
   const handleUserSearchFocus = () => {
@@ -126,8 +173,15 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
     const newErrors = {};
 
     if (!formData.serviceId) newErrors.serviceId = "Service is required";
-    if (!formData.commissionValue)
+
+    if (!formData.commissionValue && formData.commissionValue !== 0) {
       newErrors.commissionValue = "Commission value is required";
+    } else if (
+      isNaN(formData.commissionValue) ||
+      Number(formData.commissionValue) < 0
+    ) {
+      newErrors.commissionValue = "Commission value must be a valid number";
+    }
 
     if (formData.scope === "ROLE" && !formData.roleId) {
       newErrors.roleId = "Role is required for ROLE scope";
@@ -157,23 +211,42 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
       const fromDate = new Date(formData.effectiveFrom);
       const toDate = new Date(formData.effectiveTo);
       if (toDate <= fromDate) {
-        newErrors.effectiveTo = "Effective to date must be after effective from date";
+        newErrors.effectiveTo =
+          "Effective to date must be after effective from date";
       }
     }
 
-    // Check for duplicates
-    const exists = chargesData.some(
-      (item) =>
-        item.scope === formData.scope &&
-        item.serviceId === formData.serviceId &&
-        ((formData.scope === "ROLE" && item.roleId === formData.roleId) ||
-          (formData.scope === "USER" &&
-            item.targetUserId === formData.targetUserId))
-    );
+    // TDS validation
+    if (
+      formData.applyTDS &&
+      (!formData.tdsPercent || isNaN(formData.tdsPercent))
+    ) {
+      newErrors.tdsPercent = "TDS percentage is required when TDS is applied";
+    } else if (
+      formData.applyTDS &&
+      (Number(formData.tdsPercent) < 0 || Number(formData.tdsPercent) > 100)
+    ) {
+      newErrors.tdsPercent = "TDS percentage must be between 0 and 100";
+    }
 
-    if (exists) {
-      newErrors.general =
-        "Commission setting already exists for this scope, service, and target";
+    // GST validation
+    if (
+      formData.applyGST &&
+      (!formData.gstPercent || isNaN(formData.gstPercent))
+    ) {
+      newErrors.gstPercent = "GST percentage is required when GST is applied";
+    } else if (
+      formData.applyGST &&
+      (Number(formData.gstPercent) < 0 || Number(formData.gstPercent) > 100)
+    ) {
+      newErrors.gstPercent = "GST percentage must be between 0 and 100";
+    }
+
+    // Min/Max validation
+    if (formData.minAmount && formData.maxAmount) {
+      if (Number(formData.minAmount) > Number(formData.maxAmount)) {
+        newErrors.maxAmount = "Max amount must be greater than min amount";
+      }
     }
 
     setErrors(newErrors);
@@ -183,10 +256,12 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
   // Convert date to ISO string with timezone
   const formatDateToISO = (dateString) => {
     if (!dateString) return undefined;
-    
+
     const date = new Date(dateString);
     // Set to start of day in local timezone and convert to ISO
-    return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString();
+    return new Date(
+      date.getTime() - date.getTimezoneOffset() * 60000
+    ).toISOString();
   };
 
   const handleSubmit = async (e) => {
@@ -202,7 +277,6 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
 
     try {
       // Prepare payload according to backend schema
-      // Convert dates to ISO format
       const payload = {
         scope: formData.scope,
         serviceId: formData.serviceId,
@@ -211,15 +285,19 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
         minAmount: formData.minAmount ? Number(formData.minAmount) : undefined,
         maxAmount: formData.maxAmount ? Number(formData.maxAmount) : undefined,
         applyTDS: formData.applyTDS,
-        tdsPercent: formData.tdsPercent
-          ? Number(formData.tdsPercent)
-          : undefined,
+        tdsPercent:
+          formData.applyTDS && formData.tdsPercent
+            ? Number(formData.tdsPercent)
+            : undefined,
         applyGST: formData.applyGST,
-        gstPercent: formData.gstPercent
-          ? Number(formData.gstPercent)
+        gstPercent:
+          formData.applyGST && formData.gstPercent
+            ? Number(formData.gstPercent)
+            : undefined,
+        effectiveFrom: formatDateToISO(formData.effectiveFrom),
+        effectiveTo: formData.effectiveTo
+          ? formatDateToISO(formData.effectiveTo)
           : undefined,
-        effectiveFrom: formatDateToISO(formData.effectiveFrom), // Convert to ISO
-        effectiveTo: formData.effectiveTo ? formatDateToISO(formData.effectiveTo) : undefined,
       };
 
       // Add scope-specific field
@@ -229,6 +307,11 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
         payload.targetUserId = formData.targetUserId;
       }
 
+      // If editing, include the commission ID
+      if (editData?.id) {
+        payload.id = editData.id;
+      }
+
       console.log("Submitting payload:", payload);
 
       const result = await dispatch(createOrUpdateCommissionSetting(payload));
@@ -236,7 +319,9 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
       if (result?.payload?.data || result?.payload) {
         setMessage({
           type: "success",
-          text: "Commission setting added successfully!",
+          text: editData
+            ? "Commission setting updated successfully!"
+            : "Commission setting added successfully!",
         });
 
         // Auto-close on success after short delay
@@ -270,13 +355,26 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
       .join(" ");
   };
 
-  // Format service display name - Yeh UI mein show hoga
+  // Format service display name
   const formatServiceDisplayName = (service) => {
     if (!service) return "";
-    
-    // Service name show karega UI mein
-    return service.type || service.code || "Unknown Service";
+
+    return service.type || service.code || service.name || "Unknown Service";
   };
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showUserDropdown && !event.target.closest(".user-search-container")) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showUserDropdown]);
 
   return (
     <div className="fixed inset-0 bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -285,15 +383,20 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
         <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">
-              Add New Commission Setting
+              {editData
+                ? "Edit Commission Setting"
+                : "Add New Commission Setting"}
             </h2>
             <p className="text-blue-100 text-sm mt-1">
-              Create a new commission setting for roles or users
+              {editData
+                ? "Update existing commission setting"
+                : "Create a new commission setting for roles or users"}
             </p>
           </div>
           <button
             onClick={onClose}
             className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all duration-200"
+            disabled={loading}
           >
             ✕
           </button>
@@ -375,7 +478,7 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
 
               {/* User Search (only for USER scope) */}
               {formData.scope === "USER" && (
-                <div className="relative">
+                <div className="user-search-container relative">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Select User *
                   </label>
@@ -453,7 +556,7 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
                 </div>
               )}
 
-              {/* Service - Display name but store ID */}
+              {/* Service */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Service *
@@ -528,10 +631,11 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
                   }`}
                   placeholder={
                     formData.commissionType === "PERCENT"
-                      ? "Percentage"
+                      ? "Percentage value"
                       : "Amount in ₹"
                   }
-                  step={formData.commissionType === "PERCENT" ? "0.1" : "1"}
+                  step={formData.commissionType === "PERCENT" ? "0.01" : "1"}
+                  min="0"
                 />
                 {errors.commissionValue && (
                   <p className="text-red-500 text-sm mt-1">
@@ -550,9 +654,20 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
                   name="minAmount"
                   value={formData.minAmount}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.minAmount
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
                   placeholder="Optional"
+                  step="1"
+                  min="0"
                 />
+                {errors.minAmount && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.minAmount}
+                  </p>
+                )}
               </div>
 
               {/* Max Amount */}
@@ -565,79 +680,112 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
                   name="maxAmount"
                   value={formData.maxAmount}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.maxAmount
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
                   placeholder="Optional"
+                  step="1"
+                  min="0"
                 />
+                {errors.maxAmount && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.maxAmount}
+                  </p>
+                )}
               </div>
 
               {/* TDS Settings */}
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="applyTDS"
-                    name="applyTDS"
-                    checked={formData.applyTDS}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor="applyTDS"
-                    className="ml-2 block text-sm font-semibold text-gray-700"
-                  >
-                    Apply TDS
-                  </label>
-                </div>
-                {formData.applyTDS && (
-                  <div className="flex-1">
+              <div className="md:col-span-2">
+                <div className="flex items-center space-x-6 p-4 border border-gray-200 rounded-xl">
+                  <div className="flex items-center space-x-3">
                     <input
-                      type="number"
-                      name="tdsPercent"
-                      value={formData.tdsPercent}
+                      type="checkbox"
+                      id="applyTDS"
+                      name="applyTDS"
+                      checked={formData.applyTDS}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      placeholder="TDS %"
-                      step="0.1"
-                      min="0"
-                      max="100"
+                      className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
+                    <label
+                      htmlFor="applyTDS"
+                      className="block text-sm font-semibold text-gray-700"
+                    >
+                      Apply TDS
+                    </label>
                   </div>
-                )}
+                  {formData.applyTDS && (
+                    <div className="flex-1 max-w-xs">
+                      <input
+                        type="number"
+                        name="tdsPercent"
+                        value={formData.tdsPercent}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                          errors.tdsPercent
+                            ? "border-red-400 focus:ring-red-300 bg-red-50"
+                            : "border-gray-300 focus:ring-blue-400"
+                        }`}
+                        placeholder="TDS Percentage"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                      />
+                      {errors.tdsPercent && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.tdsPercent}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* GST Settings */}
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="applyGST"
-                    name="applyGST"
-                    checked={formData.applyGST}
-                    onChange={handleChange}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor="applyGST"
-                    className="ml-2 block text-sm font-semibold text-gray-700"
-                  >
-                    Apply GST
-                  </label>
-                </div>
-                {formData.applyGST && (
-                  <div className="flex-1">
+              <div className="md:col-span-2">
+                <div className="flex items-center space-x-6 p-4 border border-gray-200 rounded-xl">
+                  <div className="flex items-center space-x-3">
                     <input
-                      type="number"
-                      name="gstPercent"
-                      value={formData.gstPercent}
+                      type="checkbox"
+                      id="applyGST"
+                      name="applyGST"
+                      checked={formData.applyGST}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      placeholder="GST %"
-                      step="0.1"
-                      min="0"
-                      max="100"
+                      className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
+                    <label
+                      htmlFor="applyGST"
+                      className="block text-sm font-semibold text-gray-700"
+                    >
+                      Apply GST
+                    </label>
                   </div>
-                )}
+                  {formData.applyGST && (
+                    <div className="flex-1 max-w-xs">
+                      <input
+                        type="number"
+                        name="gstPercent"
+                        value={formData.gstPercent}
+                        onChange={handleChange}
+                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                          errors.gstPercent
+                            ? "border-red-400 focus:ring-red-300 bg-red-50"
+                            : "border-gray-300 focus:ring-blue-400"
+                        }`}
+                        placeholder="GST Percentage"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                      />
+                      {errors.gstPercent && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.gstPercent}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Effective From */}
@@ -657,7 +805,9 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
                   }`}
                 />
                 {errors.effectiveFrom && (
-                  <p className="text-red-500 text-sm mt-1">{errors.effectiveFrom}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.effectiveFrom}
+                  </p>
                 )}
               </div>
 
@@ -677,21 +827,40 @@ const AddCommissionModal = ({ onClose, onSuccess, chargesData }) => {
                       : "border-gray-300 focus:ring-blue-400"
                   }`}
                   placeholder="Optional"
+                  min={formData.effectiveFrom}
                 />
                 {errors.effectiveTo && (
-                  <p className="text-red-500 text-sm mt-1">{errors.effectiveTo}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.effectiveTo}
+                  </p>
                 )}
               </div>
             </div>
 
             {/* Submit Button */}
-            <div className="pt-3 flex justify-end">
+            <div className="pt-3 flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold transition-all disabled:opacity-50 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
               <button
                 type="submit"
-                disabled={loading || rolesLoading || usersLoading || servicesLoading}
+                disabled={
+                  loading || rolesLoading || usersLoading || servicesLoading
+                }
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Creating..." : "Add Commission Setting"}
+                {loading
+                  ? editData
+                    ? "Updating..."
+                    : "Creating..."
+                  : editData
+                  ? "Update Commission"
+                  : "Add Commission Setting"}
               </button>
             </div>
           </form>

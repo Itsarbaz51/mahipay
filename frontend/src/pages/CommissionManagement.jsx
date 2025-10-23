@@ -1,83 +1,272 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Search,
+  DollarSign,
+  X,
+  MoreVertical,
+  RefreshCw,
+  Plus,
+} from "lucide-react";
+import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
-import { Plus } from "lucide-react";
-import AddCommissionModal from "../components/forms/AddCommission";
-import CommissionTable from "../components/tabels/CommissionTable";
-import { getCommissionSettingsByCreatedBy } from "../redux/slices/commissionSlice";
+
+import AddCommissionModal from "../components/forms/AddCommissionModal";
+import HeaderSection from "../components/ui/HeaderSection";
+import ButtonField from "../components/ui/ButtonField";
+import Pagination from "../components/ui/Pagination";
+import CommissionTable from "../components/tabels/CommissionTable"; // New import
+
+import {
+  getCommissionSettingsByCreatedBy,
+  clearCommissionError,
+  clearCommissionSuccess,
+} from "../redux/slices/commissionSlice";
 
 const CommissionManagement = () => {
+  const [search, setSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [selectedCommission, setSelectedCommission] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const dispatch = useDispatch();
-  const [chargesData, setChargesData] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const searchTimeoutRef = useRef(null);
+  const initialLoadRef = useRef(false);
 
-  // Get commission settings from Redux store
-  const commissionSettings = useSelector(
-    (state) => state.commission.commissionSettings
+  const {
+    commissionSettings = [],
+    isLoading = false,
+    error: commissionError,
+    success: commissionSuccess,
+    pagination = {
+      page: 1,
+      limit: 10,
+      total: 0,
+      totalPages: 0,
+    },
+  } = useSelector((state) => state.commission || {});
+
+  const currentPage = pagination.page;
+  const totalPages = pagination.totalPages;
+  const totalCommissions = pagination.total;
+  const limit = pagination.limit;
+
+  // Load commission settings
+  const loadCommissions = useCallback(
+    async (searchTerm = "", forceRefresh = false, isSearch = false) => {
+      try {
+        const params = {
+          page: isSearch ? 1 : currentPage,
+          limit,
+          search: searchTerm,
+        };
+
+        if (forceRefresh) {
+          params.timestamp = Date.now();
+          params.refresh = true;
+        }
+
+        await dispatch(getCommissionSettingsByCreatedBy(params));
+      } catch (error) {
+        console.error("Failed to load commissions:", error);
+      }
+    },
+    [dispatch, currentPage, limit]
   );
-  const isLoading = useSelector((state) => state.commission.isLoading);
 
-  // Fetch commission settings on component mount
+  // Toast handling
   useEffect(() => {
-    dispatch(getCommissionSettingsByCreatedBy());
-  }, [dispatch]);
-
-  // Update local state when Redux state changes
-  useEffect(() => {
-    if (commissionSettings) {
-      setChargesData(
-        Array.isArray(commissionSettings) ? commissionSettings : []
-      );
+    if (commissionError) {
+      toast.error(commissionError);
+      dispatch(clearCommissionError());
     }
-  }, [commissionSettings]);
 
-  const handleAddSuccess = () => {
-    setShowAddModal(false);
-    // Refresh the data
-    dispatch(getCommissionSettingsByCreatedBy());
+    if (commissionSuccess) {
+      if (
+        commissionSuccess &&
+        !commissionSuccess.toLowerCase().includes("created") &&
+        !commissionSuccess.toLowerCase().includes("updated") &&
+        !commissionSuccess.toLowerCase().includes("deleted")
+      ) {
+        toast.success(commissionSuccess);
+      }
+      dispatch(clearCommissionSuccess());
+    }
+  }, [commissionError, commissionSuccess, dispatch]);
+
+  // Initial load
+  useEffect(() => {
+    if (!initialLoadRef.current) {
+      initialLoadRef.current = true;
+      loadCommissions();
+    }
+  }, []);
+
+  // Search with debouncing
+  useEffect(() => {
+    if (!initialLoadRef.current) return;
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      loadCommissions(search, true, true);
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [search, loadCommissions]);
+
+  // Refresh trigger
+  useEffect(() => {
+    if (refreshTrigger > 0 && initialLoadRef.current) {
+      loadCommissions(search, true);
+    }
+  }, [refreshTrigger, loadCommissions, search]);
+
+  const handleManualRefresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  const handlePageChange = useCallback(
+    (page) => {
+      if (page >= 1 && page <= totalPages) {
+        dispatch(
+          getCommissionSettingsByCreatedBy({
+            page,
+            limit,
+            search,
+            timestamp: Date.now(),
+          })
+        );
+      }
+    },
+    [dispatch, totalPages, limit, search]
+  );
+
+  const handleFormClose = () => {
+    setShowForm(false);
+    setSelectedCommission(null);
   };
 
+  const handleFormSuccess = () => {
+    setShowForm(false);
+    setSelectedCommission(null);
+    handleManualRefresh();
+  };
+
+  const handleEditCommission = (commission) => {
+    setSelectedCommission(commission);
+    setShowForm(true);
+  };
+
+  const handleMenuToggle = (menuId) => {
+    setOpenMenuId(menuId);
+  };
+
+  const filteredCommissions = commissionSettings.filter(
+    (commission) =>
+      commission.role?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      commission.targetUser?.firstName
+        ?.toLowerCase()
+        .includes(search.toLowerCase()) ||
+      commission.service?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      commission.service?.type?.toLowerCase().includes(search.toLowerCase()) ||
+      String(commission.commissionValue).includes(search)
+  );
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Commission Management
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Manage commission settings for roles and users
-          </p>
-        </div>
-
-        {/* Add Commission Button */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold transition-colors mt-4 md:mt-0"
-        >
-          <Plus className="w-5 h-5" />
-          Add Commission Setting
-        </button>
-      </div>
-
-      {/* Commission Table */}
-      <CommissionTable
-        chargesData={chargesData}
-        setChargesData={setChargesData}
+    <div>
+      <HeaderSection
+        title="Commission Management"
+        tagLine="Manage commission settings for roles and users"
+        icon={DollarSign}
+        totalCount={`${totalCommissions || 0} Commission Settings`}
       />
 
-      {isLoading && (
-        <div className="text-center py-4">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      )}
+      {/* Search + Add Commission */}
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-300 mb-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-1">
+              Commission Settings
+            </h2>
+            <p className="text-gray-600">Manage and monitor commission rules</p>
+          </div>
 
-      {/* Add Commission Modal */}
-      {showAddModal && (
-        <AddCommissionModal
-          onClose={() => setShowAddModal(false)}
-          onSuccess={handleAddSuccess}
-          chargesData={chargesData}
-        />
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search commissions..."
+                className="pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 bg-gray-50 focus:bg-white"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            {/* Refresh Button */}
+            <button
+              onClick={handleManualRefresh}
+              disabled={isLoading}
+              className={`px-4 py-3 border border-gray-300 rounded-lg flex items-center gap-2 transition-colors ${
+                isLoading
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+              }`}
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+              />
+              {isLoading ? "Refreshing..." : "Refresh"}
+            </button>
+
+            <ButtonField
+              name="Add Commission"
+              isOpen={() => {
+                setSelectedCommission(null);
+                setShowForm(true);
+              }}
+              icon={Plus}
+              css
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Commission Table Component */}
+      <CommissionTable
+        commissions={filteredCommissions}
+        isLoading={isLoading}
+        search={search}
+        currentPage={currentPage}
+        limit={limit}
+        onEditCommission={handleEditCommission}
+        onMenuToggle={handleMenuToggle}
+        openMenuId={openMenuId}
+      />
+
+      {/* Pagination */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+      />
+
+      {/* Add/Edit Commission Modal */}
+      {showForm && (
+        <div className="fixed inset-0 flex justify-center items-center bg-black/50 z-50">
+          <AddCommissionModal
+            onClose={handleFormClose}
+            onSuccess={handleFormSuccess}
+            editData={selectedCommission}
+          />
+        </div>
       )}
     </div>
   );

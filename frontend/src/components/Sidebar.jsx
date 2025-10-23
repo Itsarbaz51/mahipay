@@ -114,13 +114,21 @@ const Sidebar = () => {
   const username = userData.username || "";
   const profileImage = userData.profileImage || "";
   const walletBalance = userData.wallets?.[0]?.balance || 0;
+  const isRetailer = role === "RETAILER";
 
-  // Filter menus by role
-  const mainItems = menuItems.filter((item) =>
-    isAdmin
-      ? item.group === "main" && item.id !== "add-fund"
-      : item.group === "main"
-  );
+  // For non-admin users
+  const mainItems = menuItems.filter((item) => {
+    if (isAdmin) {
+      return item.group === "main" && item.id !== "add-fund";
+    }
+
+    // ❌ Hide "Members" for Retailer
+    if (isRetailer && item.id === "members") {
+      return false;
+    }
+
+    return item.group === "main";
+  });
   const adminItems = isAdmin
     ? menuItems.filter((item) => item.group === "admin")
     : [];

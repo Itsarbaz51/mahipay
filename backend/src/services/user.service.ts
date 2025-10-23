@@ -255,72 +255,74 @@ class UserServices {
     userId: string,
     profileImagePath: string
   ): Promise<User> {
-    const user = await Prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: { select: { id: true, name: true, level: true } },
-        wallets: true,
-      },
-    });
+    try {
+      const user = await Prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          role: { select: { id: true, name: true, level: true } },
+          wallets: true,
+        },
+      });
 
-    if (!user) {
-      throw ApiError.notFound("User not found");
-    }
-
-    // Delete old profile image from S3 if exists
-    if (user.profileImage) {
-      try {
-        await S3Service.delete({ fileUrl: user.profileImage });
-      } catch (error) {
-        logger.error("Failed to delete old profile image", {
-          userId,
-          profileImage: user.profileImage,
-          error,
-        });
+      if (!user) {
+        throw ApiError.notFound("User not found");
       }
-    }
 
-    // Upload new profile image
-    const profileImageUrl =
-      (await S3Service.upload(profileImagePath, "profile")) ?? "";
+      // Delete old profile image from S3 if exists
+      if (user.profileImage) {
+        try {
+          await S3Service.delete({ fileUrl: user.profileImage });
+        } catch (error) {
+          logger.error("Failed to delete old profile image", {
+            userId,
+            profileImage: user.profileImage,
+            error,
+          });
+        }
+      }
 
-    Helper.deleteOldImage(profileImagePath);
+      // Upload new profile image
+      const profileImageUrl =
+        (await S3Service.upload(profileImagePath, "profile")) ?? "";
 
-    const updatedUser = await Prisma.user.update({
-      where: { id: userId },
-      data: { profileImage: profileImageUrl },
-      include: {
-        role: { select: { id: true, name: true, level: true } },
-        wallets: true,
-        parent: { select: { id: true, username: true } },
-        children: { select: { id: true, username: true } },
-      },
-    });
+      const updatedUser = await Prisma.user.update({
+        where: { id: userId },
+        data: { profileImage: profileImageUrl },
+        include: {
+          role: { select: { id: true, name: true, level: true } },
+          wallets: true,
+          parent: { select: { id: true, username: true } },
+          children: { select: { id: true, username: true } },
+        },
+      });
 
-    // Update cache and clear related cache
-    await cacheUser(
-      userId,
-      Helper.serializeUser(updatedUser),
-      this.USER_CACHE_TTL
-    );
-
-    await this.clearUserRelatedCache(
-      userId,
-      updatedUser.parentId,
-      updatedUser.roleId
-    );
-
-    await Prisma.auditLog.create({
-      data: {
+      // Update cache and clear related cache
+      await cacheUser(
         userId,
-        action: "UPDATE_PROFILE_IMAGE",
-        metadata: { newImage: profileImageUrl },
-      },
-    });
+        Helper.serializeUser(updatedUser),
+        this.USER_CACHE_TTL
+      );
 
-    logger.info("Profile image updated successfully", { userId });
+      await this.clearUserRelatedCache(
+        userId,
+        updatedUser.parentId,
+        updatedUser.roleId
+      );
 
-    return updatedUser;
+      await Prisma.auditLog.create({
+        data: {
+          userId,
+          action: "UPDATE_PROFILE_IMAGE",
+          metadata: { newImage: profileImageUrl },
+        },
+      });
+
+      logger.info("Profile image updated successfully", { userId });
+
+      return updatedUser;
+    } finally {
+      Helper.deleteOldImage(profileImagePath);
+    }
   }
 
   static async getUserById(userId: string): Promise<User | null> {

@@ -8,7 +8,7 @@ class CommissionValidationSchemas {
       roleId: z.string().uuid().optional(),
       targetUserId: z.string().uuid().optional(),
       serviceId: z.string().uuid(),
-      commissionType: z.enum(["FLAT", "PERCENT"]),
+      commissionType: z.enum(["FLAT", "PERCENTAGE"]),
       commissionValue: z.number().positive(),
       minAmount: z.number().optional(),
       maxAmount: z.number().optional(),

@@ -2,78 +2,19 @@ import Prisma from "../src/db/db.js";
 import Helper from "../src/utils/helper.js";
 
 async function main() {
-  // ===== 1. Create Admin Role =====
-  const adminRole = await Prisma.role.upsert({
-    where: { level: 0 },
-    update: {},
-    create: {
-      name: "ADMIN",
-      level: 0,
-      description: "Admin with all permissions",
-    },
-  });
+  console.log("🚀 Starting hierarchical seed (multi-level with rules)...");
 
-  console.log("Admin Role created:", adminRole.id);
-
-  // ===== 2. Create default Admin User =====
-  const email = "admin@gmail.com";
-  const password = "Admin@123";
-
-  const hashedPassword = await Helper.hashPassword(password);
-  const hashedPin = await Helper.hashPassword("1234");
-
-  const adminUser = await Prisma.user.upsert({
-    where: { email },
-    update: {},
-    create: {
-      username: "admin",
-      firstName: "Admin",
-      lastName: "User",
-      email,
-      phoneNumber: "9999999999",
-      password: hashedPassword,
-      transactionPin: hashedPin,
-      roleId: adminRole.id,
-      isAuthorized: true,
-      hierarchyLevel: 0,
-      hierarchyPath: "0",
-      status: "ACTIVE",
-      isKycVerified: true,
-      profileImage: "https://via.placeholder.com/150",
-    },
-  });
-
-  console.log("Admin User created:", adminUser.id);
-
-  // ===== 3. Assign all services to Admin Role =====
-  const services = await Prisma.serviceProvider.findMany();
-
-  if (services.length > 0) {
-    const rolePermissionsData = services.map((s: any) => ({
-      roleId: adminRole.id,
-      serviceId: s.id,
-      canView: true,
-      canEdit: true,
-      canSetCommission: true,
-    }));
-
-    await Prisma.rolePermission.createMany({
-      data: rolePermissionsData,
-      skipDuplicates: true,
-    });
-
-    console.log("Assigned all services permissions to Admin role");
-  }
-
-  // ===== 4. Create Other Roles =====
+  // ===== 1. Define role hierarchy =====
   const roles = [
+    { name: "ADMIN", level: 0 },
     { name: "STATE HEAD", level: 1 },
     { name: "MASTER DISTRIBUTOR", level: 2 },
     { name: "DISTRIBUTOR", level: 3 },
     { name: "RETAILER", level: 4 },
   ];
 
-  const createdRoles: typeof roles & any = [];
+  const createdRoles: Record<number, any> = {};
+
   for (const role of roles) {
     const created = await Prisma.role.upsert({
       where: { level: role.level },
@@ -81,80 +22,131 @@ async function main() {
       create: {
         name: role.name,
         level: role.level,
-        description: `${role.name.replace("_", " ")} role`,
+        description: `${role.name} role`,
       },
     });
-    console.log(`Role created: ${created.name}`);
-    createdRoles.push(created);
+    createdRoles[role.level] = created;
+    console.log(`✅ Role created: ${created.name}`);
   }
 
-  // ===== 5. Create 20 Users with hierarchy =====
-  const allUsers: any[] = [
-    { ...adminUser, hierarchyLevel: 0, hierarchyPath: "0" },
+  // ===== 2. Create Admins =====
+  const adminData = [
+    { username: "admin1", email: "admin1@gmail.com", phone: "9999999991" },
+    { username: "admin2", email: "admin2@gmail.com", phone: "9999999992" },
   ];
 
-  for (let i = 1; i <= 20; i++) {
-    const randomRole =
-      createdRoles[Math.floor(Math.random() * createdRoles.length)];
-    const userEmail = `user${i}@gmail.com`;
-    const userPhone = `90000000${i.toString().padStart(2, "0")}`;
-    const username = `user${i}`;
-    const pwdHash = await Helper.hashPassword("User@123");
-    const pinHash = await Helper.hashPassword("1234");
+  const admins: any[] = [];
 
-    // Determine parent
-    const possibleParents = allUsers.filter(
-      (u) => u.hierarchyLevel === randomRole.level - 1
-    );
+  for (const data of adminData) {
+    const hashedPassword = await Helper.hashPassword("Admin@123");
+    const hashedPin = await Helper.hashPassword("1234");
 
-    let parentId: string | null = null;
-    let hierarchyPath: string;
-
-    if (possibleParents.length > 0) {
-      const parent =
-        possibleParents[Math.floor(Math.random() * possibleParents.length)];
-      parentId = parent.id;
-      hierarchyPath = `${parent.hierarchyPath}/${randomRole.level}`;
-    } else {
-      // no parent available (should not happen for level>0 if admin exists), default to adminUser
-      parentId = adminUser.id;
-      hierarchyPath = `0/${randomRole.level}`;
-    }
-
-    const user = await Prisma.user.create({
-      data: {
-        username,
-        firstName: `First${i}`,
-        lastName: `Last${i}`,
-        email: userEmail,
-        phoneNumber: userPhone,
-        password: pwdHash,
-        transactionPin: pinHash,
-        roleId: randomRole.id,
-        isAuthorized: true,
-        hierarchyLevel: randomRole.level,
-        hierarchyPath,
-        parentId,
+    const admin = await Prisma.user.upsert({
+      where: { email: data.email },
+      update: {},
+      create: {
+        username: data.username,
+        firstName: data.username,
+        lastName: "User",
+        email: data.email,
+        phoneNumber: data.phone,
+        password: hashedPassword,
+        transactionPin: hashedPin,
+        roleId: createdRoles[0].id,
+        hierarchyLevel: 0,
+        hierarchyPath: "0",
         status: "ACTIVE",
         isKycVerified: true,
-        profileImage: "",
+        profileImage: "https://via.placeholder.com/150",
       },
     });
 
-    console.log(
-      `Created user ${username} with role ${randomRole.name} — parentId: ${parentId}`
-    );
-
-    allUsers.push({ ...user, hierarchyLevel: randomRole.level, hierarchyPath });
+    admins.push(admin);
+    console.log(`👑 Created Admin: ${data.username}`);
   }
 
-  console.log("Seeding completed ✅");
-  process.exit(0);
+  // ===== 3. Helper for unique phone numbers =====
+  let phoneCounter = 1000000;
+  const nextPhone = () => `9${phoneCounter++}`;
+
+  // ===== 4. Helper to create users under a parent =====
+  async function createChildUsers(
+    parentUser: any,
+    childRole: any,
+    count: number
+  ) {
+    const users: any[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const email = `${childRole.name
+        .replace(/\s+/g, "_")
+        .toLowerCase()}_${parentUser.username}_${i + 1}@gmail.com`;
+      const username = `${childRole.name
+        .replace(/\s+/g, "_")
+        .toLowerCase()}_${parentUser.username}_${i + 1}`;
+
+      const hashedPassword = await Helper.hashPassword("User@123");
+      const hashedPin = await Helper.hashPassword("1234");
+
+      const user = await Prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: {
+          username,
+          firstName: childRole.name.split(" ")[0],
+          lastName: `${i + 1}`,
+          email,
+          phoneNumber: nextPhone(),
+          password: hashedPassword,
+          transactionPin: hashedPin,
+          roleId: childRole.id,
+          hierarchyLevel: childRole.level,
+          hierarchyPath: `${parentUser.hierarchyPath}/${childRole.level}`,
+          parentId: parentUser.id,
+          status: "ACTIVE",
+          isKycVerified: true,
+          profileImage: "",
+        },
+      });
+
+      users.push(user);
+      console.log(
+        `👤 Created ${childRole.name} (${username}) → Parent: ${parentUser.username}`
+      );
+    }
+
+    return users;
+  }
+
+  // ===== 5. Build hierarchy according to rules =====
+  const allUsersByLevel: Record<number, any[]> = { 0: admins };
+
+  // Each user can create all roles below its own level
+  for (const parentLevel of [0, 1, 2, 3]) {
+    const parents = allUsersByLevel[parentLevel] || [];
+    if (!parents.length) continue;
+
+    for (const parent of parents) {
+      for (let childLevel = parentLevel + 1; childLevel <= 4; childLevel++) {
+        const childRole = createdRoles[childLevel];
+        if (!childRole) continue;
+
+        const children = await createChildUsers(parent, childRole, 2);
+        if (!allUsersByLevel[childLevel]) allUsersByLevel[childLevel] = [];
+        allUsersByLevel[childLevel]!.push(...children);
+      }
+    }
+  }
+
+  console.log("🎉 Hierarchical seeding completed successfully!");
 }
 
 main()
-  .then(() => {})
+  .then(() => {
+    console.log("✅ Seeding done.");
+    process.exit(0);
+  })
   .catch((err) => {
-    console.error(err);
+    console.error("❌ Seeding failed:", err);
     process.exit(1);
   });

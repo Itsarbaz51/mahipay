@@ -1,7 +1,5 @@
 import crypto from "crypto";
 
-const algorithm = "aes-256-gcm";
-
 const secretKey = process.env.CRYPTO_SECRET_KEY;
 
 if (!secretKey || secretKey.length !== 64) {
@@ -11,8 +9,10 @@ if (!secretKey || secretKey.length !== 64) {
 }
 
 export class CryptoService {
-  static encrypt = (text: string): string => {
+  static encrypt(text: string): string {
     try {
+      if (!text) return text;
+
       const iv = crypto.randomBytes(16);
       const cipher = crypto.createCipheriv(
         "aes-256-gcm",
@@ -32,10 +32,12 @@ export class CryptoService {
       console.error("Encryption failed:", error);
       throw new Error("Encryption failed");
     }
-  };
+  }
 
-  static decrypt = (encryptedText: string): string => {
+  static decrypt(encryptedText: string): string {
     try {
+      if (!encryptedText) return encryptedText;
+
       const parts = encryptedText.split(":");
       if (parts.length !== 3) {
         throw new Error("Invalid encrypted text format");
@@ -60,5 +62,42 @@ export class CryptoService {
       console.error("Decryption failed:", error);
       throw new Error("Decryption failed");
     }
-  };
+  }
+
+  static maskCardNumber(cardNumber: string): string {
+    if (!cardNumber || cardNumber.length < 4) return "****";
+    return "**** **** **** " + cardNumber.slice(-4);
+  }
+
+  static maskCVV(cvv: string): string {
+    return "***";
+  }
+
+  static maskAadhar(aadhar: string): string {
+    if (!aadhar || aadhar.length !== 12) return "**** **** ****";
+    return aadhar.slice(0, 4) + " **** " + aadhar.slice(-4);
+  }
+
+  static maskPAN(pan: string): string {
+    if (!pan || pan.length !== 10) return "*****";
+    return pan.slice(0, 2) + "****" + pan.slice(-4);
+  }
+
+  static maskPhone(phone: string): string {
+    if (!phone || phone.length < 4) return "****";
+    return "******" + phone.slice(-4);
+  }
+
+  static maskAccountNumber(accountNumber: string): string {
+    if (!accountNumber || accountNumber.length < 4) return "****";
+    return "****" + accountNumber.slice(-4);
+  }
+
+  static hashData(data: string): string {
+    return crypto.createHash("sha256").update(data).digest("hex");
+  }
+
+  static generateSecureToken(length: number = 32): string {
+    return crypto.randomBytes(length).toString("hex");
+  }
 }
