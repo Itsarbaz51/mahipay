@@ -9,14 +9,14 @@ const roleRoutes = Router();
 roleRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"]),
   RoleController.index
 );
 
 roleRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeRoles(["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"]),
   RoleController.show
 );
 
