@@ -94,13 +94,6 @@ const Sidebar = () => {
       path: "/reports",
       group: "admin",
     },
-    {
-      id: "permission",
-      label: "Permissions",
-      icon: BarChart3,
-      path: "/permission",
-      group: "admin",
-    },
 
     // --- SYSTEM ---
     {
