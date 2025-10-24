@@ -22,7 +22,7 @@ const Reports = ({ currentUser, transactions, users }) => {
 
     if (currentUser.role === "super_admin") {
       reportUsers = users;
-    } else if (currentUser.role === "admin") {
+    } else if (currentUser.role.name === "admin") {
       reportUsers = users.filter(
         (u) => u.parent_id === currentUser.id || u.id === currentUser.id
       );

@@ -7,7 +7,7 @@ import ManageServices from "../pages/ManageServices";
 import RoleManager from "./RoleManager";
 import Address from "./tabels/Address";
 import PageHeader from "./ui/PageHeader";
-
+import AuditLogs from "../pages/AuditLogs";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("general");
@@ -19,6 +19,7 @@ const Settings = () => {
     { id: "services", label: "Services", icon: UserCog },
     { id: "role", label: "Roles Management", icon: UserCog },
     { id: "address", label: "Address Management", icon: UserCog },
+    { id: "audit-logs", label: "Audit Logs", icon: UserCog },
   ];
 
   const renderActiveTab = () => {
@@ -35,6 +36,8 @@ const Settings = () => {
         return <RoleManager />;
       case "address":
         return <Address />;
+      case "audit-logs":
+        return <AuditLogs />;
       default:
         return <MainSettings />;
     }

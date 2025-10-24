@@ -36,10 +36,10 @@ import EditCredentialsModal from "../forms/EditCredentialsModal";
 import EditProfileImageModal from "../forms/EditProfileImageModal";
 import PermissionForm from "../forms/PermissionForm";
 import {
-  getAllPermissions,
   getPermissionById,
   upsertPermission,
 } from "../../redux/slices/permissionSlice";
+import { getServiceProvidersByUser } from "../../redux/slices/serviceSlice";
 
 const MembersTable = () => {
   const [search, setSearch] = useState("");
@@ -59,7 +59,7 @@ const MembersTable = () => {
 
   const dispatch = useDispatch();
   const searchTimeoutRef = useRef(null);
-  const initialLoadRef = useRef(false); // Track initial load
+  const initialLoadRef = useRef(false); 
 
   // --- Permission Modal States ---
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -67,33 +67,28 @@ const MembersTable = () => {
   const [existingPermissions, setExistingPermissions] = useState([]);
   const [permissionMode, setPermissionMode] = useState("add");
 
-  const {currentPermission} = useSelector((state) => state.permission)
+  const { currentPermission } = useSelector((state) => state.permission);
 
   useEffect(() => {
-    const loadPermissions = async () => {
-      try {
-        if (showPermissionModal === true) {
-          const result = await dispatch(getAllPermissions());
-          if (result.payload?.data?.permissions) {
-            setExistingPermissions(result.payload.data.permissions);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load permissions:", error);
-      }
-    };
+    if (showPermissionModal && permissionUser?.id) {
+      dispatch(getPermissionById(permissionUser.id));
+    }
+  }, [dispatch, showPermissionModal, permissionUser]);
 
-    loadPermissions();
-  }, [dispatch]);
+  useEffect(() => {
+    if (currentPermission) {
+      setExistingPermissions(currentPermission);
+    }
+  }, [currentPermission]);
 
-  // Static service list
-  const [services] = useState([
-    { id: "6a779af5-31ea-464e-8577-eb3045559e88", name: "Payment Gateway" },
-    { id: "6a779af5-31ea-464e-8577-eb3045559e85", name: "Analytics Dashboard" },
-    { id: "6a779af5-31ea-464e-8577-eb3045559e86", name: "User Management" },
-    { id: "6a779af5-31ea-464e-8577-eb3045559e87", name: "Billing System" },
-    { id: "6a779af5-31ea-464e-8577-eb3045559e89", name: "Reporting Tool" },
-  ]);
+  const services =
+    useSelector((state) => state.services.serviceProviders) || [];
+
+  useEffect(() => {
+    if (showPermissionModal === true) {
+      dispatch(getServiceProvidersByUser());
+    }
+  }, [showPermissionModal, dispatch]);
 
   // --- Open Permission Modal (Updated) ---
   const handleAddPermission = async (user) => {
@@ -110,7 +105,7 @@ const MembersTable = () => {
     } catch (error) {
       // If no permissions found, use add mode
       setPermissionMode("add");
-      console.log("No existing permissions found, using add mode");
+      console.log("No existing permissions found, using add mode",error);
     }
 
     setShowPermissionModal(true);
@@ -125,18 +120,9 @@ const MembersTable = () => {
       ...permissionData,
     };
 
-    dispatch(upsertPermission(finalData, "user-upsert")).then(() => {
-      // Refresh permissions list after successful update
-      dispatch(getAllPermissions());
-    });
-
-    const message =
-      permissionMode === "add"
-        ? `Permissions added for ${permissionUser.firstName}`
-        : `Permissions updated for ${permissionUser.firstName}`;
-
-    toast.success(message);
-    handleClosePermissionModal();
+    dispatch(
+      upsertPermission(finalData)
+    ).handleClosePermissionModal();
   };
 
   // --- Close Modal (Updated) ---
@@ -216,7 +202,6 @@ const MembersTable = () => {
   useEffect(() => {
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
-      console.log("🚀 Initial load - API call 1");
       loadUsers();
     }
   }, []); // Empty dependency array - runs only once on mount
@@ -231,7 +216,6 @@ const MembersTable = () => {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      console.log("🔍 Search triggered - API call 2");
       loadUsers(search, true, true);
     }, 500);
 
@@ -245,7 +229,6 @@ const MembersTable = () => {
   // FIXED: Refresh trigger - ONLY TRIGGERS AFTER INITIAL LOAD
   useEffect(() => {
     if (refreshTrigger > 0 && initialLoadRef.current) {
-      console.log("🔄 Refresh triggered - API call 3");
       loadUsers(search, true);
     }
   }, [refreshTrigger, loadUsers, search]);
@@ -259,7 +242,6 @@ const MembersTable = () => {
   const handlePageChange = useCallback(
     (page) => {
       if (page >= 1 && page <= totalPages) {
-        console.log("📄 Page change - API call 4");
         dispatch(
           getAllUsersByParentId({
             page,
@@ -788,8 +770,6 @@ const MembersTable = () => {
           onSuccess={handleCredentialsSuccess}
         />
       )}
-      {console.log(existingPermissions)}
-      
 
       {/* Permission Modal */}
       {showPermissionModal && permissionUser && (

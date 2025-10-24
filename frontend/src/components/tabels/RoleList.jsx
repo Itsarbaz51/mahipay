@@ -1,6 +1,6 @@
-import { Trash2, Edit2, Users } from "lucide-react";
+import { Trash2, Edit2, Users, Shield } from "lucide-react";
 
-export function RoleList({ roles, onEdit, onDelete }) {
+export function RoleList({ roles, onEdit, onDelete, onPermission }) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full">
@@ -61,6 +61,13 @@ export function RoleList({ roles, onEdit, onDelete }) {
                     >
                       <Edit2 size={14} />
                       Edit
+                    </button>
+                    <button
+                      onClick={() => onPermission(role, idx)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm"
+                    >
+                      <Shield size={14} />
+                      Permission
                     </button>
                     <button
                       onClick={() => onDelete(role)}

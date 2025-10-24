@@ -4,8 +4,7 @@ import { toast } from "react-toastify";
 
 // Axios setup
 axios.defaults.withCredentials = true;
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-axios.defaults.baseURL = baseURL;
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 
 // Initial state
 const initialState = {
@@ -42,13 +41,21 @@ const permissionSlice = createSlice({
       state.success = null;
     },
     setPermissions: (state, action) => {
-      state.permissions = action.payload;
+      state.permissions = action.payload || [];
     },
     setCurrentPermission: (state, action) => {
-      state.currentPermission = action.payload;
+      state.currentPermission = action.payload || null;
     },
     addPermission: (state, action) => {
-      state.permissions.push(action.payload);
+      const exists = state.permissions.some((p) => p.id === action.payload?.id);
+      if (!exists) {
+        state.permissions.push(action.payload);
+      } else {
+        const index = state.permissions.findIndex(
+          (p) => p.id === action.payload?.id
+        );
+        if (index !== -1) state.permissions[index] = action.payload;
+      }
     },
     updatePermissionInList: (state, action) => {
       const updated = action.payload;
@@ -58,8 +65,9 @@ const permissionSlice = createSlice({
       }
     },
     removePermissionFromList: (state, action) => {
-      const id = action.payload;
-      state.permissions = state.permissions.filter((p) => p.id !== id);
+      state.permissions = state.permissions.filter(
+        (p) => p.id !== action.payload
+      );
     },
   },
 });
@@ -77,26 +85,10 @@ export const {
   removePermissionFromList,
 } = permissionSlice.actions;
 
-export const getAllPermissions = () => async (dispatch) => {
-  try {
-    dispatch(permissionRequest());
-    const { data } = await axios.get(`/permissions`);
-    dispatch(setPermissions(data.data.permissions || []));
-    dispatch(permissionSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to fetch permissions";
-    dispatch(permissionFail(errMsg));
-    throw new Error(errMsg);
-  }
-};
+/* ========================= USER PERMISSIONS ========================= */
 
+// Fetch user permission by userId
 export const getPermissionById = (userId) => async (dispatch) => {
-     console.log(userId);
-   
   try {
     dispatch(permissionRequest());
     const { data } = await axios.get(`permissions/user-permission/${userId}`);
@@ -107,65 +99,71 @@ export const getPermissionById = (userId) => async (dispatch) => {
     const errMsg =
       error?.response?.data?.message ||
       error?.message ||
-      "Failed to fetch permission";
+      "Failed to fetch user permission";
     dispatch(permissionFail(errMsg));
     throw new Error(errMsg);
   }
 };
 
-export const upsertPermission =
-  (permissionData, entityType) => async (dispatch) => {
-    try {
-      dispatch(permissionRequest());
-      const { data } = await axios.post(
-        `permissions/${entityType}`,
-        permissionData
-      );
-      dispatch(addPermission(data.data));
-      dispatch(permissionSuccess(data));
-      toast.success(data.message);
-      return data;
-    } catch (error) {
-      const errMsg =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to create permission";
-      dispatch(permissionFail(errMsg));
-      throw new Error(errMsg);
-    }
-  };
-
-export const updatePermission = (id, permissionData) => async (dispatch) => {
+// Upsert user permission
+export const upsertPermission = (permissionData) => async (dispatch) => {
   try {
     dispatch(permissionRequest());
-    const { data } = await axios.put(`/permissions/${id}`, permissionData);
-    dispatch(updatePermissionInList(data.data));
+    const { data } = await axios.post(
+      `permissions/user-upsert`,
+      permissionData
+    );
+    dispatch(addPermission(data.data));
     dispatch(permissionSuccess(data));
-    toast.success(data.message || "Permission updated successfully");
+    toast.success(data.message || "User permission saved");
     return data;
   } catch (error) {
     const errMsg =
       error?.response?.data?.message ||
       error?.message ||
-      "Failed to update permission";
+      "Failed to upsert user permission";
     dispatch(permissionFail(errMsg));
     throw new Error(errMsg);
   }
 };
 
-export const deletePermission = (id) => async (dispatch) => {
+/* ========================= ROLE PERMISSIONS ========================= */
+
+// Fetch role permission by roleId
+export const getPermissionRoleById = (roleId) => async (dispatch) => {
   try {
     dispatch(permissionRequest());
-    const { data } = await axios.delete(`/permissions/${id}`);
-    dispatch(removePermissionFromList(id));
+    const { data } = await axios.get(`/permissions/role-permission/${roleId}`);
+    dispatch(setCurrentPermission(data.data));
     dispatch(permissionSuccess(data));
-    toast.success(data.message || "Permission deleted successfully");
     return data;
   } catch (error) {
     const errMsg =
       error?.response?.data?.message ||
       error?.message ||
-      "Failed to delete permission";
+      "Failed to fetch role permission";
+    dispatch(permissionFail(errMsg));
+    throw new Error(errMsg);
+  }
+};
+
+// Upsert role permission
+export const upsertRolePermission = (permissionData) => async (dispatch) => {
+  try {
+    dispatch(permissionRequest());
+    const { data } = await axios.post(
+      `permissions/role-upsert`,
+      permissionData
+    );
+    dispatch(addPermission(data.data));
+    dispatch(permissionSuccess(data));
+    toast.success(data.message || "Role permission saved");
+    return data;
+  } catch (error) {
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to upsert role permission";
     dispatch(permissionFail(errMsg));
     throw new Error(errMsg);
   }

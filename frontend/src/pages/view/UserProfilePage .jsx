@@ -134,7 +134,7 @@ const UserProfilePage = ({ onClose }) => {
 
   return (
     <div className=" bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div>
         {/* Header */}
         <div className="bg-white shadow rounded-lg mb-6">
           <div className="px-6 py-4 border-b border-gray-300 flex justify-between">

@@ -12,6 +12,8 @@ const ROLE_PERMISSIONS = {
     "/members",
     "/commission",
     "/add-fund",
+    "/card-payout",
+    "/profile",
   ],
   STATE_HEAD: [
     "/dashboard",
@@ -19,6 +21,7 @@ const ROLE_PERMISSIONS = {
     "/members",
     "/commission",
     "/add-fund",
+    "/profile",
   ],
   MASTER_DISTRIBUTOR: [
     "/dashboard",
@@ -26,6 +29,7 @@ const ROLE_PERMISSIONS = {
     "/members",
     "/commission",
     "/add-fund",
+    "/profile",
   ],
   DISTRIBUTOR: [
     "/dashboard",
@@ -33,6 +37,7 @@ const ROLE_PERMISSIONS = {
     "/members",
     "/commission",
     "/add-fund",
+    "/profile",
   ],
   RETAILER: ["/dashboard", "/kyc-submit", "/commission", "/add-fund"], // Retailer restricted
 };

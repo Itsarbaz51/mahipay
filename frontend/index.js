@@ -70,6 +70,7 @@ export const protectedRoute = [
   "/all-kyc",
   "/add-fund",
   "/permission",
+  "/profile",
 ];
 
 import {
