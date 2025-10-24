@@ -1,4 +1,3 @@
-// controllers/auth.controller.ts
 import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import AuthServices from "../services/auth.service.js";
@@ -135,28 +134,60 @@ class AuthController {
   static updateCredentials = asyncHandler(
     async (req: Request, res: Response) => {
       const { userId } = req.params;
+      const currentUserId = req.user?.id;
 
-      if (!userId) {
+      if (!currentUserId) {
         throw ApiError.unauthorized("User not authenticated");
       }
 
       const credentialsData = req.body;
-      const result = await AuthServices.updateCredentials(
+
+      logger.info("Updating credentials", {
         userId,
-        credentialsData
+        currentUserId: currentUserId,
+        hasBody: !!req.body,
+        bodyKeys: Object.keys(req.body),
+      });
+
+      const result = await AuthServices.updateCredentials(
+        userId!,
+        credentialsData,
+        currentUserId
       );
 
-      // Clear cookies if password was changed (since refresh token is invalidated)
-      if (credentialsData.newPassword) {
+      const isUpdatingOwnAccount = currentUserId === userId;
+      const shouldLogout = credentialsData.newPassword && isUpdatingOwnAccount;
+
+      // Clear cookies ONLY if user is updating their own password
+      if (shouldLogout) {
         res.clearCookie("accessToken", cookieOptions);
         res.clearCookie("refreshToken", cookieOptions);
+
+        logger.info("User updated their own password - cookies cleared", {
+          userId,
+        });
+      } else if (credentialsData.newPassword) {
+        logger.info("Admin updated user password - cookies preserved", {
+          adminId: currentUserId,
+          targetUserId: userId,
+        });
       }
 
-      logger.info("User credentials updated successfully", { userId });
+      logger.info("User credentials updated successfully", {
+        userId,
+        updatedBy: currentUserId,
+      });
 
-      return res
-        .status(200)
-        .json(ApiResponse.success(null, result.message, 200));
+      return res.status(200).json(
+        ApiResponse.success(
+          {
+            logout: shouldLogout,
+            isOwnUpdate: isUpdatingOwnAccount,
+          },
+          result.message,
+          200
+        )
+      );
     }
   );
 }

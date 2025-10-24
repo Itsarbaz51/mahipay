@@ -41,7 +41,13 @@ const ROLE_PERMISSIONS = {
     "/add-fund",
     "/profile",
   ],
-  RETAILER: ["/dashboard", "/kyc-submit", "/commission", "/add-fund"],
+  RETAILER: [
+    "/dashboard",
+    "/kyc-submit",
+    "/commission",
+    "/add-fund",
+    "/profile",
+  ],
 };
 
 const ProtectedRoute = ({ children }) => {
@@ -50,6 +56,7 @@ const ProtectedRoute = ({ children }) => {
   );
   const location = useLocation();
 
+  // Show loading spinner
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -58,23 +65,31 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated) {
+  // Redirect to login if not authenticated
+  if (!isAuthenticated || !currentUser) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (
-    isAuthenticated &&
-    !currentUser?.isKycVerified &&
-    location.pathname !== "/kyc-submit"
-  ) {
-    return <Navigate to="/kyc-submit" replace state={{ from: location }} />;
+  // Redirect to KYC submit if not verified and not already on KYC page
+  if (!currentUser.isKycVerified && location.pathname !== "/kyc-submit") {
+    return <Navigate to="/kyc-submit" replace />;
   }
 
-  const role = currentUser?.role?.name || currentUser?.role || "USER";
+  // Redirect to dashboard if KYC verified but on KYC submit page
+  if (currentUser.isKycVerified && location.pathname === "/kyc-submit") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Role-based access control
+  const role = currentUser?.role?.name || currentUser?.role || "RETAILER";
   const allowedPaths = ROLE_PERMISSIONS[role] || [];
   const currentPath = location.pathname;
 
-  if (!allowedPaths.some((p) => currentPath.startsWith(p))) {
+  const isPathAllowed = allowedPaths.some(
+    (path) => currentPath === path || currentPath.startsWith(path + "/")
+  );
+
+  if (!isPathAllowed) {
     return <Navigate to="/dashboard" replace />;
   }
 

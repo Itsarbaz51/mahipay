@@ -124,6 +124,8 @@ enum PaymentType {
   TAX
   ADJUSTMENT
   CHARGE
+  FUND_REQ_BANK
+  FUND_REQ_RAZORPAY
 }
 
 enum WalletType {
@@ -330,7 +332,7 @@ model UserKyc {
   dob                DateTime
   gender             Gender
   status             KycStatus @default(PENDING)
-  kycRejectionReason String?   @default("") @map("kyc_rejection_reason")
+  kycRejectionReason String?   @map("kyc_rejection_reason") @db.LongText
 
   addressId String  @map("address_id")
   address   Address @relation(fields: [addressId], references: [id])

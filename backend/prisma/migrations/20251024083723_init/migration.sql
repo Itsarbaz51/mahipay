@@ -109,7 +109,7 @@ CREATE TABLE `user_kyc` (
     `dob` DATETIME(3) NOT NULL,
     `gender` ENUM('MALE', 'FEMALE', 'OTHER') NOT NULL,
     `status` ENUM('PENDING', 'VERIFIED', 'REJECT') NOT NULL DEFAULT 'PENDING',
-    `kyc_rejection_reason` VARCHAR(191) NULL DEFAULT '',
+    `kyc_rejection_reason` LONGTEXT NULL,
     `address_id` VARCHAR(191) NOT NULL,
     `pan_file` VARCHAR(191) NOT NULL,
     `aadhaar_file` VARCHAR(191) NOT NULL,
@@ -170,7 +170,6 @@ CREATE TABLE `cities` (
     `id` VARCHAR(191) NOT NULL,
     `city_name` VARCHAR(191) NOT NULL,
     `city_code` VARCHAR(191) NOT NULL,
-    `state_id` VARCHAR(191) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -376,7 +375,7 @@ CREATE TABLE `transactions` (
     `status` ENUM('PENDING', 'SUCCESS', 'FAILED', 'REVERSED', 'REFUNDED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
     `module_type` ENUM('CC_PAYOUT', 'BBPS', 'RECHARGE', 'DMT', 'AEPS') NOT NULL,
     `sub_module` VARCHAR(191) NULL,
-    `payment_type` ENUM('COLLECTION', 'PAYOUT', 'REFUND', 'REVERSAL', 'COMMISSION', 'FEE', 'TAX', 'ADJUSTMENT', 'CHARGE') NOT NULL,
+    `payment_type` ENUM('COLLECTION', 'PAYOUT', 'REFUND', 'REVERSAL', 'COMMISSION', 'FEE', 'TAX', 'ADJUSTMENT', 'CHARGE', 'FUND_REQ_BANK', 'FUND_REQ_RAZORPAY') NOT NULL,
     `user_id` VARCHAR(191) NOT NULL,
     `wallet_id` VARCHAR(191) NOT NULL,
     `service_id` VARCHAR(191) NULL,
@@ -516,9 +515,6 @@ ALTER TABLE `bank_details` ADD CONSTRAINT `bank_details_user_id_fkey` FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE `bank_details` ADD CONSTRAINT `bank_details_bank_id_fkey` FOREIGN KEY (`bank_id`) REFERENCES `banks`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `cities` ADD CONSTRAINT `cities_state_id_fkey` FOREIGN KEY (`state_id`) REFERENCES `states`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `addresses` ADD CONSTRAINT `addresses_state_id_fkey` FOREIGN KEY (`state_id`) REFERENCES `states`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
