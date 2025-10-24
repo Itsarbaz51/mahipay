@@ -62,7 +62,7 @@ export const createRouter = () => {
           <Route path="members" element={<MembersTable />} />
           <Route path="settings" element={<Settings />} />
           <Route path="employee-management" element={<EmployeeTable />} />
-          <Route path="wallet" element={<WalletTable />} />
+          {/* <Route path="wallet" element={<WalletTable />} /> */}
           {/* <Route path="permission" element={<PermissionsManager />} /> */}
         </Route>
 
