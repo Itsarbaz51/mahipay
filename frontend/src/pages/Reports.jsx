@@ -13,14 +13,16 @@ import {
 } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import StateCard from "../components/ui/StateCard";
+import { useSelector } from "react-redux";
 
-const Reports = ({ currentUser, transactions, users }) => {
+const Reports = ({  transactions, users }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const { currentUser } = useSelector((state) => state.auth);
 
   const getReportData = () => {
     let reportUsers = [];
 
-    if (currentUser.role === "super_admin") {
+    if (currentUser.role.name === "ADMIN") {
       reportUsers = users;
     } else if (currentUser.role.name === "admin") {
       reportUsers = users.filter(
@@ -30,17 +32,17 @@ const Reports = ({ currentUser, transactions, users }) => {
       reportUsers = [currentUser];
     }
 
-    return reportUsers.map((user) => {
-      const userTransactions = transactions.filter(
+    return reportUsers?.map((user) => {
+      const userTransactions = transactions?.filter(
         (t) => t.user_id === user.id
       );
       const payin = userTransactions
-        .filter((t) => t.type === "payin" && t.status === "success")
-        .reduce((sum, t) => sum + t.amount, 0);
+        ?.filter((t) => t.type === "payin" && t.status === "success")
+        ?.reduce((sum, t) => sum + t.amount, 0);
       const payout = userTransactions
-        .filter((t) => t.type === "payout" && t.status === "success")
-        .reduce((sum, t) => sum + t.amount, 0);
-      const commission = userTransactions.reduce(
+        ?.filter((t) => t.type === "payout" && t.status === "success")
+        ?.reduce((sum, t) => sum + t.amount, 0);
+      const commission = userTransactions?.reduce(
         (sum, t) => sum + (t.commission || 0),
         0
       );
@@ -51,19 +53,19 @@ const Reports = ({ currentUser, transactions, users }) => {
         payout,
         commission,
         netBalance: payin - payout,
-        transactionCount: userTransactions.length,
+        transactionCount: userTransactions?.length,
       };
     });
   };
 
   const reportData = getReportData();
-  const filteredReportData = reportData.filter(
+  const filteredReportData = reportData?.filter(
     (data) =>
       data.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       data.user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totals = reportData.reduce(
+  const totals = reportData?.reduce(
     (acc, curr) => ({
       payin: acc.payin + curr.payin,
       payout: acc.payout + curr.payout,
@@ -94,15 +96,15 @@ const Reports = ({ currentUser, transactions, users }) => {
       "bg-pink-500",
       "bg-teal-500",
     ];
-    const index = name.charCodeAt(0) % colors.length;
+    const index = name.charCodeAt(0) % colors?.length;
     return colors[index];
   };
 
   const getRoleColor = (role) => {
     switch (role) {
-      case "super_admin":
+      case "ADMIN":
         return "bg-orange-100 text-orange-600";
-      case "admin":
+      case "STATE HEAD":
         return "bg-blue-100 text-blue-600";
       default:
         return "bg-green-100 text-green-600";
@@ -112,7 +114,7 @@ const Reports = ({ currentUser, transactions, users }) => {
   const statCards = [
     {
       title: "Total Payin",
-      value: `₹${totals.payin.toLocaleString()}`,
+      value: `₹${totals?.payin.toLocaleString()}`,
       icon: TrendingUp,
       color: "bg-green-500",
       bgColor: "bg-green-50",
@@ -122,7 +124,7 @@ const Reports = ({ currentUser, transactions, users }) => {
     },
     {
       title: "Total Payout",
-      value: `₹${totals.payout.toLocaleString()}`,
+      value: `₹${totals?.payout.toLocaleString()}`,
       icon: TrendingDown,
       color: "bg-red-500",
       bgColor: "bg-red-50",
@@ -132,7 +134,7 @@ const Reports = ({ currentUser, transactions, users }) => {
     },
     {
       title: "Total Commission",
-      value: `₹${totals.commission.toFixed(2)}`,
+      value: `₹${totals?.commission.toFixed(2)}`,
       icon: DollarSign,
       color: "bg-blue-500",
       bgColor: "bg-blue-50",
@@ -142,7 +144,7 @@ const Reports = ({ currentUser, transactions, users }) => {
     },
     {
       title: "Active Users",
-      value: totals.users.toString(),
+      value: totals?.users.toString(),
       icon: Users,
       color: "bg-indigo-500",
       bgColor: "bg-indigo-50",
@@ -162,7 +164,7 @@ const Reports = ({ currentUser, transactions, users }) => {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, index) => (
+        {statCards?.map((stat, index) => (
           <StateCard
             key={index}
             title={stat.title}
@@ -240,7 +242,7 @@ const Reports = ({ currentUser, transactions, users }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredReportData.map((data, index) => (
+              {filteredReportData?.map((data, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -267,8 +269,8 @@ const Reports = ({ currentUser, transactions, users }) => {
                         data.user.role
                       )}`}
                     >
-                      {data.user.role === "super_admin"
-                        ? "Super Admin"
+                      {data.user.role === "ADMIN"
+                        ? "Super STATE HEAD"
                         : data.user.role.charAt(0).toUpperCase() +
                           data.user.role.slice(1)}
                     </span>
@@ -338,16 +340,16 @@ const Reports = ({ currentUser, transactions, users }) => {
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-300 flex items-center justify-between">
           <div className="text-sm text-gray-700">
-            Showing {filteredReportData.length} of {reportData.length} users
+            Showing {filteredReportData?.length} of {reportData?.length} users
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
               Profitable Users:{" "}
-              {filteredReportData.filter((data) => data.netBalance > 0).length}
+              {filteredReportData?.filter((data) => data.netBalance > 0)?.length}
             </div>
             <div className="text-sm text-gray-600">
               Loss Users:{" "}
-              {filteredReportData.filter((data) => data.netBalance < 0).length}
+              {filteredReportData?.filter((data) => data.netBalance < 0)?.length}
             </div>
           </div>
         </div>

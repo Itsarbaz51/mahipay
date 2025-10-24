@@ -8,8 +8,9 @@ import {
   Settings,
   Play,
   LogOut,
-  Wallet,
+  History,
   BadgeIndianRupee,
+  Wallet,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
@@ -24,7 +25,6 @@ const Sidebar = () => {
   const handleLogout = () => {
     dispatch(logout());
   };
-
   const menuItems = [
     // --- MAIN ---
     {
@@ -32,37 +32,50 @@ const Sidebar = () => {
       label: "Dashboard",
       icon: BarChart3,
       path: "/dashboard",
-      group: "main",
+      permissions: [
+        "ADMIN",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
     },
     {
       id: "add-fund",
       label: "Add Fund",
       icon: BadgeIndianRupee,
       path: "/add-fund",
-      group: "main",
+      permissions: ["STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR","RETAILER",],
     },
     {
       id: "members",
       label: "Members",
       icon: Users,
       path: "/members",
-      group: "main",
+      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
     },
     {
       id: "commission",
       label: "Commission",
       icon: Percent,
       path: "/commission",
-      group: "main",
+      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR", "RETAILER",],
+    },
+    {
+      id: "Transactions",
+      label: "Transactions",
+      icon: History,
+      path: "/transactions",
+      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR", "RETAILER",],
     },
 
-    // --- SERVICE (non-admin) ---
+    // --- SERVICE ---
     {
       id: "payout",
       label: "Payouts",
       icon: ArrowDownCircle,
       path: "/payout",
-      group: "service",
+      permissions: [ "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR", "RETAILER",],
     },
 
     // --- ADMIN ONLY ---
@@ -71,28 +84,21 @@ const Sidebar = () => {
       label: "KYC Requests",
       icon: Shield,
       path: "/all-kyc",
-      group: "admin",
-    },
-    {
-      id: "wallet",
-      label: "Wallet",
-      icon: Wallet,
-      path: "/wallet",
-      group: "admin",
+      permissions: ["ADMIN"],
     },
     {
       id: "employee-management",
       label: "Employee Management",
       icon: Users,
       path: "/employee-management",
-      group: "admin",
+      permissions: ["ADMIN"],
     },
     {
       id: "reports",
       label: "Reports",
       icon: BarChart3,
       path: "/reports",
-      group: "admin",
+      permissions: ["ADMIN"],
     },
 
     // --- SYSTEM ---
@@ -101,43 +107,47 @@ const Sidebar = () => {
       label: "Settings",
       icon: Settings,
       path: "/settings",
-      group: "system",
+      permissions: [
+        "ADMIN",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
     },
   ];
 
   // Safe data extraction with fallbacks
   const userData = currentUser || {};
   const role = userData.role?.name || userData.role || "USER";
-  const isAdmin = role === "ADMIN";
-  const firstName = userData.firstName || "";
-  const lastName = userData.lastName || "";
-  const username = userData.username || "";
-  const profileImage = userData.profileImage || "";
-  const walletBalance = userData.wallets?.[0]?.balance || 0;
-  const isRetailer = role === "RETAILER";
 
-  // For non-admin users
-  const mainItems = menuItems.filter((item) => {
-    if (isAdmin) {
-      return item.group === "main" && item.id !== "add-fund";
-    }
-
-    // ❌ Hide "Members" for Retailer
-    if (isRetailer && item.id === "members") {
-      return false;
-    }
-
-    return item.group === "main";
+  // Filter menu items based on user permissions
+  const filteredMenuItems = menuItems.filter((item) => {
+    return item.permissions.includes(role);
   });
-  const adminItems = isAdmin
-    ? menuItems.filter((item) => item.group === "admin")
-    : [];
-  const systemItems = isAdmin
-    ? menuItems.filter((item) => item.group === "system")
-    : [];
-  const serviceItems = !isAdmin
-    ? menuItems.filter((item) => item.group === "service")
-    : [];
+
+  // Group menu items by category for better organization
+  const mainItems = filteredMenuItems.filter((item) =>
+    ["dashboard", "add-fund", "members", "commission", "Transactions"].includes(
+      item.id
+    )
+  );
+
+  const serviceItems = filteredMenuItems.filter((item) =>
+    ["payout"].includes(item.id)
+  );
+
+  const adminItems = filteredMenuItems.filter((item) =>
+    ["kyc", "employee-management", "reports", "permission"].includes(item.id)
+  );
+
+  const roleSpecificItems = filteredMenuItems.filter((item) =>
+    ["md-dashboard", "dist-dashboard", "retailer-dashboard"].includes(item.id)
+  );
+
+  const systemItems = filteredMenuItems.filter((item) =>
+    ["settings"].includes(item.id)
+  );
 
   const MenuItem = ({ item }) => {
     const Icon = item.icon;
@@ -174,7 +184,14 @@ const Sidebar = () => {
       </div>
     );
 
-  // Get initials
+  // Get user details for display
+  const firstName = userData.firstName || "";
+  const lastName = userData.lastName || "";
+  const username = userData.username || "";
+  const profileImage = userData.profileImage || "";
+  const walletBalance = userData.wallets?.[0]?.balance || 0;
+
+  // Get initials for avatar
   const initials = firstName
     ? firstName[0].toUpperCase()
     : username
@@ -264,9 +281,26 @@ const Sidebar = () => {
       {/* Navigation */}
       <div className="flex-1 px-4 pb-4 overflow-y-auto">
         <MenuSection title="Main" items={mainItems} />
-        {isAdmin && <MenuSection title="Administration" items={adminItems} />}
-        {isAdmin && <MenuSection title="System" items={systemItems} />}
-        {!isAdmin && <MenuSection title="Services" items={serviceItems} />}
+
+        {/* Role Specific Dashboard */}
+        {roleSpecificItems.length > 0 && (
+          <MenuSection title={`${role} Dashboard`} items={roleSpecificItems} />
+        )}
+
+        {/* Services Section */}
+        {serviceItems.length > 0 && (
+          <MenuSection title="Services" items={serviceItems} />
+        )}
+
+        {/* Admin Section */}
+        {adminItems.length > 0 && (
+          <MenuSection title="Administration" items={adminItems} />
+        )}
+
+        {/* System Section */}
+        {systemItems.length > 0 && (
+          <MenuSection title="System" items={systemItems} />
+        )}
       </div>
 
       {/* Logout */}

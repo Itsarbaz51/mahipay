@@ -4,7 +4,8 @@ import { Navigate, useLocation } from "react-router-dom";
 const ROLE_PERMISSIONS = {
   ADMIN: [
     "/dashboard",
-    "/wallet",
+    "/transactions",
+    "/all-kyc",
     "/employee-management",
     "/reports",
     "/permission",
@@ -15,15 +16,16 @@ const ROLE_PERMISSIONS = {
     "/card-payout",
     "/profile",
   ],
-  STATE_HEAD: [
+  "STATE HEAD": [
     "/dashboard",
     "/kyc-submit",
+    "/wallet",
     "/members",
     "/commission",
     "/add-fund",
     "/profile",
   ],
-  MASTER_DISTRIBUTOR: [
+  "MASTER DISTRIBUTOR": [
     "/dashboard",
     "/kyc-submit",
     "/members",
@@ -39,7 +41,7 @@ const ROLE_PERMISSIONS = {
     "/add-fund",
     "/profile",
   ],
-  RETAILER: ["/dashboard", "/kyc-submit", "/commission", "/add-fund"], // Retailer restricted
+  RETAILER: ["/dashboard", "/kyc-submit", "/commission", "/add-fund"],
 };
 
 const ProtectedRoute = ({ children }) => {
