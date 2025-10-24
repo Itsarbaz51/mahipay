@@ -24,7 +24,7 @@ export class RolePermissionController {
   });
 
   static getByRole = asyncHandler(async (req: Request, res: Response) => {
-    const { roleId } = req.params;
+    const roleId = req.params.id;
     const data = await RolePermissionService.getRolePermissions(
       roleId as string
     );
@@ -33,16 +33,16 @@ export class RolePermissionController {
       .json(ApiResponse.success(data, "Fetched successfully", 200));
   });
 
-  static delete = asyncHandler(async (req: Request, res: Response) => {
-    const { roleId, serviceId } = req.params;
-    await RolePermissionService.deleteRolePermission(
-      roleId as string,
-      serviceId as string
-    );
-    return res
-      .status(200)
-      .json(ApiResponse.success({}, "Deleted successfully", 200));
-  });
+  // static delete = asyncHandler(async (req: Request, res: Response) => {
+  //   const { roleId, serviceId } = req.params;
+  //   await RolePermissionService.deleteRolePermission(
+  //     roleId as string,
+  //     serviceId as string
+  //   );
+  //   return res
+  //     .status(200)
+  //     .json(ApiResponse.success({}, "Deleted successfully", 200));
+  // });
 }
 
 export class UserPermissionController {
@@ -73,14 +73,14 @@ export class UserPermissionController {
       .json(ApiResponse.success(data, "Fetched successfully", 200));
   });
 
-  static delete = asyncHandler(async (req: Request, res: Response) => {
-    const { userId, serviceId } = req.params;
-    await UserPermissionService.deleteUserPermission(
-      userId as string,
-      serviceId as string
-    );
-    return res
-      .status(200)
-      .json(ApiResponse.success({}, "Deleted successfully", 200));
-  });
+  // static delete = asyncHandler(async (req: Request, res: Response) => {
+  //   const { userId, serviceId } = req.params;
+  //   await UserPermissionService.deleteUserPermission(
+  //     userId as string,
+  //     serviceId as string
+  //   );
+  //   return res
+  //     .status(200)
+  //     .json(ApiResponse.success({}, "Deleted successfully", 200));
+  // });
 }

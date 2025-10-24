@@ -14,7 +14,7 @@ permissionRoutes.post(
   "/role-upsert",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  validateRequest(PermissionValidationSchemas.createRolePermission),
+  validateRequest(PermissionValidationSchemas.createOrUpdateRolePermission),
   RolePermissionController.createOrUpdate
 );
 
@@ -25,19 +25,19 @@ permissionRoutes.get(
   RolePermissionController.getByRole
 );
 
-permissionRoutes.delete(
-  "/role-permission/delete/:roleId/:serviceId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
-  RolePermissionController.delete
-);
+// permissionRoutes.delete(
+//   "/role-permission/delete/:roleId/:serviceId",
+//   AuthMiddleware.isAuthenticated,
+//   AuthMiddleware.authorizeRoles(["ADMIN"]),
+//   RolePermissionController.delete
+// );
 
 //User
 permissionRoutes.post(
   "/user-upsert",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  validateRequest(PermissionValidationSchemas.createUserPermission),
+  validateRequest(PermissionValidationSchemas.createOrUpdateUserPermission),
   UserPermissionController.createOrUpdate
 );
 
@@ -50,11 +50,11 @@ permissionRoutes.get(
 );
 
 // ✅ Delete
-permissionRoutes.delete(
-  "/user-permission/delete/:userId/:serviceId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
-  UserPermissionController.delete
-);
+// permissionRoutes.delete(
+//   "/user-permission/delete/:userId/:serviceId",
+//   AuthMiddleware.isAuthenticated,
+//   AuthMiddleware.authorizeRoles(["ADMIN"]),
+//   UserPermissionController.delete
+// );
 
 export default permissionRoutes;
