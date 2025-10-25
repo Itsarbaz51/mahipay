@@ -136,12 +136,7 @@ const Navbar = () => {
         >
           Login
         </Link>
-        <Link
-          to="/register"
-          className="bg-black text-white px-6 py-2 rounded-full font-medium hover:bg-gray-900 transition"
-        >
-          Register
-        </Link>
+        
       </div>
 
       {/* MOBILE MENU TOGGLE */}

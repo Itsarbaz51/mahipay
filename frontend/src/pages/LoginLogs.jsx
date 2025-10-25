@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Search, Filter, MapPin } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import { useDispatch } from "react-redux";
-import { getLoginLogs } from "../redux/slices/loginLogsslice";
+import { getLoginLogs } from "../redux/slices/loginLogsSlice";
 // Sample data for login logs
 const loginLogsData = [
   {

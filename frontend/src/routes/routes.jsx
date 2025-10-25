@@ -32,7 +32,7 @@ import CommissionManagement from "../pages/CommissionManagement";
 import CardPayout from "../pages/services/CardPayout";
 import UserProfilePage from "../pages/view/UserProfilePage ";
 import AuditLogs from "../pages/AuditLogs";
-import LoginLogs from "../pages/LoginLogs";
+import LoginLogs from "../pages/LoginLogs.jsx";
 import PrivacyPolicy from "../pages/landing/Privacypolicy";
 import TermsConditions from "../pages/landing/Terms&conditions";
 
