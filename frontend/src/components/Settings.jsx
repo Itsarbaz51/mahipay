@@ -5,39 +5,32 @@ import LoginLogs from "../pages/LoginLogs";
 import CompanyAccounts from "../pages/CompanyAccounts";
 import ManageServices from "../pages/ManageServices";
 import RoleManager from "./RoleManager";
-import Address from "./tabels/Address";
+// import Address from "./tabels/Address";
 import PageHeader from "./ui/PageHeader";
-import AuditLogs from "../pages/AuditLogs";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("general");
 
   const tabs = [
     { id: "general", label: "General Settings", icon: SettingsIcon },
-    { id: "logs", label: "Login Logs", icon: Eye },
     { id: "accounts", label: "Company Accounts", icon: CreditCard },
     { id: "services", label: "Services", icon: UserCog },
     { id: "role", label: "Roles Management", icon: UserCog },
-    { id: "address", label: "Address Management", icon: UserCog },
-    { id: "audit-logs", label: "Audit Logs", icon: UserCog },
+    // { id: "address", label: "Address Management", icon: UserCog },
   ];
 
   const renderActiveTab = () => {
     switch (activeTab) {
       case "general":
         return <MainSettings />;
-      case "logs":
-        return <LoginLogs />;
       case "accounts":
         return <CompanyAccounts />;
       case "services":
         return <ManageServices />;
       case "role":
         return <RoleManager />;
-      case "address":
-        return <Address />;
-      case "audit-logs":
-        return <AuditLogs />;
+      // case "address":
+      //   return <Address />;
       default:
         return <MainSettings />;
     }

@@ -1,6 +1,5 @@
 import Prisma from "../db/db.js";
 import { KycStatus as PrismaKycStatus } from "@prisma/client";
-
 import type {
   UserKyc,
   Gender,
@@ -12,6 +11,7 @@ import { ApiError } from "../utils/ApiError.js";
 import S3Service from "../utils/S3Service.js";
 import Helper from "../utils/helper.js";
 import { CryptoService } from "../utils/cryptoService.js";
+import { cacheUser, cacheUserKyc, getCache, getCachedUserKyc, invalidateUserCache, invalidateUserKycCache, setCache } from "../utils/redisCasheHelper.js";
 
 class KycServices {
   // users kyc
@@ -29,6 +29,14 @@ class KycServices {
     const limitNum = Number(limit) || 10;
     const sortOrder = sort === "asc" ? "asc" : "desc";
 
+    // --- Build cache key
+    const cacheKey = `page:${pageNum}:limit:${limitNum}:status:${status}:sort:${sortOrder}:search:${search || ""}`;
+
+    // --- Check cache
+    const cached = await getCachedUserKyc(`${userId}:${cacheKey}`);
+    if (cached) return cached;
+
+    // --- Fetch from DB
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -42,18 +50,20 @@ class KycServices {
       throw ApiError.forbidden("Access denied: insufficient permissions");
 
     const childUserIds = user.children.map((child) => child.id);
-    if (childUserIds.length === 0)
-      return {
+    if (childUserIds.length === 0) {
+      const emptyResult = {
         data: [],
         meta: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 },
       };
+      await cacheUserKyc(`${userId}:${cacheKey}`, emptyResult, 300);
+      return emptyResult;
+    }
 
     const skip = (pageNum - 1) * limitNum;
 
     const where: any = {
       userId: { in: childUserIds },
-      ...(status &&
-        status.toUpperCase() !== "ALL" && { status: status.toUpperCase() }),
+      ...(status && status.toUpperCase() !== "ALL" && { status: status.toUpperCase() }),
       ...(search && {
         user: {
           OR: [
@@ -86,19 +96,11 @@ class KycServices {
 
     const total = await Prisma.userKyc.count({ where });
 
-    // --- Map to frontend-friendly data
     const frontendData = kycs.map((kyc) => {
-      // Mask PII
       const pii = kyc.piiConsents.map((p) => {
-        let piiDisplay = "";
-        if (p.piiType === "PAN") {
-          piiDisplay = p.piiHash.slice(0, 2) + "XXX" + p.piiHash.slice(-3);
-        } else if (p.piiType === "AADHAAR") {
-          piiDisplay = "XXXX-XXXX-" + p.piiHash.slice(-4);
-        } else {
-          piiDisplay = "******";
-        }
-        return { type: p.piiType, value: piiDisplay };
+        if (p.piiType === "PAN") return { type: "PAN", value: p.piiHash.slice(0, 2) + "XXX" + p.piiHash.slice(-3) };
+        if (p.piiType === "AADHAAR") return { type: "AADHAAR", value: "XXXX-XXXX-" + p.piiHash.slice(-4) };
+        return { type: p.piiType, value: "******" };
       });
 
       return {
@@ -117,12 +119,13 @@ class KycServices {
           address: kyc.address?.address || "-",
           pinCode: kyc.address?.pinCode || "-",
         },
+        type: kyc.type,
         status: kyc.status,
         createdAt: kyc.createdAt,
       };
     });
 
-    return {
+    const result = {
       data: frontendData,
       meta: {
         page: pageNum,
@@ -131,6 +134,11 @@ class KycServices {
         totalPages: Math.ceil(total / limitNum),
       },
     };
+
+    // --- Cache the result
+    await cacheUserKyc(`${userId}:${cacheKey}`, result, 300);
+
+    return result;
   }
 
   static async showUserKyc(
@@ -142,83 +150,68 @@ class KycServices {
       throw ApiError.badRequest("Either KYC ID or User ID is required");
     }
 
+    const cacheKey = id ? `userKyc:id:${id}` : `userKyc:user:${userId}`;
+
+    // Try fetching from cache first
+    const cachedKyc = await getCachedUserKyc<any>(cacheKey);
+    if (cachedKyc) return cachedKyc;
+
     const whereClause: any = {};
-    if (id && id !== "undefined") {
-      whereClause.id = id;
-    } else if (userId) {
-      whereClause.userId = userId;
-    }
+    if (id && id !== "undefined") whereClause.id = id;
+    else if (userId) whereClause.userId = userId;
 
     const kyc = await Prisma.userKyc.findFirst({
       where: whereClause,
       include: {
         address: {
           select: {
+            id: true,
             address: true,
             pinCode: true,
             city: { select: { cityName: true } },
             state: { select: { stateName: true } },
           },
         },
-        piiConsents: {
-          select: {
-            piiType: true,
-            piiHash: true,
-          },
-        },
+        user: { select: { email: true, phoneNumber: true } },
+        piiConsents: { select: { piiType: true, piiHash: true } },
       },
     });
 
-    if (!kyc) {
-      throw ApiError.notFound("KYC not found");
-    }
+    if (!kyc) throw ApiError.notFound("KYC not found");
 
-    // Type assertion for included relations
     const kycWithRelations = kyc as any;
 
-    // Check permissions
     const isOwner = requestingUser && kyc.userId === requestingUser.id;
     const isAdmin = requestingUser && requestingUser.role === "ADMIN";
 
     const pii = await Promise.all(
       kycWithRelations.piiConsents.map(async (p: any) => {
         try {
-          // ✅ Decrypt the encrypted data using CryptoService
           const decryptedValue = await CryptoService.decrypt(p.piiHash);
-
           if (isAdmin || isOwner) {
-            // Show decrypted values to admin and owner
             if (p.piiType === "AADHAAR" && decryptedValue.length === 12) {
-              const formattedAadhaar = `${decryptedValue.slice(0, 4)}-${decryptedValue.slice(4, 8)}-${decryptedValue.slice(8)}`;
-              return { type: p.piiType, value: formattedAadhaar };
+              return {
+                type: p.piiType,
+                value: `${decryptedValue.slice(0, 4)}-${decryptedValue.slice(4, 8)}-${decryptedValue.slice(8)}`,
+              };
             }
             return { type: p.piiType, value: decryptedValue };
           } else {
-            // Mask the PII data for non-admin/non-owner
             let masked = "******";
-            if (p.piiType === "PAN") {
-              masked = `${decryptedValue.slice(0, 2)}XXXX${decryptedValue.slice(-3)}`;
-            } else if (p.piiType === "AADHAAR") {
-              masked = `${decryptedValue.slice(0, 2)}XX-XXXX-${decryptedValue.slice(-4)}`;
-            }
+            if (p.piiType === "PAN") masked = `${decryptedValue.slice(0, 2)}XXXX${decryptedValue.slice(-3)}`;
+            else if (p.piiType === "AADHAAR") masked = `${decryptedValue.slice(0, 2)}XX-XXXX-${decryptedValue.slice(-4)}`;
             return { type: p.piiType, value: masked };
           }
         } catch (error) {
-          console.error(`Failed to decrypt ${p.piiType}:`, error);
-          // If decryption fails, it might be old hashed data
-          // Show appropriate message
           return {
             type: p.piiType,
-            value:
-              isAdmin || isOwner
-                ? `[Encrypted Data - ${p.piiHash.slice(0, 8)}...]`
-                : "******",
+            value: isAdmin || isOwner ? `[Encrypted Data - ${p.piiHash.slice(0, 8)}...]` : "******",
           };
         }
       })
     );
 
-    return {
+    const result = {
       id: kyc.id,
       profile: {
         name: `${kycWithRelations?.firstName || ""} ${kycWithRelations?.lastName || ""}`.trim(),
@@ -226,9 +219,12 @@ class KycServices {
         gender: kyc.gender || null,
         dob: kyc.dob || null,
         fatherName: kyc.fatherName || "-",
+        email: kyc.user.email || "-",
+        phone: kyc.user.phoneNumber || "-",
       },
       documents: pii,
       location: {
+        id: kycWithRelations.address?.id || null,
         city: kycWithRelations.address?.city?.cityName || "-",
         state: kycWithRelations.address?.state?.stateName || "-",
         address: kycWithRelations.address?.address || "-",
@@ -245,6 +241,14 @@ class KycServices {
       createdAt: kyc.createdAt,
       updatedAt: kyc.updatedAt,
     };
+
+    try {
+      await cacheUserKyc(cacheKey, result, 300);
+    } catch (cacheError) {
+      console.error("⚠️ Failed to cache user KYC:", cacheError);
+    }
+
+    return result;
   }
 
   static async storeUserKyc(payload: UserKycUploadInput): Promise<UserKyc> {
@@ -275,7 +279,6 @@ class KycServices {
         throw ApiError.notFound("Address not found");
       }
 
-      // Upload files
       const panUrl = await S3Service.upload(payload.panFile.path, "user-kyc");
       const photoUrl = await S3Service.upload(payload.photo.path, "user-kyc");
       const aadhaarUrl = await S3Service.upload(
@@ -311,7 +314,6 @@ class KycServices {
         throw ApiError.internal("Failed to create user kyc");
       }
 
-      // Create or replace PII consents - USE ENCRYPTION
       await Prisma.piiConsent.deleteMany({
         where: {
           userId: payload.userId,
@@ -319,7 +321,6 @@ class KycServices {
         },
       });
 
-      // ✅ Use CryptoService.encrypt() with proper error handling
       const createdPii = await Prisma.piiConsent.createMany({
         data: [
           {
@@ -345,6 +346,13 @@ class KycServices {
 
       if (!createdPii) {
         throw ApiError.internal("Failed to create user kyc Pii");
+      }
+
+      // Cache the created KYC Cache for 2 seconds
+      try {
+        await cacheUserKyc(payload.userId, createdKyc, 2000);
+      } catch (cacheError) {
+        console.error("⚠️ Failed to cache new user KYC:", cacheError);
       }
 
       return {
@@ -452,6 +460,23 @@ class KycServices {
         throw ApiError.internal("Failed to update user kyc");
       }
 
+      // Update Redis Cache
+      try {
+        await invalidateUserCache(existingKyc.userId);
+        await invalidateUserKycCache(existingKyc.userId);
+
+        if (updatedKyc.status === "VERIFIED") {
+          await cacheUser(existingKyc.userId, updatedKyc, 2000);
+          await cacheUserKyc(existingKyc.userId, updatedKyc, 2000);
+        }
+      } catch (cacheError) {
+        console.error(
+          "⚠️ Failed to update cache for user and KYC:",
+          existingKyc.userId,
+          cacheError
+        );
+      }
+
       return {
         ...updatedKyc,
         gender: updatedKyc.gender as Gender,
@@ -508,6 +533,29 @@ class KycServices {
 
     if (!updateVerify) {
       throw ApiError.internal("Failed to verify user KYC");
+    }
+
+    const updatedUser = await Prisma.user.update({
+      where: { id: existingKyc.userId },
+      data: {
+        ...(enumStatus === "VERIFIED"
+          ? { isKycVerified: true }
+          : { isKycVerified: false }),
+      },
+    });
+
+    // Invalidate and update cache
+    try {
+      await invalidateUserCache(existingKyc.userId);
+      await invalidateUserKycCache(existingKyc.userId);
+
+      // Re-cache only if verified
+      if (enumStatus === "VERIFIED") {
+        await cacheUser(existingKyc.userId, updatedUser, 5);
+        await cacheUserKyc(existingKyc.userId, updateVerify, 5);
+      }
+    } catch (cacheError) {
+      console.error("⚠️ Failed to update cache:", cacheError);
     }
 
     return {

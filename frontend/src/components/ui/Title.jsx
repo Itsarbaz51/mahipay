@@ -1,17 +1,30 @@
 import React from "react";
 import { navbarTitleConfig } from "../../../index.js";
+import { useLocation } from "react-router-dom";
 
 function Title() {
+  const location = useLocation();
   const currentPath = location.pathname;
-  const {
-    title,
-    tagLine,
-    icon: Icon,
-  } = navbarTitleConfig[currentPath] || {
+
+  // Helper to match dynamic paths
+  const matchPath = (configPath, currentPath) => {
+    const pattern = new RegExp(
+      "^" + configPath.replace(/:\w+/g, "[^/]+") + "$"
+    );
+    return pattern.test(currentPath);
+  };
+
+  // Find matching config
+  const matchedConfig = Object.entries(navbarTitleConfig).find(([path]) =>
+    matchPath(path, currentPath)
+  )?.[1] || {
     title: "",
     tagLine: "",
     icon: null,
   };
+
+  const { title, tagLine, icon: Icon } = matchedConfig;
+
   return (
     <div className="flex items-center space-x-4">
       <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 p-2 rounded-xl shadow-lg">

@@ -118,3 +118,25 @@ export async function invalidateUserCache(userId: string): Promise<void> {
   // Also clear any user-related cache patterns
   await clearPattern(`user:${userId}:*`);
 }
+
+
+
+/* ------------------------- USER KYC Cache Management ------------------------- */
+export async function cacheUserKyc(
+  userId: string,
+  kycData: any,
+  ttlSeconds = 300
+): Promise<void> {
+  await setCacheWithPrefix("userKyc", userId, kycData, ttlSeconds);
+  logger.debug("UserKYC cache set", { userId, ttlSeconds });
+}
+
+export async function getCachedUserKyc<T>(userId: string): Promise<T | null> {
+  return getCacheWithPrefix<T>("userKyc", userId);
+}
+
+export async function invalidateUserKycCache(userId: string): Promise<void> {
+  await delCacheWithPrefix("userKyc", userId);
+  await clearPattern(`userKyc:${userId}:*`);
+  logger.debug("UserKYC cache invalidated", { userId });
+}

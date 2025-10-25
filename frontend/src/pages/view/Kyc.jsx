@@ -145,17 +145,17 @@ function Kyc({ viewedKyc, onClose }) {
             {/* Profile */}
             <div className="bg-gray-50 rounded-xl p-6">
               <div className="flex items-start gap-6">
-                {viewedKyc?.profile?.photo &&
-                !isPDF(viewedKyc.profile.photo) ? (
+                {viewedKyc?.files?.photo &&
+                !isPDF(viewedKyc.files.photo) ? (
                   <img
-                    src={viewedKyc.profile.photo}
+                    src={viewedKyc.files.photo}
                     alt="Profile"
-                    onClick={() => openLightbox(viewedKyc.profile.photo)}
+                    onClick={() => openLightbox(viewedKyc.files.photo)}
                     className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
                   />
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-3xl font-bold flex items-center justify-center shadow-lg">
-                    {viewedKyc?.profile?.name?.[0]?.toUpperCase() || "U"}
+                    {viewedKyc?.profile?.name?.[0]?.toUpperCase() || "NAME"}
                   </div>
                 )}
 

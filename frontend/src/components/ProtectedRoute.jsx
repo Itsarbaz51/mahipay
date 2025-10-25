@@ -14,7 +14,7 @@ const ROLE_PERMISSIONS = {
     "/commission",
     "/add-fund",
     "/card-payout",
-    "/profile",
+    "/profile/:id",
     "/audit-logs",
     "/login-logs",
   ],
@@ -25,7 +25,9 @@ const ROLE_PERMISSIONS = {
     "/members",
     "/commission",
     "/add-fund",
-    "/profile",
+    "/card-payout",
+    "/profile/:id",
+    "/transactions",
   ],
   "MASTER DISTRIBUTOR": [
     "/dashboard",
@@ -33,22 +35,28 @@ const ROLE_PERMISSIONS = {
     "/members",
     "/commission",
     "/add-fund",
-    "/profile",
+    "/card-payout",
+    "/profile/:id",
+    "/transactions",
   ],
   DISTRIBUTOR: [
     "/dashboard",
     "/kyc-submit",
     "/members",
     "/commission",
+    "/card-payout",
     "/add-fund",
-    "/profile",
+    "/profile/:id",
+    "/transactions",
   ],
   RETAILER: [
     "/dashboard",
     "/kyc-submit",
     "/commission",
     "/add-fund",
-    "/profile",
+    "/card-payout",
+    "/profile/:id",
+    "/transactions",
   ],
 };
 
@@ -93,9 +101,14 @@ const ProtectedRoute = ({ children }) => {
   const allowedPaths = ROLE_PERMISSIONS[role] || [];
   const currentPath = location.pathname;
 
-  const isPathAllowed = allowedPaths.some(
-    (path) => currentPath === path || currentPath.startsWith(path + "/")
-  );
+  const isPathAllowed = allowedPaths.some((path) => {
+    if (path.includes(":")) {
+      // Convert "/profile/:id" to regex like /^\/profile\/[^/]+$/
+      const regex = new RegExp("^" + path.replace(/:\w+/g, "[^/]+") + "$");
+      return regex.test(currentPath);
+    }
+    return currentPath === path || currentPath.startsWith(path + "/");
+  });
 
   if (!isPathAllowed) {
     return <Navigate to="/dashboard" replace />;

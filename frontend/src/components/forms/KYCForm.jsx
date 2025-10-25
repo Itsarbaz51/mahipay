@@ -16,7 +16,11 @@ import {
   Clock,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { createEntity, getAllEntities } from "../../redux/slices/addressSlice";
+import {
+  createEntity,
+  getAllEntities,
+  updateEntity,
+} from "../../redux/slices/addressSlice";
 import {
   getbyId,
   kycSubmit,
@@ -348,12 +352,16 @@ export default function KYCWithAddressForm() {
 
   const [errors, setErrors] = useState({});
 
+  const { currentUser } = useSelector((state) => state.auth);
+
   // Fetch KYC details and states & cities
   useEffect(() => {
-    dispatch(getbyId());
+    if (currentUser?.kycInfo?.currentStatus === "REJECT") {
+      dispatch(getbyId());
+    }
     dispatch(getAllEntities("state-list"));
     dispatch(getAllEntities("city-list"));
-  }, [dispatch]);
+  }, [dispatch, currentUser]);
 
   const stateList = useMemo(
     () => addressState?.stateList?.filter((i) => i.stateName) || [],
@@ -542,17 +550,19 @@ export default function KYCWithAddressForm() {
     const isImage = file.type.startsWith("image/");
     const isPdf = file.type === "application/pdf";
 
-    if (!isImage && !isPdf) {
+    // Aadhaar file → only PDF allowed
+    if (name === "aadhaarFile" && !isPdf) {
       return setErrors((prev) => ({
         ...prev,
-        [name]: "Only image or PDF files allowed",
+        [name]: "Only PDF allowed for Aadhaar file",
       }));
     }
 
-    if (file.size > 150 * 1024) {
+    // Other files → only image allowed
+    if (name !== "aadhaarFile" && !isImage) {
       return setErrors((prev) => ({
         ...prev,
-        [name]: "File too large (max 150KB)",
+        [name]: "Only image files allowed (PNG/JPG)",
       }));
     }
 
@@ -579,6 +589,21 @@ export default function KYCWithAddressForm() {
       ["firstName", "lastName", "fatherName", "dob", "gender"].forEach(
         (f) => !formData[f] && (newErrors[f] = "Required")
       );
+    }
+
+    if (formData.dob) {
+      const dobDate = new Date(formData.dob);
+      const today = new Date();
+      const age = today.getFullYear() - dobDate.getFullYear();
+      const monthDiff = today.getMonth() - dobDate.getMonth();
+      const dayDiff = today.getDate() - dobDate.getDate();
+
+      if (
+        age < 18 ||
+        (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)))
+      ) {
+        newErrors.dob = "You must be at least 18 years old";
+      }
     }
 
     if (step === 2) {
@@ -630,23 +655,36 @@ export default function KYCWithAddressForm() {
 
     try {
       setSubmitting(true);
-
-      // Remove dashes from Aadhaar number before sending
       const aadhaarNumberClean = formData.aadhaarNumber.replace(/\D/g, "");
 
-      const addressPayload = {
-        userId,
-        stateId: formData.stateId,
-        cityId: formData.cityId,
-        address: formData.address,
-        pinCode: formData.pinCode,
-      };
+      let addressId;
 
-      const addressRes = await dispatch(
-        createEntity("address-store", addressPayload)
-      );
+      if (kycDetail?.location?.id) {
+        const addressPayload = {
+          stateId: formData.stateId,
+          cityId: formData.cityId,
+          address: formData.address,
+          pinCode: formData.pinCode,
+        };
 
-      const addressId = addressRes.data?.id;
+        await dispatch(
+          updateEntity("address-update", kycDetail.location.id, addressPayload)
+        );
+        addressId = kycDetail.location.id;
+      } else {
+        const addressPayload = {
+          userId,
+          stateId: formData.stateId,
+          cityId: formData.cityId,
+          address: formData.address,
+          pinCode: formData.pinCode,
+        };
+
+        const addressRes = await dispatch(
+          createEntity("address-store", addressPayload)
+        );
+        addressId = addressRes.data?.id;
+      }
 
       const kycPayload = new FormData();
       kycPayload.append("firstName", formData.firstName);
@@ -658,7 +696,6 @@ export default function KYCWithAddressForm() {
       kycPayload.append("aadhaarNumber", aadhaarNumberClean);
       kycPayload.append("addressId", addressId);
 
-      // Only append files that are newly uploaded or changed
       if (files.photo) kycPayload.append("photo", files.photo);
       if (files.panFile) kycPayload.append("panFile", files.panFile);
       if (files.aadhaarFile)
@@ -666,9 +703,7 @@ export default function KYCWithAddressForm() {
       if (files.addressProofFile)
         kycPayload.append("addressProofFile", files.addressProofFile);
 
-      // Use update if KYC exists, otherwise create new
       if (kycDetail && kycDetail.id) {
-        // Fixed: Pass id and data separately
         await dispatch(
           updatekycSubmit({
             id: kycDetail.id,
@@ -679,9 +714,6 @@ export default function KYCWithAddressForm() {
         await dispatch(kycSubmit(kycPayload));
       }
 
-      toast.success("KYC submitted successfully!");
-
-      // Reset form only if needed
       if (!kycDetail || kycDetail.status === "REJECT") {
         setCurrentStep(1);
         setFormData({
@@ -1043,16 +1075,19 @@ export default function KYCWithAddressForm() {
                 error={errors.panFile}
                 isPreFilled={preFilledFiles.panFile}
               />
+
               <FileUpload
                 label="Aadhaar File"
                 name="aadhaarFile"
                 icon={FileText}
+                accept=".pdf"
                 onChange={handleFileChange}
                 filePreview={filePreviews.aadhaarFile}
                 file={files.aadhaarFile}
                 error={errors.aadhaarFile}
                 isPreFilled={preFilledFiles.aadhaarFile}
               />
+
               <FileUpload
                 label="Address Proof"
                 name="addressProofFile"

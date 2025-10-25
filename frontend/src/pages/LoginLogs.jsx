@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Filter, MapPin } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
+import { useDispatch } from "react-redux";
+import { getLoginLogs } from "../redux/slices/loginLogsslice";
 // Sample data for login logs
 const loginLogsData = [
   {
@@ -71,6 +73,12 @@ const LoginLogs = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(getLoginLogs());
+  }, [dispatch]);
 
   const getInitials = (name) => {
     return name

@@ -98,6 +98,27 @@ const AllKycTable = () => {
     },
   ];
 
+  const [loading, setLoading] = useState(false);
+
+  // Function to fetch KYC data
+  const fetchKycData = async () => {
+    setLoading(true);
+    await dispatch(
+      getKycAll({
+        page: currentPage,
+        limit,
+        status: statusFilter,
+        search: debouncedSearch,
+      })
+    );
+    setLoading(false);
+  };
+
+  // useEffect for initial load & filter/search change
+  useEffect(() => {
+    fetchKycData();
+  }, [currentPage, statusFilter, debouncedSearch]);
+
   const getStatusConfig = (status) => {
     const config = {
       VERIFIED: {
@@ -144,7 +165,7 @@ const AllKycTable = () => {
         verifyKyc({
           id: selectedId,
           status: "VERIFIED",
-          kycRejectionReason: "", 
+          kycRejectionReason: "",
         })
       );
     }
@@ -284,6 +305,18 @@ const AllKycTable = () => {
                 <option value="REJECT">Rejected</option>
               </select>
             </div>
+
+            {/* Refresh Button */}
+            <button
+              onClick={fetchKycData}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+              ) : null}
+              Refresh
+            </button>
           </div>
         </div>
 
@@ -295,6 +328,7 @@ const AllKycTable = () => {
                 <th className="px-6 py-4">Profile</th>
                 <th className="px-6 py-4">Contact Info</th>
                 <th className="px-6 py-4">Documents</th>
+                <th className="px-6 py-4">Type</th>
                 <th className="px-6 py-4">Location</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>
@@ -349,6 +383,9 @@ const AllKycTable = () => {
                           </div>
                         )) || "N/A"}
                       </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {kyc?.type === "USER_KYC" ? "USER KYC" : "N/A"}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
                         <div className="flex items-start">
                           <MapPin className="w-4 h-4 mr-2 text-gray-400 mt-1 flex-shrink-0" />
@@ -384,6 +421,7 @@ const AllKycTable = () => {
                               >
                                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                               </button>
+
                               <button
                                 onClick={() =>
                                   handleActionClick("REJECT", kyc.id)
@@ -395,6 +433,21 @@ const AllKycTable = () => {
                               </button>
                             </>
                           )}
+
+                          {kyc.status === "VERIFIED" && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleActionClick("REJECT", kyc.id)
+                                }
+                                className="p-1 hover:bg-red-50 rounded transition-colors"
+                                title="Reject KYC"
+                              >
+                                <X className="w-5 h-5 text-red-600" />
+                              </button>
+                            </>
+                          )}
+
                           <button
                             onClick={() => handleViewShow(kyc.id)}
                             className="p-1 hover:bg-blue-50 rounded transition-colors"

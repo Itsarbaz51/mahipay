@@ -115,21 +115,11 @@ export const updateEntity =
   (entityType, id, updatedData) => async (dispatch) => {
     try {
       dispatch(requestStart());
-
-      let endpoint = "";
-      switch (entityType) {
-        case "state-update":
-          endpoint = `addresses/state-update/${id}`;
-          break;
-        case "city":
-          endpoint = `addresses/city/${id}`;
-          break;
-        default:
-          endpoint = `addresses/${entityType}/${id}`;
-      }
-
-      const { data } = await axios.put(endpoint, updatedData);
-      toast.success(data.message || "Updated successfully");
+      const { data } = await axios.put(
+        `/addresses/${entityType}/${id}`,
+        updatedData
+      );
+      dispatch(requestSuccess(data));
       return data;
     } catch (error) {
       const errMsg =
@@ -139,7 +129,6 @@ export const updateEntity =
       dispatch(requestFail(errMsg));
     }
   };
-
 // Delete (DELETE)
 export const deleteEntity = (entityType, id) => async (dispatch) => {
   try {

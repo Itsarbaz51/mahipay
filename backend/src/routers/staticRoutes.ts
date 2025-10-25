@@ -6,7 +6,7 @@ import commissionRoutes from "./commission.routes.js";
 // import idempotencyKeyRoutes from "./idempotencyKey.routes.js";
 import kycRoutes from "./kyc.routes.js";
 // import ledgerRoutes from "./ledger.routes.js";
-// import loginLogRoutes from "./loginLog.routes.js";
+import loginLogRoutes from "./loginLog.routes.js";
 import permissionRoutes from "./permission.routes.js";
 // import piiConsentRoutes from "./piiConsent.routes.js";
 import roleRoutes from "./role.routes.js";
@@ -26,7 +26,7 @@ export function StaticRoutes(app: any) {
   // app.use("api/v1/idempotency-key", idempotencyKeyRoutes);
   app.use("/api/v1/kycs", kycRoutes);
   // app.use("api/v1/ledgers", ledgerRoutes);
-  // app.use("api/v1/login-logs", loginLogRoutes);
+  app.use("/api/v1/login-logs", loginLogRoutes);
   app.use("/api/v1/permissions", permissionRoutes);
   // app.use("api/v1/pii-consent", piiConsentRoutes);
   app.use("/api/v1/roles", roleRoutes);

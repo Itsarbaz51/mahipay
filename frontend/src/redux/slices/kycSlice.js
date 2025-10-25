@@ -79,8 +79,6 @@ export const kycSubmit = (kycPayload) => async (dispatch) => {
     });
 
     dispatch(kycActionSuccess(data));
-    toast.success(data.message);
-    dispatch(logout());
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;

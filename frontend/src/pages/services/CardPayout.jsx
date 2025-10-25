@@ -6,27 +6,14 @@ import {
   Plus,
   Upload,
   ExternalLink,
-  CheckCircle,
-  TrendingUp,
-  Activity,
-  DollarSign,
-  ArrowUpRight,
-  Search,
-  Bell,
-  Settings,
-  Menu,
-  X,
-  Download,
-  Filter,
   Eye,
   Copy,
 } from "lucide-react";
 
 const CardPayout = () => {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("senders");
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const recentTransactions = [
     {
@@ -156,43 +143,37 @@ const CardPayout = () => {
   };
 
   const menuItems = [
-    { id: "overview", label: "Overview", icon: Activity },
     { id: "senders", label: "Senders", icon: Users },
     { id: "beneficiaries", label: "Beneficiaries", icon: CreditCard },
     { id: "transactions", label: "Transactions", icon: Send },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <div
-        className={`${
-          sidebarOpen ? "w-64" : "w-20"
-        } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col`}
-      >
-        <div className="p-6 border-b border-gray-200">
+    <div>
+      <div className="flex-1 flex flex-col">
+        <div className="bg-white border-b border-gray-200 px-8 py-4">
           <div className="flex items-center justify-between">
-            {sidebarOpen && (
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold text-gray-900">Bulkpe</span>
-              </div>
-            )}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              {sidebarOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <Menu className="w-5 h-5" />
-              )}
-            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage your CC payouts efficiently
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => openModal("transaction")}
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Payout</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <nav className="flex-1 p-4">
+        <div className="flex p-4">
           {menuItems.map((item) => (
             <button
               key={item.id}
@@ -204,55 +185,12 @@ const CardPayout = () => {
               }`}
             >
               <item.icon className="w-5 h-5" />
-              {sidebarOpen && <span className="font-medium">{item.label}</span>}
+              <span className="font-medium">{item.label}</span>
             </button>
           ))}
-        </nav>
-
-        <div className="p-4 border-t border-gray-200">
-          <button className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
-            <Settings className="w-5 h-5" />
-            {sidebarOpen && <span className="font-medium">Settings</span>}
-          </button>
         </div>
-      </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-gray-200 px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                Manage your CC payouts efficiently
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
-                />
-              </div>
-              <button className="p-2 hover:bg-gray-100 rounded-lg relative">
-                <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
-              <button
-                onClick={() => openModal("transaction")}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Payout</span>
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto py-8">
           {activeTab === "senders" && (
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -427,10 +365,6 @@ const CardPayout = () => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
-                    <Filter className="w-4 h-4" />
-                    <span>Filter</span>
-                  </button>
                   <button
                     onClick={() => openModal("transaction")}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 font-medium"
@@ -516,8 +450,8 @@ const CardPayout = () => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 backdrop-blur-xs bg-black/10 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-5 border-b border-gray-200">
               <h3 className="text-xl font-bold text-gray-900">
                 Add New {modalType.charAt(0).toUpperCase() + modalType.slice(1)}
@@ -527,15 +461,6 @@ const CardPayout = () => {
               <div className="space-y-4">
                 {modalType === "sender" && (
                   <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Reference ID
-                      </label>
-                      <input
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter reference ID"
-                      />
-                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Name
@@ -609,15 +534,6 @@ const CardPayout = () => {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Reference ID
-                      </label>
-                      <input
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter reference ID"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Beneficiary Name
                       </label>
                       <input
@@ -654,15 +570,6 @@ const CardPayout = () => {
                 )}
                 {modalType === "transaction" && (
                   <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Reference ID
-                      </label>
-                      <input
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter unique reference"
-                      />
-                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Select Beneficiary

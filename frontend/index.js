@@ -1,59 +1,3 @@
-export const mockUsers = [
-  {
-    id: 1,
-    name: "Arbaz Khan",
-    email: "arbaz@superadmin.com",
-    role: "super_admin",
-    wallet_balance: 50000,
-    parent_id: null,
-    kyc_status: "verified",
-    created_at: "2024-01-15",
-  },
-  {
-    id: 2,
-    name: "Rajesh Sharma",
-    email: "rajesh@admin.com",
-    role: "admin",
-    wallet_balance: 25000,
-    parent_id: 1,
-    kyc_status: "verified",
-    created_at: "2024-02-01",
-  },
-  {
-    id: 3,
-    name: "Priya Singh",
-    email: "priya@agent.com",
-    role: "agent",
-    wallet_balance: 5000,
-    parent_id: 2,
-    kyc_status: "pending",
-    created_at: "2024-02-15",
-  },
-];
-
-export const mockTransactions = [
-  {
-    id: 1,
-    user_id: 3,
-    type: "payin",
-    amount: 2000,
-    status: "success",
-    razorpay_order_id: "order_123",
-    commission: 40,
-    created_at: "2024-08-29 10:30:00",
-  },
-  {
-    id: 2,
-    user_id: 3,
-    type: "payout",
-    amount: 1500,
-    status: "processing",
-    razorpay_payout_id: "payout_456",
-    commission: 30,
-    created_at: "2024-08-29 11:15:00",
-  },
-];
-
 export const protectedRoute = [
   "/dashboard",
   "/payin",
@@ -70,7 +14,10 @@ export const protectedRoute = [
   "/all-kyc",
   "/add-fund",
   "/permission",
-  "/profile",
+  "/profile/:id",
+  "/login-logs",
+  "/audit-logs",
+  "/card-payout",
 ];
 
 import {
@@ -85,6 +32,9 @@ import {
   Settings,
   User,
   BadgeIndianRupee,
+  Logs,
+  LogIn,
+  Activity,
 } from "lucide-react";
 
 export const navbarTitleConfig = {
@@ -98,7 +48,7 @@ export const navbarTitleConfig = {
     tagLine: "Manage incoming transactions",
     icon: BadgeIndianRupee,
   },
-  "/payout": {
+  "/card-payout": {
     title: "Payout",
     tagLine: "Manage outgoing transactions",
     icon: ArrowDownCircle,
@@ -142,6 +92,21 @@ export const navbarTitleConfig = {
     title: "Settings",
     tagLine: "Manage application settings",
     icon: Settings,
+  },
+  "/profile/:id": {
+    title: "Profile",
+    tagLine: "View and manage your profile",
+    icon: User,
+  },
+  "/login-logs": {
+    title: "Login logs",
+    tagLine: "View and manage your login logs",
+    icon: LogIn,
+  },
+  "/audit-logs": {
+    title: "Audit logs",
+    tagLine: "View and manage your audit logs",
+    icon: Activity,
   },
 };
 

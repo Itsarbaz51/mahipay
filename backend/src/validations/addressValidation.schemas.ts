@@ -3,7 +3,11 @@ import { z } from "zod";
 class AddressValidationSchemas {
   static get Address() {
     return z.object({
-      address: z.string().min(5, "Address must be at least 5 characters long.").max(100, "Address must be at most 100 characters long."),
+      address: z
+        .string()
+        .min(5, "Address must be at least 5 characters long.")
+        .max(500, "Address must be at most 500 characters long."), // LongText support
+
       pinCode: z
         .string()
         .length(6, "Pin code must be exactly 6 digits.")
@@ -18,7 +22,8 @@ class AddressValidationSchemas {
     return z.object({
       stateName: z
         .string()
-        .min(2, "State name must be at least 2 characters long."),
+        .min(2, "State name must be at least 2 characters long.")
+        .max(100, "State name must be at most 100 characters long."),
     });
   }
 
@@ -26,7 +31,8 @@ class AddressValidationSchemas {
     return z.object({
       cityName: z
         .string()
-        .min(2, "City name must be at least 2 characters long."),
+        .min(2, "City name must be at least 2 characters long.")
+        .max(100, "City name must be at most 100 characters long."),
     });
   }
 }

@@ -11,6 +11,8 @@ import {
   History,
   BadgeIndianRupee,
   Wallet,
+  LogInIcon,
+  RedoDot,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
@@ -45,7 +47,12 @@ const Sidebar = () => {
       label: "Add Fund",
       icon: BadgeIndianRupee,
       path: "/add-fund",
-      permissions: ["STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR","RETAILER",],
+      permissions: [
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
     },
     {
       id: "members",
@@ -59,14 +66,26 @@ const Sidebar = () => {
       label: "Commission",
       icon: Percent,
       path: "/commission",
-      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR", "RETAILER",],
+      permissions: [
+        "ADMIN",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
     },
     {
       id: "Transactions",
       label: "Transactions",
       icon: History,
       path: "/transactions",
-      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR", "RETAILER",],
+      permissions: [
+        "ADMIN",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
     },
 
     // --- SERVICE ---
@@ -74,8 +93,13 @@ const Sidebar = () => {
       id: "payout",
       label: "Payouts",
       icon: ArrowDownCircle,
-      path: "/payout",
-      permissions: [ "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR", "RETAILER",],
+      path: "/card-payout",
+      permissions: [
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
     },
 
     // --- ADMIN ONLY ---
@@ -86,13 +110,13 @@ const Sidebar = () => {
       path: "/all-kyc",
       permissions: ["ADMIN"],
     },
-    {
-      id: "employee-management",
-      label: "Employee Management",
-      icon: Users,
-      path: "/employee-management",
-      permissions: ["ADMIN"],
-    },
+    // {
+    //   id: "employee-management",
+    //   label: "Employee Management",
+    //   icon: Users,
+    //   path: "/employee-management",
+    //   permissions: ["ADMIN"],
+    // },
     {
       id: "reports",
       label: "Reports",
@@ -100,6 +124,20 @@ const Sidebar = () => {
       path: "/reports",
       permissions: ["ADMIN"],
     },
+    {
+      id: "login-logs",
+      label: "Login Logs",
+      icon: LogInIcon,
+      path: "/login-logs",
+      permissions: ["ADMIN"],
+    },
+    // {
+    //   id: "audit-logs",
+    //   label: "Audit Logs",
+    //   icon: RedoDot,
+    //   path: "/audit-logs",
+    //   permissions: ["ADMIN"],
+    // },
 
     // --- SYSTEM ---
     {
@@ -109,10 +147,10 @@ const Sidebar = () => {
       path: "/settings",
       permissions: [
         "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
+        // "STATE HEAD",
+        // "MASTER DISTRIBUTOR",
+        // "DISTRIBUTOR",
+        // "RETAILER",
       ],
     },
   ];
@@ -138,7 +176,14 @@ const Sidebar = () => {
   );
 
   const adminItems = filteredMenuItems.filter((item) =>
-    ["kyc", "employee-management", "reports", "permission"].includes(item.id)
+    [
+      "kyc",
+      "employee-management",
+      "reports",
+      "permission",
+      "login-logs",
+      "audit-logs",
+    ].includes(item.id)
   );
 
   const roleSpecificItems = filteredMenuItems.filter((item) =>

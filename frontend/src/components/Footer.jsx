@@ -1,29 +1,41 @@
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { protectedRoute } from "../../index";
+import { HashLink } from "react-router-hash-link";
 
 export default function Footer() {
   const location = useLocation();
-  const isProtectedRoute = protectedRoute.includes(location.pathname);
+  const matchPath = (allowedPath, currentPath) => {
+    const pattern = new RegExp(
+      "^" + allowedPath.replace(/:\w+/g, "[^/]+") + "$"
+    );
+    return pattern.test(currentPath);
+  };
+
+  const isProtectedRoute = protectedRoute.some((path) =>
+    matchPath(path, location.pathname)
+  );
 
   return (
     <footer
-      className={`${!isProtectedRoute && "bg-white border-t border-gray-300"}`}
+      className={`${
+        !isProtectedRoute && "bg-white border-t border-gray-300 "
+      } px-6 md:px-8`}
     >
       {/* Show full footer only on public routes, show only copyright on protected routes */}
       {!isProtectedRoute && (
-        <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="px-4 py-12 grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Left Column */}
           <div>
             <div className="flex items-center gap-2 mb-4">
               <img
-                src="https://via.placeholder.com/24"
-                alt="Monks Pay Logo"
-                className="w-6 h-6"
+                src="WhatsApp Image 2025-10-10 at 11.48.12 AM.jpeg"
+                alt="Mahi Pay Logo"
+                className="w-16 h-16 object-contain"
               />
-              <span className="font-bold text-lg text-gray-900">Monks Pay</span>
+              <span className="font-bold text-lg text-gray-900">Mahi Pay</span>
             </div>
             <p className="text-gray-600 text-sm max-w-xs">
-              Monks Pay offers secure, seamless, and fee-free payments for
+              Mahi Pay offers secure, seamless, and fee-free payments for
               effortless global transactions.
             </p>
           </div>
@@ -33,16 +45,16 @@ export default function Footer() {
             <h4 className="font-semibold text-gray-900 mb-4">Short links</h4>
             <ul className="space-y-2 text-gray-600 text-sm">
               <li>
-                <a href="#">Features</a>
+                <HashLink to="/#feature">Features</HashLink>
               </li>
-              <li>
+              {/* <li>
                 <a href="#">How it works</a>
               </li>
               <li>
                 <a href="#">Security</a>
-              </li>
+              </li> */}
               <li>
-                <a href="#">Testimonial</a>
+                <HashLink to="/#testimonial">Testimonial</HashLink>
               </li>
             </ul>
           </div>
@@ -52,10 +64,10 @@ export default function Footer() {
             <h4 className="font-semibold text-gray-900 mb-4">Other pages</h4>
             <ul className="space-y-2 text-gray-600 text-sm">
               <li>
-                <a href="#">Privacy policy</a>
+                <HashLink to="/privacy-policy">Privacy policy</HashLink>
               </li>
               <li>
-                <a href="#">Terms & conditions</a>
+                <HashLink to="/terms-conditions">Terms & conditions</HashLink>
               </li>
             </ul>
           </div>
@@ -67,9 +79,13 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
           <div className="flex gap-4 mb-4 md:mb-0">
             <a href="#">Get This Turch</a>
-            <a href="#">azzunique.com</a>
+            <a href="#">mahipay.com</a>
           </div>
-          <div>2025 © Design Monks. All rights reserved.</div>
+          <div>
+            2025 © <Link to={"https://azzunique.com/"}>azzunique.com</Link>
+            {/* <Link to={""}>Samir</Link>
+            rights reserved. Developed by <Link to={"https://in.linkedin.com/in/arbazfullstackdeveloper"}>Arbaz </Link> */}
+          </div>
         </div>
       </div>
     </footer>

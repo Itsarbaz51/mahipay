@@ -31,6 +31,10 @@ import Settings from "../components/Settings";
 import CommissionManagement from "../pages/CommissionManagement";
 import CardPayout from "../pages/services/CardPayout";
 import UserProfilePage from "../pages/view/UserProfilePage ";
+import AuditLogs from "../pages/AuditLogs";
+import LoginLogs from "../pages/LoginLogs";
+import PrivacyPolicy from "../pages/landing/Privacypolicy";
+import TermsConditions from "../pages/landing/Terms&conditions";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -42,6 +46,8 @@ export const createRouter = () => {
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
           <Route path="login" element={<Login />} />
+          <Route path="privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="terms-conditions" element={<TermsConditions />} />
         </Route>
 
         {/* ---------------- PROTECTED ROUTES ---------------- */}
@@ -65,7 +71,9 @@ export const createRouter = () => {
           <Route path="employee-management" element={<EmployeeTable />} />
           <Route path="wallet" element={<WalletTable />} />
           <Route path="card-payout" element={<CardPayout />} />
-          <Route path="profile" element={<UserProfilePage />} />
+          <Route path="profile/:id" element={<UserProfilePage />} />
+          <Route path="audit-logs" element={<AuditLogs />} />
+          <Route path="login-logs" element={<LoginLogs />} />
         </Route>
 
         <Route

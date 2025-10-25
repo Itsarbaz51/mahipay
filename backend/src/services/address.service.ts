@@ -10,31 +10,41 @@ import type {
 import { ApiError } from "../utils/ApiError.js";
 
 class AddressServices {
-  // user addresses
+  // 🔹 Show a specific address with relations
   static async showAddress(id: string): Promise<Address> {
+    if (!id) {
+      throw ApiError.badRequest("Address ID is required");
+    }
+
     const address = await Prisma.address.findUnique({
       where: { id },
+      include: {
+        state: true,
+        city: true,
+      },
     });
+
     if (!address) {
       throw ApiError.notFound("Address not found");
     }
+
     return address;
   }
 
+  // 🔹 Create a new address
   static async storeUserAddress(payload: AddressInput): Promise<Address> {
-    const stateExsits = await Prisma.state.findUnique({
+    const stateExists = await Prisma.state.findUnique({
       where: { id: payload.stateId },
     });
-    if (!stateExsits) {
-      throw ApiError.notFound("State not found for creating address");
+    if (!stateExists) {
+      throw ApiError.notFound("State not found");
     }
 
-    const cityExsits = await Prisma.city.findUnique({
+    const cityExists = await Prisma.city.findUnique({
       where: { id: payload.cityId },
     });
-
-    if (!cityExsits) {
-      throw ApiError.notFound("City not found for creating address");
+    if (!cityExists) {
+      throw ApiError.notFound("City not found");
     }
 
     const createdAddress = await Prisma.address.create({
@@ -44,142 +54,186 @@ class AddressServices {
         stateId: payload.stateId,
         cityId: payload.cityId,
       },
+      include: {
+        state: true,
+        city: true,
+      },
     });
-
-    if (!createdAddress) {
-      throw ApiError.internal("Failed to create address record");
-    }
 
     return createdAddress;
   }
 
+  // 🔹 Update an existing address
   static async updateUserAddress(
     payload: AddressInput,
-    id: string
+    addressId: string
   ): Promise<Address> {
-    const stateExsits = await Prisma.state.findUnique({
+    if (!addressId) {
+      throw ApiError.badRequest("Address ID is required");
+    }
+
+    const existingAddress = await Prisma.address.findUnique({
+      where: { id: addressId },
+    });
+
+    if (!existingAddress) {
+      throw ApiError.notFound("Address not found");
+    }
+
+    const state = await Prisma.state.findUnique({
       where: { id: payload.stateId },
     });
 
-    if (!stateExsits) {
-      throw ApiError.notFound("State not found for update address");
+    if (!state) {
+      throw ApiError.notFound("State not found");
     }
 
-    const cityExsits = await Prisma.city.findUnique({
+    const city = await Prisma.city.findUnique({
       where: { id: payload.cityId },
     });
 
-    if (!cityExsits) {
-      throw ApiError.notFound("City not found for update address");
+    if (!city) {
+      throw ApiError.notFound("City not found");
     }
 
     const updatedAddress = await Prisma.address.update({
-      where: { id },
+      where: { id: addressId },
       data: {
         address: payload.address,
         pinCode: payload.pinCode,
         stateId: payload.stateId,
         cityId: payload.cityId,
       },
+      include: {
+        state: true,
+        city: true,
+      },
     });
-
-    if (!updatedAddress) {
-      throw ApiError.internal("Failed to update address");
-    }
 
     return updatedAddress;
   }
 
+  // 🔹 Delete an address
   static async deleteUserAddress(id: string): Promise<Address> {
-    const exsitsCity = await Prisma.address.findFirst({
-      where: {
-        id,
-      },
+    if (!id) {
+      throw ApiError.badRequest("Address ID is required");
+    }
+
+    const existingAddress = await Prisma.address.findUnique({
+      where: { id },
     });
 
-    if (exsitsCity) {
+    if (!existingAddress) {
       throw ApiError.notFound("Address not found");
     }
+
     const deletedAddress = await Prisma.address.delete({
       where: { id },
     });
-    if (!deletedAddress) {
-      throw ApiError.internal("Internal Server Error", [
-        "Failed to delete address record.",
-      ]);
-    }
+
     return deletedAddress;
   }
 
-  // states
+  // 🔹 List all states
   static async indexState(): Promise<State[]> {
-    const allStates = await Prisma.state.findMany();
-    if (!allStates) {
+    const allStates = await Prisma.state.findMany({
+      orderBy: {
+        stateName: "asc",
+      },
+    });
+
+    if (allStates.length === 0) {
       throw ApiError.notFound("No states found");
     }
 
     return allStates;
   }
 
+  // 🔹 Create new state
   static async storeState(payload: StateInput): Promise<State> {
+    const formattedName =
+      payload.stateName.charAt(0).toUpperCase() +
+      payload.stateName.slice(1).toLowerCase();
+
     const alreadyExists = await Prisma.state.findFirst({
-      where: { stateName: payload.stateName },
+      where: { stateName: formattedName },
     });
 
     if (alreadyExists) {
-      throw ApiError.badRequest("A state with the same name already exists.");
+      throw ApiError.conflict("A state with the same name already exists");
     }
 
     const createdState = await Prisma.state.create({
       data: {
-        stateName:
-          payload.stateName.charAt(0).toUpperCase() +
-          payload.stateName.slice(1),
+        stateName: formattedName,
+        stateCode: formattedName.toUpperCase().replace(/\s+/g, "_"),
       },
     });
-
-    if (!createdState) {
-      throw ApiError.internal("Failed to create state");
-    }
 
     return createdState;
   }
 
+  // 🔹 Update existing state
   static async updateState(payload: StateInput, id: string): Promise<State> {
-    const formattedName =
-      payload.stateName.charAt(0).toUpperCase() + payload.stateName.slice(1);
+    if (!id) {
+      throw ApiError.badRequest("State ID is required");
+    }
 
-    const existingState = await Prisma.state.findUnique({ where: { id } });
-    if (!existingState) throw ApiError.notFound("State not found");
+    const formattedName =
+      payload.stateName.charAt(0).toUpperCase() +
+      payload.stateName.slice(1).toLowerCase();
+
+    const existingState = await Prisma.state.findUnique({
+      where: { id },
+    });
+
+    if (!existingState) {
+      throw ApiError.notFound("State not found");
+    }
 
     const alreadyExists = await Prisma.state.findFirst({
-      where: { stateName: formattedName, NOT: { id } },
+      where: {
+        stateName: formattedName,
+        NOT: { id },
+      },
     });
+
     if (alreadyExists) {
-      throw ApiError.badRequest("A state with the same name already exists");
+      throw ApiError.conflict("A state with the same name already exists");
     }
 
     const linkedAddresses = await Prisma.address.count({
       where: { stateId: id },
     });
+
     if (linkedAddresses > 0) {
       throw ApiError.forbidden("Cannot update state: linked addresses exist");
     }
 
     const updatedState = await Prisma.state.update({
       where: { id },
-      data: { stateName: formattedName },
+      data: {
+        stateName: formattedName,
+        stateCode: formattedName.toUpperCase().replace(/\s+/g, "_"),
+      },
     });
 
     return updatedState;
   }
 
+  // 🔹 Delete a state
   static async deleteState(id: string): Promise<State> {
+    if (!id) {
+      throw ApiError.badRequest("State ID is required");
+    }
+
     const existingState = await Prisma.state.findUnique({
       where: { id },
     });
 
-    if (!existingState) throw ApiError.notFound("State not found");
+    if (!existingState) {
+      throw ApiError.notFound("State not found");
+    }
 
     const linkedAddresses = await Prisma.address.count({
       where: { stateId: id },
@@ -196,44 +250,62 @@ class AddressServices {
     return deletedState;
   }
 
-  // cities
+  // 🔹 List all cities
   static async indexCity(): Promise<City[]> {
-    const allCities = await Prisma.city.findMany();
-    if (!allCities) {
-      throw ApiError.notFound("No cities found");
-    }
-    return allCities;
-  }
-
-  static async storeCity(payload: CityInput): Promise<City> {
-    const exsitsCity = await Prisma.city.findFirst({
-      where: {
-        cityName:
-          payload.cityName.charAt(0).toUpperCase() + payload.cityName.slice(1),
+    const allCities = await Prisma.city.findMany({
+      orderBy: {
+        cityName: "asc",
       },
     });
 
-    if (exsitsCity) {
-      throw ApiError.conflict("Already exsits city");
+    if (allCities.length === 0) {
+      throw ApiError.notFound("No cities found");
+    }
+
+    return allCities;
+  }
+
+  // 🔹 Create new city
+  static async storeCity(payload: CityInput): Promise<City> {
+    const formattedName =
+      payload.cityName.charAt(0).toUpperCase() +
+      payload.cityName.slice(1).toLowerCase();
+
+    const existsCity = await Prisma.city.findFirst({
+      where: { cityName: formattedName },
+    });
+
+    if (existsCity) {
+      throw ApiError.conflict("City already exists");
     }
 
     const createdCity = await Prisma.city.create({
       data: {
-        cityName:
-          payload.cityName.charAt(0).toUpperCase() + payload.cityName.slice(1),
+        cityName: formattedName,
+        cityCode: formattedName.toUpperCase().replace(/\s+/g, "_"),
       },
     });
-
-    if (!createdCity) {
-      throw ApiError.internal("Failed to create city record.");
-    }
 
     return createdCity;
   }
 
+  // 🔹 Update existing city
   static async updateCity(payload: CityInput, id: string): Promise<City> {
+    if (!id) {
+      throw ApiError.badRequest("City ID is required");
+    }
+
     const formattedName =
-      payload.cityName.charAt(0).toUpperCase() + payload.cityName.slice(1);
+      payload.cityName.charAt(0).toUpperCase() +
+      payload.cityName.slice(1).toLowerCase();
+
+    const existingCity = await Prisma.city.findUnique({
+      where: { id },
+    });
+
+    if (!existingCity) {
+      throw ApiError.notFound("City not found");
+    }
 
     const existsCity = await Prisma.city.findFirst({
       where: {
@@ -256,22 +328,26 @@ class AddressServices {
 
     const updatedCity = await Prisma.city.update({
       where: { id },
-      data: { cityName: formattedName },
+      data: {
+        cityName: formattedName,
+        cityCode: formattedName.toUpperCase().replace(/\s+/g, "_"),
+      },
     });
-
-    if (!updatedCity) {
-      throw ApiError.internal("Failed to update city record");
-    }
 
     return updatedCity;
   }
 
+  // 🔹 Delete a city
   static async deleteCity(id: string): Promise<City> {
-    const existsCity = await Prisma.city.findUnique({
+    if (!id) {
+      throw ApiError.badRequest("City ID is required");
+    }
+
+    const existingCity = await Prisma.city.findUnique({
       where: { id },
     });
 
-    if (!existsCity) {
+    if (!existingCity) {
       throw ApiError.notFound("City not found");
     }
 
@@ -286,10 +362,6 @@ class AddressServices {
     const deletedCity = await Prisma.city.delete({
       where: { id },
     });
-
-    if (!deletedCity) {
-      throw ApiError.internal("Failed to delete city record");
-    }
 
     return deletedCity;
   }
