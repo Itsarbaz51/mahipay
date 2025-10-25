@@ -61,6 +61,11 @@ enum KycStatus {
   REJECT
 }
 
+enum KycTypes {
+  AEPS
+  USER_KYC
+}
+
 enum Currency {
   INR
   USD
@@ -330,7 +335,8 @@ model UserKyc {
   dob                DateTime
   gender             Gender
   status             KycStatus @default(PENDING)
-  kycRejectionReason String?   @default("") @map("kyc_rejection_reason")
+  type               KycTypes  @default(USER_KYC)
+  kycRejectionReason String?   @default("") @map("kyc_rejection_reason") @db.LongText
 
   addressId String  @map("address_id")
   address   Address @relation(fields: [addressId], references: [id])

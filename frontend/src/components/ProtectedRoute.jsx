@@ -15,6 +15,8 @@ const ROLE_PERMISSIONS = {
     "/add-fund",
     "/card-payout",
     "/profile",
+    "/audit-logs",
+    "/login-logs",
   ],
   "STATE HEAD": [
     "/dashboard",
@@ -65,9 +67,18 @@ const ProtectedRoute = ({ children }) => {
   if (
     isAuthenticated &&
     !currentUser?.isKycVerified &&
+    currentUser?.kyc?.status !== "VERIFIED" &&
     location.pathname !== "/kyc-submit"
   ) {
     return <Navigate to="/kyc-submit" replace state={{ from: location }} />;
+  }
+
+  if (
+    currentUser?.isKycVerified &&
+    currentUser?.kyc?.status === "VERIFIED" &&
+    location.pathname === "/kyc-submit"
+  ) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   const role = currentUser?.role?.name || currentUser?.role || "USER";
