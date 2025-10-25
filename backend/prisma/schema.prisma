@@ -129,6 +129,8 @@ enum PaymentType {
   TAX
   ADJUSTMENT
   CHARGE
+  FUND_REQ_BANK
+  FUND_REQ_RAZORPAY
 }
 
 enum WalletType {

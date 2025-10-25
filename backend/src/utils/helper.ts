@@ -42,10 +42,49 @@ class Helper {
     return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as JwtPayload;
   }
 
-  static serializeUser(user: any) {
-    return JSON.parse(
-      JSON.stringify(user, (k, v) => (typeof v === "bigint" ? v.toString() : v))
-    );
+  static serializeUser(user: any): any {
+    if (!user) return user;
+
+    const serialized = { ...user };
+
+    // Handle BigInt fields in wallets
+    if (user.wallets) {
+      serialized.wallets = user.wallets.map((wallet: any) => ({
+        ...wallet,
+        balance: wallet.balance?.toString() || "0",
+        holdBalance: wallet.holdBalance?.toString() || "0",
+        availableBalance: wallet.availableBalance?.toString() || "0",
+        dailyLimit: wallet.dailyLimit?.toString() || null,
+        monthlyLimit: wallet.monthlyLimit?.toString() || null,
+        perTransactionLimit: wallet.perTransactionLimit?.toString() || null,
+      }));
+    }
+
+    // Handle BigInt in bank accounts if needed
+    if (user.bankInfo?.primaryAccount) {
+      serialized.bankInfo.primaryAccount = {
+        ...user.bankInfo.primaryAccount,
+        // Add any BigInt conversions if your bank account has numeric fields
+      };
+    }
+
+    // Handle date serialization for KYC
+    if (user.kycInfo?.latestKyc?.dob) {
+      serialized.kycInfo.latestKyc.dob =
+        user.kycInfo.latestKyc.dob.toISOString();
+    }
+
+    if (user.kycInfo?.latestKyc?.createdAt) {
+      serialized.kycInfo.latestKyc.createdAt =
+        user.kycInfo.latestKyc.createdAt.toISOString();
+    }
+
+    if (user.kycInfo?.latestKyc?.updatedAt) {
+      serialized.kycInfo.latestKyc.updatedAt =
+        user.kycInfo.latestKyc.updatedAt.toISOString();
+    }
+
+    return serialized;
   }
 
   static async sendEmail({ to, subject, text, html }: any) {

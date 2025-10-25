@@ -1,4 +1,11 @@
-import { UserStatus } from "@prisma/client";
+import {
+  UserStatus,
+  WalletType,
+  Currency,
+  KycStatus,
+  Gender,
+  AccountType,
+} from "@prisma/client";
 import Prisma from "../db/db.js";
 import type { RegisterPayload, User } from "../types/auth.types.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -9,14 +16,13 @@ import {
   cacheUser,
   getCachedUser,
   clearPattern,
-} from "../utils/redisCasheHelper.js"; // Updated import path
+} from "../utils/redisCasheHelper.js";
 import logger from "../utils/WinstonLogger.js";
 import S3Service from "../utils/S3Service.js";
 
 class UserServices {
-  private static readonly USER_CACHE_TTL = 600; // 5 minutes
+  private static readonly USER_CACHE_TTL = 600; // 10 minutes
 
-  // ===================== REGISTER =====================
   static async register(
     payload: RegisterPayload
   ): Promise<{ user: User; accessToken: string }> {
@@ -102,22 +108,51 @@ class UserServices {
           profileImage: profileImageUrl,
           email,
           phoneNumber,
-          roleId,
           password: hashedPassword,
           transactionPin: hashedPin,
-          isAuthorized: false,
-          isKycVerified: false,
-          status: "ACTIVE",
+          roleId,
+          parentId,
           hierarchyLevel,
           hierarchyPath,
-          parentId,
+          status: UserStatus.ACTIVE,
+          isKycVerified: false,
+          // Auth fields set to null initially
           refreshToken: null,
+          passwordResetToken: null,
+          passwordResetExpires: null,
+          emailVerificationToken: null,
+          emailVerifiedAt: null,
+          emailVerificationTokenExpires: null,
         },
         include: {
-          role: { select: { id: true, name: true, level: true } },
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
           wallets: true,
-          parent: { select: { id: true, username: true } },
-          children: { select: { id: true, username: true } },
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
         },
       });
 
@@ -126,8 +161,12 @@ class UserServices {
         data: {
           userId: user.id,
           balance: BigInt(0),
-          currency: "INR",
-          isPrimary: true,
+          currency: Currency.INR,
+          walletType: WalletType.PRIMARY,
+          holdBalance: BigInt(0),
+          availableBalance: BigInt(0),
+          isActive: true,
+          version: 1,
         },
       });
 
@@ -138,7 +177,7 @@ class UserServices {
         roleLevel: user.role.level,
       });
 
-      // Cache user using your existing utility
+      // Cache user with TTL
       await cacheUser(user.id, Helper.serializeUser(user), this.USER_CACHE_TTL);
 
       // Clear relevant cache patterns
@@ -146,7 +185,11 @@ class UserServices {
 
       // Audit log
       await Prisma.auditLog.create({
-        data: { userId: user.id, action: "REGISTER", metadata: {} },
+        data: {
+          userId: user.id,
+          action: "REGISTER",
+          metadata: {},
+        },
       });
 
       logger.info("User registered successfully", { userId: user.id, email });
@@ -162,11 +205,10 @@ class UserServices {
       if (err instanceof ApiError) throw err;
       throw ApiError.internal("Failed to register user. Please try again.");
     } finally {
-      Helper.deleteOldImage(profileImage);
+      Helper.deleteOldImage(profileImage!);
     }
   }
 
-  // ===================== UPDATE PROFILE =====================
   static async updateProfile(
     userId: string,
     updateData: {
@@ -205,7 +247,7 @@ class UserServices {
     }
 
     // Apply proper casing to names if provided
-    const formattedData = { ...updateData };
+    const formattedData: any = { ...updateData };
     if (firstName) {
       formattedData.firstName = this.formatName(firstName);
     }
@@ -217,14 +259,38 @@ class UserServices {
       where: { id: userId },
       data: formattedData,
       include: {
-        role: { select: { id: true, name: true, level: true } },
+        role: {
+          select: { id: true, name: true, level: true, description: true },
+        },
         wallets: true,
-        parent: { select: { id: true, username: true } },
-        children: { select: { id: true, username: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
-    // Update cache and clear related cache
+    // Update cache and clear related cache with TTL
     await cacheUser(
       userId,
       Helper.serializeUser(updatedUser),
@@ -250,7 +316,6 @@ class UserServices {
     return updatedUser;
   }
 
-  // ===================== UPDATE PROFILE IMAGE =====================
   static async updateProfileImage(
     userId: string,
     profileImagePath: string
@@ -259,7 +324,9 @@ class UserServices {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
         include: {
-          role: { select: { id: true, name: true, level: true } },
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
           wallets: true,
         },
       });
@@ -289,14 +356,38 @@ class UserServices {
         where: { id: userId },
         data: { profileImage: profileImageUrl },
         include: {
-          role: { select: { id: true, name: true, level: true } },
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
           wallets: true,
-          parent: { select: { id: true, username: true } },
-          children: { select: { id: true, username: true } },
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
         },
       });
 
-      // Update cache and clear related cache
+      // Update cache and clear related cache with TTL
       await cacheUser(
         userId,
         Helper.serializeUser(updatedUser),
@@ -326,7 +417,6 @@ class UserServices {
   }
 
   static async getUserById(userId: string): Promise<User | null> {
-    // Try cache first using your existing utility
     const cachedUser = await getCachedUser<User>(userId);
 
     if (cachedUser) {
@@ -337,10 +427,104 @@ class UserServices {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
-        role: { select: { id: true, name: true, level: true } },
+        role: {
+          select: { id: true, name: true, level: true, description: true },
+        },
         wallets: true,
-        parent: { select: { id: true, username: true } },
-        children: { select: { id: true, username: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+        kycs: {
+          include: {
+            address: {
+              include: {
+                state: {
+                  select: {
+                    id: true,
+                    stateName: true,
+                    stateCode: true,
+                  },
+                },
+                city: {
+                  select: {
+                    id: true,
+                    cityName: true,
+                    cityCode: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1, // Get only the latest KYC
+        },
+        bankAccounts: {
+          include: {
+            bank: {
+              select: {
+                id: true,
+                bankName: true,
+                ifscCode: true,
+                bankIcon: true,
+              },
+            },
+          },
+          where: {
+            isVerified: true,
+          },
+          orderBy: {
+            isPrimary: "desc",
+          },
+        },
+        userPermissions: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                code: true,
+              },
+            },
+          },
+        },
+        piiConsents: {
+          select: {
+            id: true,
+            piiType: true,
+            scope: true,
+            providedAt: true,
+            expiresAt: true,
+          },
+          where: {
+            expiresAt: {
+              gt: new Date(),
+            },
+          },
+        },
       },
     });
 
@@ -349,9 +533,40 @@ class UserServices {
       throw ApiError.notFound("User not found");
     }
 
-    const safeUser = Helper.serializeUser(user);
+    // Transform the user data to include computed KYC status
+    const transformedUser = {
+      ...user,
+      // Add computed KYC information
+      kycInfo:
+        user.kycs.length > 0
+          ? {
+              currentStatus: user.kycs[0]!.status,
+              isKycSubmitted: user.kycs.length > 0,
+              latestKyc: user.kycs[0],
+              kycHistory: user.kycs,
+              totalKycAttempts: user.kycs.length,
+            }
+          : {
+              currentStatus: "NOT_SUBMITTED" as const,
+              isKycSubmitted: false,
+              latestKyc: null,
+              kycHistory: [],
+              totalKycAttempts: 0,
+            },
+      // Add computed bank account information
+      bankInfo: {
+        totalAccounts: user.bankAccounts.length,
+        primaryAccount: user.bankAccounts.find((acc) => acc.isPrimary) || null,
+        verifiedAccounts: user.bankAccounts.filter((acc) => acc.isVerified),
+      },
+      // Remove the original arrays to avoid duplication
+      kycs: undefined,
+      bankAccounts: undefined,
+    };
 
-    // Cache the user using your existing utility
+    const safeUser = Helper.serializeUser(transformedUser);
+
+    // Cache the user with TTL
     await cacheUser(userId, safeUser, this.USER_CACHE_TTL);
 
     logger.debug("User fetched from database and cached", { userId });
@@ -380,20 +595,44 @@ class UserServices {
     const users = await Prisma.user.findMany({
       where: {
         roleId,
-        status: "ACTIVE",
+        status: UserStatus.ACTIVE,
       },
       include: {
-        role: { select: { id: true, name: true, level: true } },
+        role: {
+          select: { id: true, name: true, level: true, description: true },
+        },
         wallets: true,
-        parent: { select: { id: true, username: true } },
-        children: { select: { id: true, username: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
 
-    // Cache the results using your existing utility
+    // Cache the results with TTL
     await setCache(cacheKey, safeUsers, this.USER_CACHE_TTL);
 
     logger.debug("Users by role fetched from database", {
@@ -441,10 +680,34 @@ class UserServices {
       Prisma.user.findMany({
         where: queryWhere,
         include: {
-          role: { select: { id: true, name: true, level: true } },
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
           wallets: true,
-          parent: { select: { id: true, username: true } },
-          children: { select: { id: true, username: true } },
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
         },
         orderBy: { createdAt: sort },
         skip,
@@ -491,20 +754,44 @@ class UserServices {
         hierarchyPath: {
           contains: userId,
         },
-        status: "ACTIVE",
+        status: UserStatus.ACTIVE,
       },
       include: {
-        role: { select: { id: true, name: true, level: true } },
+        role: {
+          select: { id: true, name: true, level: true, description: true },
+        },
         wallets: true,
-        parent: { select: { id: true, username: true } },
-        children: { select: { id: true, username: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: { hierarchyLevel: "asc" },
     });
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
 
-    // Cache the results using your existing utility
+    // Cache the results with TTL
     await setCache(cacheKey, safeUsers, this.USER_CACHE_TTL);
 
     logger.debug("Children users fetched from database", {
@@ -538,11 +825,11 @@ class UserServices {
     const count = await Prisma.user.count({
       where: {
         parentId,
-        status: "ACTIVE",
+        status: UserStatus.ACTIVE,
       },
     });
 
-    // Cache the count using your existing utility
+    // Cache the count with TTL
     await setCache(cacheKey, count, this.USER_CACHE_TTL);
 
     logger.debug("Users count by parent fetched from database", {
@@ -587,11 +874,11 @@ class UserServices {
         hierarchyPath: {
           contains: userId,
         },
-        status: "ACTIVE",
+        status: UserStatus.ACTIVE,
       },
     });
 
-    // Cache the count using your existing utility
+    // Cache the count with TTL
     await setCache(cacheKey, count, this.USER_CACHE_TTL);
 
     logger.debug("Children count fetched from database", {
@@ -602,11 +889,295 @@ class UserServices {
     return { count };
   }
 
+  static async updateUserStatus(
+    userId: string,
+    status: UserStatus,
+    updatedBy: string
+  ): Promise<User> {
+    const user = await Prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const updatedUser = await Prisma.user.update({
+      where: { id: userId },
+      data: { status },
+      include: {
+        role: {
+          select: { id: true, name: true, level: true, description: true },
+        },
+        wallets: true,
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    // Update cache and clear related cache
+    await cacheUser(
+      userId,
+      Helper.serializeUser(updatedUser),
+      this.USER_CACHE_TTL
+    );
+
+    await this.clearUserRelatedCache(
+      userId,
+      updatedUser.parentId,
+      updatedUser.roleId
+    );
+
+    await Prisma.auditLog.create({
+      data: {
+        userId: updatedBy,
+        action: "UPDATE_USER_STATUS",
+        entityType: "User",
+        entityId: userId,
+        metadata: {
+          previousStatus: user.status,
+          newStatus: status,
+          updatedUserId: userId,
+        },
+      },
+    });
+
+    logger.info("User status updated successfully", {
+      userId,
+      previousStatus: user.status,
+      newStatus: status,
+      updatedBy,
+    });
+
+    return updatedUser;
+  }
+
+  static async searchUsers(
+    searchTerm: string,
+    options: {
+      page?: number;
+      limit?: number;
+      roleId?: string;
+      status?: UserStatus;
+    } = {}
+  ): Promise<{ users: User[]; total: number }> {
+    const {
+      page = 1,
+      limit = 10,
+      roleId,
+      status = UserStatus.ACTIVE,
+    } = options;
+
+    const skip = (page - 1) * limit;
+
+    const searchConditions: any = {
+      OR: [
+        { username: { contains: searchTerm, mode: "insensitive" } },
+        { firstName: { contains: searchTerm, mode: "insensitive" } },
+        { lastName: { contains: searchTerm, mode: "insensitive" } },
+        { email: { contains: searchTerm, mode: "insensitive" } },
+        { phoneNumber: { contains: searchTerm } },
+      ],
+      status,
+    };
+
+    if (roleId) {
+      searchConditions.roleId = roleId;
+    }
+
+    const [users, total] = await Promise.all([
+      Prisma.user.findMany({
+        where: searchConditions,
+        include: {
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
+          wallets: true,
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      Prisma.user.count({ where: searchConditions }),
+    ]);
+
+    const safeUsers = users.map((user) => Helper.serializeUser(user));
+
+    return { users: safeUsers, total };
+  }
+
+  static async getUserHierarchy(userId: string): Promise<{
+    parent: User | null;
+    children: User[];
+    siblings: User[];
+  }> {
+    const user = await Prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        parentId: true,
+        hierarchyPath: true,
+      },
+    });
+
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const [parent, children, siblings] = await Promise.all([
+      user.parentId
+        ? Prisma.user.findUnique({
+            where: { id: user.parentId },
+            include: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  level: true,
+                  description: true,
+                },
+              },
+              wallets: true,
+              parent: {
+                select: {
+                  id: true,
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phoneNumber: true,
+                  profileImage: true,
+                },
+              },
+            },
+          })
+        : null,
+      Prisma.user.findMany({
+        where: {
+          parentId: userId,
+          status: UserStatus.ACTIVE,
+        },
+        include: {
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
+          wallets: true,
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { hierarchyLevel: "asc" },
+      }),
+      user.parentId
+        ? Prisma.user.findMany({
+            where: {
+              parentId: user.parentId,
+              id: { not: userId },
+              status: UserStatus.ACTIVE,
+            },
+            include: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  level: true,
+                  description: true,
+                },
+              },
+              wallets: true,
+              parent: {
+                select: {
+                  id: true,
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phoneNumber: true,
+                  profileImage: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+          })
+        : [],
+    ]);
+
+    return {
+      parent: parent ? Helper.serializeUser(parent) : null,
+      children: children.map((child) => Helper.serializeUser(child)),
+      siblings: siblings.map((sibling) => Helper.serializeUser(sibling)),
+    };
+  }
+
   // ===================== HELPER METHODS =====================
 
-  /**
-   * Format name with proper casing (First Letter Capital)
-   */
+  // Format name with proper casing (First Letter Capital
   private static formatName(name: string): string {
     if (!name) return name;
 
@@ -618,9 +1189,7 @@ class UserServices {
       .trim();
   }
 
-  /**
-   * Clear all cache related to user operations
-   */
+  // Clear all cache related to user operation
   private static async clearUserRelatedCache(
     userId: string,
     parentId: string | null,
@@ -632,6 +1201,7 @@ class UserServices {
         `users:role:${roleId}`,
         `users:children:${userId}`,
         `users:children:count:${userId}`,
+        `user:${userId}`,
       ];
 
       // Add parent-related cache patterns if parent exists
@@ -642,7 +1212,7 @@ class UserServices {
         );
       }
 
-      // Clear all patterns using your existing utility
+      // Clear all patterns
       await Promise.all(
         patternsToClear.map((pattern) => clearPattern(pattern))
       );

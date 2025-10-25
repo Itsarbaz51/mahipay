@@ -59,7 +59,7 @@ const MembersTable = () => {
 
   const dispatch = useDispatch();
   const searchTimeoutRef = useRef(null);
-  const initialLoadRef = useRef(false); 
+  const initialLoadRef = useRef(false);
 
   // --- Permission Modal States ---
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -69,49 +69,59 @@ const MembersTable = () => {
 
   const { currentPermission } = useSelector((state) => state.permission);
 
+  // Permission effect
   useEffect(() => {
     if (showPermissionModal && permissionUser?.id) {
-      dispatch(getPermissionById(permissionUser.id));
+      dispatch(getPermissionById(permissionUser.id))
+        .then((result) => {
+          if (result?.data) {
+            setExistingPermissions(result.data);
+          }
+        })
+        .catch((error) => {
+          console.log("No existing permissions found:", error);
+          setExistingPermissions([]);
+        });
     }
   }, [dispatch, showPermissionModal, permissionUser]);
-
-  useEffect(() => {
-    if (currentPermission) {
-      setExistingPermissions(currentPermission);
-    }
-  }, [currentPermission]);
 
   const services =
     useSelector((state) => state.services.serviceProviders) || [];
 
+  // Service providers effect
   useEffect(() => {
-    if (showPermissionModal === true) {
+    if (showPermissionModal) {
       dispatch(getServiceProvidersByUser());
     }
   }, [showPermissionModal, dispatch]);
 
-  // --- Open Permission Modal (Updated) ---
+  // Open Permission Modal
   const handleAddPermission = async (user) => {
     setPermissionUser(user);
 
     try {
-      // Try to fetch existing permissions for this user
       const result = await dispatch(getPermissionById(user.id));
-      if (result.payload?.data) {
+      if (
+        result?.data &&
+        Array.isArray(result.data) &&
+        result.data.length > 0
+      ) {
         setPermissionMode("edit");
+        setExistingPermissions(result.data);
       } else {
         setPermissionMode("add");
+        setExistingPermissions([]);
       }
     } catch (error) {
-      // If no permissions found, use add mode
       setPermissionMode("add");
-      console.log("No existing permissions found, using add mode",error);
+      setExistingPermissions([]);
+      console.log("No existing permissions found, using add mode");
     }
 
     setShowPermissionModal(true);
   };
 
-  // --- Submit Permission (Updated) ---
+  // Submit Permission
   const handlePermissionSubmit = (permissionData) => {
     if (!permissionUser) return;
 
@@ -120,17 +130,31 @@ const MembersTable = () => {
       ...permissionData,
     };
 
-    dispatch(
-      upsertPermission(finalData)
-    ).handleClosePermissionModal();
+    dispatch(upsertPermission(finalData))
+      .then(() => {
+        toast.success(
+          `Permissions ${
+            permissionMode === "add" ? "added" : "updated"
+          } successfully!`
+        );
+        handleClosePermissionModal();
+        handleManualRefresh();
+      })
+      .catch((error) => {
+        toast.error(error.message || "Failed to update permissions");
+      });
   };
 
-  // --- Close Modal (Updated) ---
+  // Close Modal
   const handleClosePermissionModal = () => {
     setShowPermissionModal(false);
     setPermissionUser(null);
-    setPermissionMode("add"); // Reset to add mode
+    setPermissionMode("add");
+    setExistingPermissions([]);
   };
+
+  // Users state
+  const usersState = useSelector((state) => state.users || {});
 
   const {
     users = [],
@@ -144,14 +168,14 @@ const MembersTable = () => {
     },
     error: userError,
     success: userSuccess,
-  } = useSelector((state) => state.users || {});
+  } = usersState;
 
-  const currentPage = pagination.page;
-  const totalPages = pagination.totalPages;
-  const totalUsers = pagination.total;
-  const limit = pagination.limit;
+  const currentPage = pagination.page || 1;
+  const totalPages = pagination.totalPages || 0;
+  const totalUsers = pagination.total || 0;
+  const limit = pagination.limit || 10;
 
-  // FIXED: Load users function - SINGLE SOURCE OF TRUTH
+  // Load users function
   const loadUsers = useCallback(
     async (searchTerm = "", forceRefresh = false, isSearch = false) => {
       try {
@@ -171,12 +195,13 @@ const MembersTable = () => {
         await dispatch(getAllUsersByParentId(params));
       } catch (error) {
         console.error("Failed to load users:", error);
+        toast.error(error.message || "Failed to load users");
       }
     },
     [dispatch, currentPage, limit]
   );
 
-  // FIXED: Toast handling - NO API CALLS HERE
+  // Toast handling
   useEffect(() => {
     if (userError) {
       toast.error(userError);
@@ -184,31 +209,39 @@ const MembersTable = () => {
     }
 
     if (userSuccess) {
-      // Only show generic success messages
-      if (
-        userSuccess &&
-        !userSuccess.toLowerCase().includes("registered") &&
-        !userSuccess.toLowerCase().includes("updated") &&
-        !userSuccess.toLowerCase().includes("created") &&
-        !userSuccess.toLowerCase().includes("added")
-      ) {
+      const lowerSuccess = userSuccess.toLowerCase();
+      const isGenericSuccess = ![
+        "registered",
+        "updated",
+        "created",
+        "added",
+        "activated",
+        "deactivated",
+      ].some((word) => lowerSuccess.includes(word));
+
+      if (isGenericSuccess) {
         toast.success(userSuccess);
       }
       dispatch(clearUserSuccess());
     }
   }, [userError, userSuccess, dispatch]);
 
-  // FIXED: Initial load - RUNS ONLY ONCE
+  // Initial load
   useEffect(() => {
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
       loadUsers();
     }
-  }, []); // Empty dependency array - runs only once on mount
 
-  // FIXED: Search with proper debouncing - ONLY TRIGGERS AFTER INITIAL LOAD
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [loadUsers]);
+
+  // Search with debouncing
   useEffect(() => {
-    // Skip initial render and empty search on mount
     if (!initialLoadRef.current) return;
 
     if (searchTimeoutRef.current) {
@@ -226,19 +259,20 @@ const MembersTable = () => {
     };
   }, [search, loadUsers]);
 
-  // FIXED: Refresh trigger - ONLY TRIGGERS AFTER INITIAL LOAD
+  // Refresh trigger
   useEffect(() => {
     if (refreshTrigger > 0 && initialLoadRef.current) {
       loadUsers(search, true);
     }
   }, [refreshTrigger, loadUsers, search]);
 
-  // FIXED: Manual refresh - SIMPLIFIED
+  // Manual refresh
   const handleManualRefresh = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
+    toast.info("Refreshing data...");
   }, []);
 
-  // FIXED: Page change - DIRECT DISPATCH (NO loadUsers CALL)
+  // Page change
   const handlePageChange = useCallback(
     (page) => {
       if (page >= 1 && page <= totalPages) {
@@ -251,14 +285,18 @@ const MembersTable = () => {
             search,
             timestamp: Date.now(),
           })
-        );
+        ).catch((error) => {
+          toast.error(error.message || "Failed to load page");
+        });
       }
     },
     [dispatch, totalPages, limit, search]
   );
 
+  // Role colors and display names
   const getRoleColor = (roleName) => {
-    switch (roleName) {
+    const role = roleName?.toUpperCase();
+    switch (role) {
       case "STATE HEAD":
         return "bg-purple-100 text-purple-800 border-purple-300";
       case "STATE HOLDER":
@@ -269,13 +307,16 @@ const MembersTable = () => {
         return "bg-green-100 text-green-800 border-green-300";
       case "AGENT":
         return "bg-amber-100 text-amber-800 border-amber-300";
+      case "RETAILER":
+        return "bg-orange-100 text-orange-800 border-orange-300";
       default:
         return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
 
   const getRoleDisplayName = (roleName) => {
-    switch (roleName) {
+    const role = roleName?.toUpperCase();
+    switch (role) {
       case "STATE HEAD":
         return "State Head";
       case "STATE HOLDER":
@@ -286,14 +327,17 @@ const MembersTable = () => {
         return "Distributor";
       case "AGENT":
         return "Agent";
+      case "RETAILER":
+        return "Retailer";
       default:
         return roleName || "Unknown";
     }
   };
 
+  // Mask sensitive data
   const maskSensitiveData = (data, type = "password") => {
     if (!data) return "••••••";
-    return "•".repeat(6);
+    return "•".repeat(type === "password" ? 8 : 6);
   };
 
   const togglePasswordVisibility = (userId) => {
@@ -310,24 +354,33 @@ const MembersTable = () => {
     }));
   };
 
+  // Confirm action
   const confirmAction = async () => {
     if (actionType && selectedUser) {
       try {
         const newStatus =
           selectedUser.status === "ACTIVE" ? "IN_ACTIVE" : "ACTIVE";
         await dispatch(updateUserStatus(selectedUser.id, newStatus));
-        // Refresh after status change
+
+        toast.success(
+          `User ${
+            newStatus === "ACTIVE" ? "activated" : "deactivated"
+          } successfully!`
+        );
+
         setTimeout(() => {
           handleManualRefresh();
         }, 500);
       } catch (error) {
         console.error("Failed to update user status:", error);
+        toast.error(error.message || "Failed to update user status");
       }
     }
     setShowActionModal(false);
     setSelectedUser(null);
   };
 
+  // View user
   const handleViewUser = async (user) => {
     try {
       await dispatch(getUserById(user.id));
@@ -341,6 +394,7 @@ const MembersTable = () => {
     }
   };
 
+  // Form handlers
   const handleFormClose = () => {
     setShowForm(false);
     setSelectedUser(null);
@@ -350,12 +404,16 @@ const MembersTable = () => {
     setShowForm(false);
     setSelectedUser(null);
     handleManualRefresh();
+    toast.success(
+      selectedUser ? "User updated successfully!" : "User added successfully!"
+    );
   };
 
   const handleEditProfileSuccess = () => {
     setShowEditProfile(false);
     setSelectedUser(null);
     handleManualRefresh();
+    toast.success("Profile image updated successfully!");
   };
 
   const handleCredentialsSuccess = () => {
@@ -363,15 +421,19 @@ const MembersTable = () => {
     setShowEditPin(false);
     setSelectedUser(null);
     handleManualRefresh();
+    toast.success("Credentials updated successfully!");
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-      user.lastName?.toLowerCase().includes(search.toLowerCase()) ||
-      user.email?.toLowerCase().includes(search.toLowerCase()) ||
-      user.phoneNumber?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter users safely
+  const filteredUsers = Array.isArray(users)
+    ? users.filter(
+        (user) =>
+          user.firstName?.toLowerCase().includes(search.toLowerCase()) ||
+          user.lastName?.toLowerCase().includes(search.toLowerCase()) ||
+          user.email?.toLowerCase().includes(search.toLowerCase()) ||
+          user.phoneNumber?.toLowerCase().includes(search.toLowerCase())
+      )
+    : [];
 
   return (
     <div>
@@ -502,11 +564,13 @@ const MembersTable = () => {
 
                       <div>
                         <p className="text-sm font-semibold text-gray-900 mb-1">
-                          {user.firstName + " " + (user.lastName || "")}
+                          {`${user.firstName || ""} ${
+                            user.lastName || ""
+                          }`.trim()}
                         </p>
                         <div className="flex items-center text-xs text-gray-500">
                           <Mail className="w-3 h-3 mr-1" />
-                          {user.email}
+                          {user.email || "No email"}
                         </div>
                       </div>
                     </div>
@@ -515,7 +579,7 @@ const MembersTable = () => {
                   <td className="px-6 py-5 text-sm text-gray-700">
                     <div className="flex items-center">
                       <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                      {user.phoneNumber}
+                      {user.phoneNumber || "No phone"}
                     </div>
                   </td>
 
@@ -533,12 +597,13 @@ const MembersTable = () => {
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-mono">
                         {showPasswords[user.id]
-                          ? user.password
+                          ? "••••••••"
                           : maskSensitiveData(user.password)}
                       </span>
                       <button
                         onClick={() => togglePasswordVisibility(user.id)}
                         className="text-gray-500 hover:text-gray-700"
+                        title={showPasswords[user.id] ? "Hide" : "Show"}
                       >
                         {showPasswords[user.id] ? (
                           <EyeOff size={14} />
@@ -553,12 +618,13 @@ const MembersTable = () => {
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-mono">
                         {showPins[user.id]
-                          ? user.transactionPin
+                          ? "••••••"
                           : maskSensitiveData(user.transactionPin, "pin")}
                       </span>
                       <button
                         onClick={() => togglePinVisibility(user.id)}
                         className="text-gray-500 hover:text-gray-700"
+                        title={showPins[user.id] ? "Hide" : "Show"}
                       >
                         {showPins[user.id] ? (
                           <EyeOff size={14} />
@@ -634,8 +700,6 @@ const MembersTable = () => {
                             setOpenMenuId(null);
                           }}
                           onEditPin={(user) => {
-                            console.log("user", user);
-
                             setSelectedUser(user);
                             setShowEditPin(true);
                             setOpenMenuId(null);
@@ -673,11 +737,13 @@ const MembersTable = () => {
       </div>
 
       {/* Pagination */}
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={handlePageChange}
-      />
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
+      )}
 
       {/* Profile Modal */}
       {showViewProfile && (
@@ -748,7 +814,7 @@ const MembersTable = () => {
       {/* Edit Password Modal */}
       {showEditPassword && selectedUser && (
         <EditCredentialsModal
-          user={selectedUser}
+          userId={selectedUser.id}
           type="password"
           onClose={() => {
             setShowEditPassword(false);
@@ -761,7 +827,7 @@ const MembersTable = () => {
       {/* Edit PIN Modal */}
       {showEditPin && selectedUser && (
         <EditCredentialsModal
-          user={selectedUser}
+          userId={selectedUser.id}
           type="pin"
           onClose={() => {
             setShowEditPin(false);

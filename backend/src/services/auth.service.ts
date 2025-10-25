@@ -9,7 +9,7 @@ import {
   delCache,
   invalidateUserCache,
   clearPattern,
-} from "../utils/redisCasheHelper.js"; // Updated import path
+} from "../utils/redisCasheHelper.js";
 import logger from "../utils/WinstonLogger.js";
 import {
   recordLoginAttempt,
@@ -19,9 +19,8 @@ import {
 import type { Request } from "express";
 
 class AuthServices {
-  private static readonly USER_CACHE_TTL = 600; // 5 minutes
+  private static readonly USER_CACHE_TTL = 600; // 10 minutes
 
-  // ===================== LOGIN =====================
   static async login(
     payload: LoginPayload,
     req: Request
@@ -43,13 +42,39 @@ class AuthServices {
         include: {
           role: true,
           wallets: true,
-          parent: { select: { id: true, username: true } },
-          children: { select: { id: true, username: true } },
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
         },
       });
 
       if (user) {
-        await setCache(cacheKey, Helper.serializeUser(user), 300);
+        await setCache(
+          cacheKey,
+          Helper.serializeUser(user),
+          this.USER_CACHE_TTL
+        );
       }
     }
 
@@ -116,7 +141,6 @@ class AuthServices {
     return { user, accessToken, refreshToken };
   }
 
-  // ===================== LOGOUT =====================
   static async logout(userId: string, refreshToken?: string): Promise<void> {
     if (!userId) return;
 
@@ -155,7 +179,6 @@ class AuthServices {
     logger.info("User logged out successfully", { userId });
   }
 
-  // ===================== REFRESH TOKEN =====================
   static async refreshToken(refreshToken: string) {
     let payload: JwtPayload;
     try {
@@ -168,7 +191,17 @@ class AuthServices {
       where: { id: payload.id },
       include: {
         role: true,
-        parent: { select: { id: true, username: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
       },
     });
     if (!user || !user.refreshToken)
@@ -216,7 +249,7 @@ class AuthServices {
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      user: { id: user.id, email: user.email, role: user.role.name },
+      user: Helper.serializeUser(user),
     };
   }
 
@@ -224,7 +257,17 @@ class AuthServices {
     const user = await Prisma.user.findUnique({
       where: { email },
       include: {
-        parent: { select: { id: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
       },
     });
 
@@ -279,7 +322,17 @@ class AuthServices {
         passwordResetExpires: { gt: new Date() },
       },
       include: {
-        parent: { select: { id: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
       },
     });
 
@@ -332,7 +385,17 @@ class AuthServices {
         emailVerificationToken: tokenHash,
       },
       include: {
-        parent: { select: { id: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
       },
     });
 
@@ -346,7 +409,6 @@ class AuthServices {
       data: {
         emailVerificationToken: null,
         emailVerifiedAt: new Date(),
-        isAuthorized: true,
       },
     });
 
@@ -379,7 +441,7 @@ class AuthServices {
     const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`;
 
     // Apply proper casing for email content
-    const formattedFirstName = this.formatName(user.firstName ?? "");
+    const formattedFirstName = this.formatName(user.firstName);
 
     await Helper.sendEmail({
       to: user.email,
@@ -399,7 +461,6 @@ class AuthServices {
     });
   }
 
-  // ===================== UPDATE CREDENTIALS =====================
   static async updateCredentials(
     userId: string,
     credentialsData: {
@@ -407,12 +468,23 @@ class AuthServices {
       newPassword?: string;
       currentTransactionPin?: string;
       newTransactionPin?: string;
-    }
+    },
+    requestedBy?: string
   ): Promise<{ message: string }> {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
-        parent: { select: { id: true } },
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
       },
     });
 
@@ -420,19 +492,19 @@ class AuthServices {
       throw ApiError.notFound("User not found");
     }
 
-    // Verify current password
+    const isOwnUpdate = requestedBy === userId;
+
     const isPasswordValid = await Helper.comparePassword(
       credentialsData.currentPassword,
       user.password
     );
 
     if (!isPasswordValid) {
-      throw ApiError.unauthorized("Current password is incorrect");
+      throw ApiError.unauthorized("User's current password is incorrect");
     }
 
     const updateData: any = {};
 
-    // Update password if provided
     if (credentialsData.newPassword) {
       updateData.password = await Helper.hashPassword(
         credentialsData.newPassword
@@ -440,7 +512,6 @@ class AuthServices {
       updateData.refreshToken = null;
     }
 
-    // Update transaction PIN if provided
     if (credentialsData.newTransactionPin) {
       if (!credentialsData.currentTransactionPin) {
         throw ApiError.badRequest("Current transaction PIN is required");
@@ -465,33 +536,37 @@ class AuthServices {
       data: updateData,
     });
 
-    // Clear user cache and related patterns
     await invalidateUserCache(userId);
     await this.clearUserRelatedCache(userId, user.parentId, user.roleId);
 
     await Prisma.auditLog.create({
       data: {
-        userId,
+        userId: requestedBy || userId,
         action: "UPDATE_CREDENTIALS",
         metadata: {
           updatedFields: [
             ...(credentialsData.newPassword ? ["password"] : []),
             ...(credentialsData.newTransactionPin ? ["transactionPin"] : []),
           ],
+          isOwnUpdate: isOwnUpdate,
+          updatedBy: requestedBy,
+          targetUserId: userId,
         },
       },
     });
 
-    logger.info("Credentials updated successfully", { userId });
+    logger.info("Credentials updated successfully", {
+      userId,
+      updatedBy: requestedBy,
+      isOwnUpdate,
+    });
 
     return { message: "Credentials updated successfully" };
   }
 
   // ===================== HELPER METHODS =====================
 
-  /**
-   * Format name with proper casing (First Letter Capital)
-   */
+  // Format name with proper casing (First Letter Capital)
   private static formatName(name: string): string {
     if (!name) return name;
 
@@ -503,9 +578,7 @@ class AuthServices {
       .trim();
   }
 
-  /**
-   * Clear all cache related to user operations
-   */
+  // Clear all cache related to user operations
   private static async clearUserRelatedCache(
     userId: string,
     parentId: string | null,
@@ -528,7 +601,7 @@ class AuthServices {
         );
       }
 
-      // Clear all patterns using your existing utility
+      // Clear all patterns
       await Promise.all(
         patternsToClear.map((pattern) => clearPattern(pattern))
       );

@@ -72,6 +72,19 @@ const authSlice = createSlice({
     setLoading: (state, action) => {
       state.isLoading = action.payload;
     },
+    clearAuthState: (state) => {
+      state.currentUser = null;
+      state.isLoading = false;
+      state.isAuthenticated = false;
+      state.success = null;
+      state.error = null;
+    },
+    updateCredentialsSuccess: (state, action) => {
+      state.isLoading = false;
+      state.success =
+        action.payload?.message || "Credentials updated successfully";
+      state.error = null;
+    },
   },
 });
 
@@ -85,14 +98,16 @@ export const {
   updateUser,
   setAuthentication,
   setLoading,
+  clearAuthState,
+  updateCredentialsSuccess,
 } = authSlice.actions;
 
+// Async Actions
 export const login = (credentials) => async (dispatch) => {
   try {
     dispatch(authRequest());
     const { data } = await axios.post(`/auth/login`, credentials);
 
-    // Cookies automatically set by backend (httpOnly + secure)
     dispatch(setAuthentication(true));
     dispatch(authSuccess(data));
     toast.success(data.message);
@@ -111,7 +126,6 @@ export const logout = () => async (dispatch) => {
     dispatch(authRequest());
     const { data } = await axios.post(`/auth/logout`);
 
-    // Cookies automatically cleared by backend
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
     toast.success(data.message);
@@ -119,7 +133,6 @@ export const logout = () => async (dispatch) => {
   } catch (error) {
     const errMsg =
       error?.response?.data?.message || error?.message || "Logout failed";
-    // Even if API call fails, clear local state
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
     dispatch(authFail(errMsg));
@@ -131,7 +144,6 @@ export const refreshToken = () => async (dispatch) => {
   try {
     const { data } = await axios.post(`/auth/refresh`);
 
-    // New tokens automatically set in cookies by backend
     dispatch(setAuthentication(true));
     return data;
   } catch (error) {
@@ -149,7 +161,7 @@ export const verifyAuth = () => async (dispatch) => {
   try {
     const { data } = await axios.get(`/users/me`);
     dispatch(setAuthentication(true));
-    dispatch(authSuccess(data)); // Changed from updateUser to authSuccess
+    dispatch(authSuccess(data));
     return data;
   } catch (error) {
     dispatch(setAuthentication(false));
@@ -160,8 +172,10 @@ export const verifyAuth = () => async (dispatch) => {
   }
 };
 
+// FIXED: createAsyncThunk removed - using regular async action
 export const updateCredentials =
-  (userId, credentialsData) => async (dispatch) => {
+  ({ userId, credentialsData, currentUserId }) =>
+  async (dispatch) => {
     try {
       dispatch(authRequest());
       const { data } = await axios.put(
@@ -169,14 +183,25 @@ export const updateCredentials =
         credentialsData
       );
 
-      // If password changed, user might be logged out
-      if (credentialsData.newPassword) {
-        dispatch(setAuthentication(false));
-      }
+      const isUpdatingOwnAccount = userId === currentUserId;
 
-      dispatch(authSuccess(data));
-      toast.success(data.message);
-      return data;
+      if (credentialsData.newPassword && isUpdatingOwnAccount) {
+        // User updated their own password - logout
+        dispatch(clearAuthState());
+        toast.success("Password updated successfully. Please login again.");
+
+        // Redirect to login page after delay
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+
+        return { ...data, logout: true };
+      } else {
+        // Admin updated someone else's password - update state
+        dispatch(updateCredentialsSuccess(data));
+        toast.success(data.message);
+        return { ...data, logout: false };
+      }
     } catch (error) {
       const errMsg =
         error?.response?.data?.message ||

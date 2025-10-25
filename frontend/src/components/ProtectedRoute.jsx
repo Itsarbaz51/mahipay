@@ -43,7 +43,13 @@ const ROLE_PERMISSIONS = {
     "/add-fund",
     "/profile",
   ],
-  RETAILER: ["/dashboard", "/kyc-submit", "/commission", "/add-fund"],
+  RETAILER: [
+    "/dashboard",
+    "/kyc-submit",
+    "/commission",
+    "/add-fund",
+    "/profile",
+  ],
 };
 
 const ProtectedRoute = ({ children }) => {
@@ -52,6 +58,7 @@ const ProtectedRoute = ({ children }) => {
   );
   const location = useLocation();
 
+  // Show loading spinner
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -60,7 +67,8 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated) {
+  // Redirect to login if not authenticated
+  if (!isAuthenticated || !currentUser) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
@@ -85,7 +93,11 @@ const ProtectedRoute = ({ children }) => {
   const allowedPaths = ROLE_PERMISSIONS[role] || [];
   const currentPath = location.pathname;
 
-  if (!allowedPaths.some((p) => currentPath.startsWith(p))) {
+  const isPathAllowed = allowedPaths.some(
+    (path) => currentPath === path || currentPath.startsWith(path + "/")
+  );
+
+  if (!isPathAllowed) {
     return <Navigate to="/dashboard" replace />;
   }
 

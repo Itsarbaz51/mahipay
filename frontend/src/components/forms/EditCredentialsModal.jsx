@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { updateCredentials } from "../../redux/slices/authSlice";
 
-const EditCredentialsModal = ({ type, onClose, onSuccess }) => {
+const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -16,6 +16,7 @@ const EditCredentialsModal = ({ type, onClose, onSuccess }) => {
   const [errors, setErrors] = useState({});
 
   const dispatch = useDispatch();
+  const { currentUser } = useSelector((state) => state.auth);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -83,7 +84,6 @@ const EditCredentialsModal = ({ type, onClose, onSuccess }) => {
 
     setLoading(true);
     try {
-      // Prepare payload according to backend schema
       const payload = {
         currentPassword: formData.currentPassword,
         ...(type === "password"
@@ -98,16 +98,23 @@ const EditCredentialsModal = ({ type, onClose, onSuccess }) => {
             }),
       };
 
-      const res = await dispatch(updateCredentials(payload));
+      const currentUserId = currentUser?.id;
+      const result = await dispatch(
+        updateCredentials({
+          userId,
+          credentialsData: payload,
+          currentUserId,
+        })
+      );
 
-      if (res?.status === "success" || res?.data?.status === "success") {
+      if (result.payload?.logout !== true) {
+        // Only close modal if it wasn't own password update
         toast.success(
           `${
             type === "password" ? "Password" : "Transaction PIN"
           } updated successfully!`
         );
 
-        // Clear form
         setFormData({
           currentPassword: "",
           newPassword: "",
@@ -121,7 +128,7 @@ const EditCredentialsModal = ({ type, onClose, onSuccess }) => {
       }
     } catch (error) {
       console.error("Credentials update error:", error);
-      // Error is handled by Redux slice and shown via toast
+      toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -134,7 +141,7 @@ const EditCredentialsModal = ({ type, onClose, onSuccess }) => {
   return (
     <div className="fixed inset-0 bg-opacity-50 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md">
-        <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5   rounded-t-xl">
+        <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 rounded-t-xl">
           <h2 className="text-xl font-semibold text-white">{getTitle()}</h2>
           <p className="text-blue-100 text-sm">
             {type === "password"

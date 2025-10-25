@@ -5,7 +5,7 @@ import type {
 } from "../types/commission.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
-import { PrismaClient, CommissionType } from "@prisma/client";
+import { CommissionType } from "@prisma/client";
 
 export class CommissionSettingService {
   static async createOrUpdateCommissionSetting(
