@@ -360,18 +360,21 @@ model UserKyc {
 model BankDetail {
   id            String      @id @default(uuid())
   accountHolder String      @map("account_holder") @db.Text
-  accountNumber String      @map("account_number") @db.VarChar(18)
+  accountNumber String      @map("account_number") @db.VarChar(18) @unique
   phoneNumber   String      @map("phone_number")
   accountType   AccountType @map("account_type")
-  bankProofFile String      @map("bank_proof_file")
-  isVerified    Boolean     @default(false) @map("is_verified")
-  isPrimary     Boolean     @default(false) @map("is_primary")
+  ifscCode      String      @map("ifsc_code") @db.Text
+  bankName      String      @map("bank_name") @db.Text
+
+  bankProofFile String  @map("bank_proof_file")
+  isVerified    Boolean @default(false) @map("is_verified")
+  isPrimary     Boolean @default(false) @map("is_primary")
 
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
 
-  bankId String @map("bank_id")
-  bank   Banks  @relation(fields: [bankId], references: [id])
+  // bankId String @map("bank_id")
+  // bank   Banks  @relation(fields: [bankId], references: [id])
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -389,7 +392,7 @@ model Banks {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  bankDetails BankDetail[]
+  // bankDetails BankDetail[]
 
   @@map("banks")
 }

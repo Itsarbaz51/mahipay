@@ -40,7 +40,24 @@ const authSlice = createSlice({
     authFail: (state, action) => {
       state.isLoading = false;
       state.error = action.payload;
-      state.isAuthenticated = false;
+
+      const logoutErrors = [
+        "Not authenticated",
+        "Unauthorized",
+        "Invalid token",
+        "Token expired",
+        "Access denied",
+      ];
+
+      if (logoutErrors.includes(action.payload)) {
+        // Real auth error → logout user
+        state.isAuthenticated = false;
+        state.currentUser = null;
+      } else {
+        // Stay logged in for normal business logic errors
+        state.isAuthenticated = true;
+      }
+
       if (action.payload) {
         toast.error(action.payload);
       }
@@ -186,18 +203,12 @@ export const updateCredentials =
       const isUpdatingOwnAccount = userId === currentUserId;
 
       if (credentialsData.newPassword && isUpdatingOwnAccount) {
-        // User updated their own password - logout
-        dispatch(clearAuthState());
-        toast.success("Password updated successfully. Please login again.");
-
-        // Redirect to login page after delay
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 2000);
-
-        return { ...data, logout: true };
+        // ✅ User updated own password → stay logged in
+        toast.success("Password updated successfully!");
+        dispatch(updateCredentialsSuccess(data));
+        return { ...data, logout: false };
       } else {
-        // Admin updated someone else's password - update state
+        // ✅ Admin updated someone else’s password
         dispatch(updateCredentialsSuccess(data));
         toast.success(data.message);
         return { ...data, logout: false };

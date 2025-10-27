@@ -2,154 +2,11 @@ import Prisma from "../db/db.js";
 import type {
   BankDetail,
   BankDetailInput,
-  BankInput,
 } from "../types/bank.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
 
-export class BankService {
-  static async index(): Promise<BankInput[]> {
-    const exists = await Prisma.banks.findMany({
-      orderBy: { bankName: "asc" },
-    });
-
-    if (!exists) {
-      throw ApiError.notFound("banks not found");
-    }
-
-    return exists;
-  }
-
-  static async show(id: string) {
-    const bank = await Prisma.banks.findUnique({ where: { id } });
-    if (!bank) throw ApiError.notFound("Bank not found");
-    return bank;
-  }
-
-  static async store(data: BankInput & { bankIcon?: Express.Multer.File }) {
-    try {
-      const existsBank = await Prisma.banks.findFirst({
-        where: { bankName: data.bankName, ifscCode: data.ifscCode },
-      });
-      if (existsBank) {
-        throw ApiError.conflict("Bank with this IFSC already exists");
-      }
-
-      if (!data.bankIcon) {
-        throw ApiError.badRequest("Bank icon is required");
-      }
-
-      let bankIconUrl;
-
-      try {
-        bankIconUrl = await S3Service.upload(data.bankIcon, "bank-icon");
-        if (!bankIconUrl) throw new Error("Upload returned empty URL");
-      } catch (err) {
-        console.error("Bank icon upload failed:", err);
-        throw ApiError.internal("Failed to upload bank icon");
-      }
-
-      const createdBank = await Prisma.banks.create({
-        data: {
-          bankName: data.bankName,
-          ifscCode: data.ifscCode,
-          bankIcon: bankIconUrl,
-        },
-      });
-
-      return createdBank;
-    } finally {
-      if (data.bankIcon?.path) {
-        await Helper.deleteOldImage(data.bankIcon.path);
-      }
-    }
-  }
-
-  static async update(
-    id: string,
-    data: Partial<BankInput> & { bankIcon?: Express.Multer.File }
-  ) {
-    const bank = await Prisma.banks.findUnique({ where: { id } });
-    if (!bank) throw ApiError.notFound("Bank not found");
-
-    const linkedBankDetails = await Prisma.bankDetail.count({
-      where: { bankId: id },
-    });
-    if (linkedBankDetails > 0) {
-      throw ApiError.forbidden(
-        "Cannot update this bank because it is linked in bankDetail"
-      );
-    }
-
-    const duplicateBank = await Prisma.banks.findFirst({
-      where: {
-        bankName: data.bankName ?? bank.bankName,
-        ifscCode: data.ifscCode ?? bank.ifscCode,
-        NOT: { id },
-      },
-    });
-    if (duplicateBank) {
-      throw ApiError.conflict("Bank with this name and IFSC already exists");
-    }
-
-    let bankIconUrl;
-    if (data.bankIcon) {
-      try {
-        bankIconUrl = await S3Service.upload(data.bankIcon.path, "bank-icon");
-
-        if (bank.bankIcon) {
-          await S3Service.delete({ fileUrl: bank.bankIcon });
-        }
-      } catch (err) {
-        console.warn("Bank icon upload failed:", err);
-      } finally {
-        if (data.bankIcon.path) await Helper.deleteOldImage(data.bankIcon.path);
-      }
-    }
-
-    const updatedBank = await Prisma.banks.update({
-      where: { id },
-      data: {
-        bankName: data.bankName ?? bank.bankName,
-        ifscCode: data.ifscCode ?? bank.ifscCode,
-        bankIcon: bankIconUrl as string,
-      },
-    });
-
-    return updatedBank;
-  }
-
-  static async destroy(id: string) {
-    const bank = await Prisma.banks.findUnique({ where: { id } });
-    if (!bank) throw ApiError.notFound("Bank not found");
-
-    const linkedBankDetails = await Prisma.bankDetail.count({
-      where: { bankId: id },
-    });
-    if (linkedBankDetails > 0) {
-      throw ApiError.forbidden(
-        "Cannot delete this bank because it is linked in bankDetail"
-      );
-    }
-
-    if (bank.bankIcon) {
-      try {
-        await S3Service.delete({ fileUrl: bank.bankIcon });
-      } catch (err) {
-        console.warn("Failed to delete bank icon from S3:", err);
-      }
-    }
-
-    const deletedBank = await Prisma.banks.delete({ where: { id } });
-
-    if (!deletedBank) {
-      throw ApiError.internal("Failed to delete Bank");
-    }
-
-    return deletedBank;
-  }
-}
 
 // ================= USER BANK DETAILS =================
 
@@ -202,7 +59,7 @@ export class BankDetailService {
       skip,
       take: limitNum,
       orderBy: { createdAt: sortOrder },
-      include: { bank: true, user: true },
+      include: { user: true },
     });
 
     const total = await Prisma.bankDetail.count({ where });
@@ -221,7 +78,7 @@ export class BankDetailService {
   static async show(id: string, userId: string): Promise<BankDetail> {
     const record = await Prisma.bankDetail.findUnique({
       where: { id },
-      include: { bank: true, user: true },
+      include: { user: true },
     });
 
     if (!record) throw ApiError.notFound("Bank detail not found");

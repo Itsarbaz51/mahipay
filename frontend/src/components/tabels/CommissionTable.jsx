@@ -1,5 +1,6 @@
 import { Edit, X, MoreVertical } from "lucide-react";
 import EmptyState from "../ui/EmptyState";
+import {useSelector} from "react-redux"
 
 const CommissionTable = ({
   commissions = [],
@@ -45,6 +46,8 @@ const CommissionTable = ({
     },
   ];
 
+  const { currentUser} = useSelector((state) => state.auth)
+
   return (
     <div className="bg-white w-full rounded-xl h-full shadow-lg border border-gray-300 overflow-x-auto">
       <table className="min-w-full">
@@ -74,9 +77,9 @@ const CommissionTable = ({
             <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
               TDS/GST
             </th>
-            <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
+           {currentUser.role.name === "ADMIN" &&  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
               Actions
-            </th>
+            </th>}
           </tr>
         </thead>
 
@@ -175,7 +178,7 @@ const CommissionTable = ({
                   </div>
                 </td>
 
-                <td className="px-6 py-5 text-center relative">
+                {currentUser.role.name === "ADMIN" && <td className="px-6 py-5 text-center relative">
                   <div className="inline-block relative">
                     <button
                       className="p-2 rounded-full hover:bg-gray-100"
@@ -211,7 +214,7 @@ const CommissionTable = ({
                       </div>
                     )}
                   </div>
-                </td>
+                </td>}
               </tr>
             ))
           )}

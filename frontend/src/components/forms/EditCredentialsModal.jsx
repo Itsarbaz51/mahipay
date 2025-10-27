@@ -99,6 +99,8 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
       };
 
       const currentUserId = currentUser?.id;
+
+      // Dispatch and wait for the result
       const result = await dispatch(
         updateCredentials({
           userId,
@@ -107,14 +109,18 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         })
       );
 
-      if (result.payload?.logout !== true) {
-        // Only close modal if it wasn't own password update
+      console.log("Update credentials result:", result);
+
+      // Check if the action was successful using Redux Toolkit pattern
+      if (updateCredentials.fulfilled.match(result)) {
+        // Success case
         toast.success(
           `${
             type === "password" ? "Password" : "Transaction PIN"
           } updated successfully!`
         );
 
+        // Reset form
         setFormData({
           currentPassword: "",
           newPassword: "",
@@ -124,11 +130,21 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
           confirmNewTransactionPin: "",
         });
 
+        // Only call onSuccess to close modal when update is successful
         onSuccess();
+      } else {
+        // Error case - show error but keep modal open
+        const errorMessage =
+          result.error?.message ||
+          result.payload?.message ||
+          "Failed to update credentials";
+        toast.error(errorMessage);
+        // Don't call onSuccess() - modal stays open
       }
     } catch (error) {
       console.error("Credentials update error:", error);
       toast.error(error.message || "Something went wrong");
+      // Don't call onSuccess() here - keep modal open on error
     } finally {
       setLoading(false);
     }
@@ -161,6 +177,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
               name="currentPassword"
               value={formData.currentPassword}
               onChange={handleChange}
+              autoComplete="current-password"
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                 errors.currentPassword
                   ? "border-red-400 focus:ring-red-300"
@@ -186,6 +203,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                     errors.newPassword
                       ? "border-red-400 focus:ring-red-300"
@@ -209,6 +227,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                   name="confirmNewPassword"
                   value={formData.confirmNewPassword}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                     errors.confirmNewPassword
                       ? "border-red-400 focus:ring-red-300"
@@ -235,6 +254,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                   value={formData.currentTransactionPin}
                   onChange={handleChange}
                   maxLength={6}
+                  autoComplete="current-pin"
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                     errors.currentTransactionPin
                       ? "border-red-400 focus:ring-red-300"
@@ -259,6 +279,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                   value={formData.newTransactionPin}
                   onChange={handleChange}
                   maxLength={6}
+                  autoComplete="new-pin"
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                     errors.newTransactionPin
                       ? "border-red-400 focus:ring-red-300"
@@ -283,6 +304,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                   value={formData.confirmNewTransactionPin}
                   onChange={handleChange}
                   maxLength={6}
+                  autoComplete="new-pin"
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                     errors.confirmNewTransactionPin
                       ? "border-red-400 focus:ring-red-300"
@@ -303,7 +325,8 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              disabled={loading}
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
