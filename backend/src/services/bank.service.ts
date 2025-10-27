@@ -16,7 +16,7 @@ export class BankDetailService {
     isVerified?: boolean;
     page?: number;
     limit?: number;
-    sort?: string;
+    sort?: "asc" | "desc";
   }): Promise<any> {
     const { userId, isVerified, page = 1, limit = 10, sort = "desc" } = params;
 
@@ -24,55 +24,86 @@ export class BankDetailService {
     const limitNum = Number(limit) || 10;
     const sortOrder = sort === "asc" ? "asc" : "desc";
 
+    // Fetch user and their direct children
     const user = await Prisma.user.findUnique({
       where: { id: userId },
-      include: { role: true, children: { select: { id: true } } },
+      include: { children: { select: { id: true } } },
     });
 
     if (!user) throw ApiError.notFound("User not found");
 
-    const roleName = user.role.name.toUpperCase();
-
-    let where: any = {};
-
-    if (["ADMIN", "SUPER ADMIN"].includes(roleName)) {
-      const childUserIds = user.children.map((child) => child.id);
-      if (childUserIds.length === 0) {
-        return {
-          data: [],
-          meta: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 },
-        };
-      }
-      where.userId = { in: childUserIds };
-    } else {
-      where.userId = userId;
-    }
+    const selfWhere: any = { userId: userId };
+    const childUserIds = user.children?.map((child) => child.id) || [];
+    const childWhere: any = { userId: { in: childUserIds } };
 
     if (typeof isVerified === "boolean") {
-      where.isVerified = isVerified;
+      selfWhere.isVerified = isVerified;
+      childWhere.isVerified = isVerified;
     }
 
     const skip = (pageNum - 1) * limitNum;
 
-    const banks = await Prisma.bankDetail.findMany({
-      where,
+    // Fetch self banks
+    const selfBanks = await Prisma.bankDetail.findMany({
+      where: selfWhere,
       skip,
       take: limitNum,
       orderBy: { createdAt: sortOrder },
       include: { user: true },
     });
 
-    const total = await Prisma.bankDetail.count({ where });
+    const selfTotal = await Prisma.bankDetail.count({ where: selfWhere });
+
+    // Fetch child banks (only if children exist)
+    let childBanks: any[] = [];
+    let childTotal = 0;
+    if (childUserIds.length > 0) {
+      childBanks = await Prisma.bankDetail.findMany({
+        where: childWhere,
+        skip,
+        take: limitNum,
+        orderBy: { createdAt: sortOrder },
+        include: { user: true },
+      });
+      childTotal = await Prisma.bankDetail.count({ where: childWhere });
+    }
 
     return {
-      data: banks,
-      meta: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
+      message: "Bank details fetched successfully",
+      data: {
+        selfBanks: {
+          data: selfBanks,
+          meta: {
+            page: pageNum,
+            limit: limitNum,
+            total: selfTotal,
+            totalPages: Math.ceil(selfTotal / limitNum),
+          },
+        },
+        childBanks: {
+          data: childBanks,
+          meta: {
+            page: pageNum,
+            limit: limitNum,
+            total: childTotal,
+            totalPages: Math.ceil(childTotal / limitNum),
+          },
+        },
       },
+      statusCode: 200,
     };
+  }
+
+  static async getAllMy(userId: string): Promise<BankDetail[]> {
+
+    const records = await Prisma.bankDetail.findMany({
+      where: { userId }
+    });
+
+    if (!records) throw ApiError.notFound("No bank details found");
+
+    const safely = await Helper.serializeUser(records);
+    return safely;
   }
 
   static async show(id: string, userId: string): Promise<BankDetail> {
@@ -93,6 +124,8 @@ export class BankDetailService {
   static async store(payload: BankDetailInput): Promise<BankDetail> {
     const { bankProofFile, ...rest } = payload;
     let proofUrl;
+    console.log(payload);
+
 
     try {
       const exists = await Prisma.bankDetail.findFirst({
@@ -106,6 +139,9 @@ export class BankDetailService {
       if (bankProofFile) {
         proofUrl = await S3Service.upload(bankProofFile.path, "bankdoc");
       }
+
+      console.log("bnbbbbbbbbbbbbbbbbbbbbb", proofUrl);
+
 
       if (!proofUrl) throw ApiError.internal("Proof upload failed");
 

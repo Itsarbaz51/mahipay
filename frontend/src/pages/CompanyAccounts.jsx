@@ -1,118 +1,168 @@
-import { useState } from "react";
-import { Plus, Edit, Trash2, MoreVertical } from "lucide-react";
-import PageHeader from "../components/ui/PageHeader";
+import { useState, useEffect } from "react";
+import { Plus, Edit, Trash2, MoreVertical, Check, Shield } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  addBank,
+  getAllMyBanks,
+  // updateBank,
+  // deleteBank,
+} from "../redux/slices/bankSlice";
+import BankForm from "../components/forms/BankForm";
 
+export const AccountType = Object.freeze({
+  PERSONAL: "PERSONAL",
+  BUSINESS: "BUSINESS",
+});
 
 const CompanyAccounts = () => {
-  const [accounts, setAccounts] = useState([
-    {
-      id: 1,
-      holderName: "AZU",
-      accountNumber: "34621114254",
-      ifsc: "SBIN0004655",
-      bankName: "State Bank of India",
-    },
-  ]);
+  const dispatch = useDispatch();
   const [accountForm, setAccountForm] = useState({
-    holderName: "",
+    accountHolder: "",
     accountNumber: "",
-    ifsc: "",
+    phoneNumber: "",
+    accountType: AccountType.PERSONAL,
+    ifscCode: "",
     bankName: "",
+    bankProofFile: null,
+    isPrimary: false,
   });
+
+  const [formErrors, setFormErrors] = useState({});
   const [editingAccountId, setEditingAccountId] = useState(null);
   const [showAccountForm, setShowAccountForm] = useState(false);
 
+  const accountTypes = [
+    { value: AccountType.PERSONAL, label: "Personal Account" },
+    { value: AccountType.BUSINESS, label: "Business Account" },
+  ];
+
+  const { banks = [] } = useSelector((state) => state.bank);
+
+  useEffect(() => {
+    dispatch(getAllMyBanks());
+  }, [dispatch]);
+
   const handleAccountChange = (e) => {
-    const { name, value } = e.target;
-    setAccountForm((prev) => ({ ...prev, [name]: value }));
-  };
+    const { name, value, type, checked } = e.target;
+    setAccountForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
 
-  const handleAddAccount = () => {
-    if (
-      !accountForm.holderName ||
-      !accountForm.accountNumber ||
-      !accountForm.ifsc ||
-      !accountForm.bankName
-    )
-      return;
-
-    const newAccount = {
-      id: Date.now(),
-      ...accountForm,
-    };
-
-    setAccounts((prev) => [...prev, newAccount]);
-    setAccountForm({
-      holderName: "",
-      accountNumber: "",
-      ifsc: "",
-      bankName: "",
-    });
-    setShowAccountForm(false);
-  };
-
-  const handleEditAccount = (id) => {
-    const acc = accounts.find((acc) => acc.id === id);
-    if (acc) {
-      setAccountForm({
-        holderName: acc.holderName,
-        accountNumber: acc.accountNumber,
-        ifsc: acc.ifsc,
-        bankName: acc.bankName,
-      });
-      setEditingAccountId(id);
-      setShowAccountForm(true);
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  const handleUpdateAccount = () => {
-    setAccounts((prev) =>
-      prev.map((acc) =>
-        acc.id === editingAccountId ? { ...acc, ...accountForm } : acc
-      )
-    );
-    setEditingAccountId(null);
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAccountForm((prev) => ({ ...prev, bankProofFile: file }));
+      if (formErrors.bankProofFile) {
+        setFormErrors((prev) => ({ ...prev, bankProofFile: "" }));
+      }
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!accountForm.accountHolder.trim())
+      errors.accountHolder = "Account holder name is required.";
+    if (!accountForm.accountNumber.trim())
+      errors.accountNumber = "Account number is required.";
+    else if (
+      accountForm.accountNumber.length < 9 ||
+      accountForm.accountNumber.length > 18
+    )
+      errors.accountNumber = "Account number must be between 9 and 18 digits.";
+    if (!accountForm.phoneNumber.trim())
+      errors.phoneNumber = "Phone number is required.";
+    else if (!/^\d{10}$/.test(accountForm.phoneNumber))
+      errors.phoneNumber = "Phone number must be exactly 10 digits.";
+    if (!accountForm.ifscCode.trim())
+      errors.ifscCode = "IFSC code is required.";
+    else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(accountForm.ifscCode.toUpperCase()))
+      errors.ifscCode = "Enter a valid IFSC code (e.g., SBIN0001234).";
+    if (!accountForm.bankName.trim())
+      errors.bankName = "Bank name is required.";
+    if (!Object.values(AccountType).includes(accountForm.accountType))
+      errors.accountType = "Invalid account type.";
+    if (!editingAccountId && !accountForm.bankProofFile)
+      errors.bankProofFile = "Bank proof file is required.";
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const resetForm = () => {
     setAccountForm({
-      holderName: "",
+      accountHolder: "",
       accountNumber: "",
-      ifsc: "",
+      phoneNumber: "",
+      accountType: AccountType.PERSONAL,
+      ifscCode: "",
       bankName: "",
+      bankProofFile: null,
+      isPrimary: false,
     });
+    setFormErrors({});
+    setEditingAccountId(null);
     setShowAccountForm(false);
   };
 
-  const handleDeleteAccount = (id) => {
-    setAccounts((prev) => prev.filter((acc) => acc.id !== id));
+  const handleAddAccount = async () => {
+    if (!validateForm()) return;
+
+    const formData = new FormData();
+    Object.entries(accountForm).forEach(([key, value]) => {
+      if (value !== null) formData.append(key, value);
+    });
+
+    await dispatch(addBank(formData));
+    await dispatch(getAllMyBanks());
+    resetForm();
   };
 
-  const getInitials = (name) => {
-    return name
+  const handleEditAccount = (account) => {
+    setAccountForm({
+      accountHolder: account.accountHolder,
+      accountNumber: account.accountNumber,
+      phoneNumber: account.phoneNumber,
+      accountType: account.accountType,
+      ifscCode: account.ifscCode,
+      bankName: account.bankName,
+      bankProofFile: null,
+      isPrimary: account.isPrimary,
+    });
+    setEditingAccountId(account.id);
+    setShowAccountForm(true);
+  };
+
+  const getInitials = (name) =>
+    name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .substring(0, 2);
-  };
 
   return (
     <div className="">
-      <PageHeader
-        breadcrumb={["Dashboard", "Settings", "Company Accounts"]}
-        title="Company Bank Accounts"
-        description="Manage your company's banking information"
-      />
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Company Bank Accounts
+        </h1>
+        <p className="text-gray-600 mt-1">
+          Manage your company's banking information
+        </p>
+      </div>
 
-      <div className="space-y-6 mt-8">
-        <div className="bg-white rounded-xl border border-gray-300 p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Company Bank Accounts
-              </h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Manage your company's banking information
-              </p>
-            </div>
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl border border-gray-300 shadow-sm">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Bank Accounts
+            </h2>
             <button
               onClick={() => setShowAccountForm(!showAccountForm)}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -122,169 +172,71 @@ const CompanyAccounts = () => {
             </button>
           </div>
 
-          {/* Account Form */}
-          {showAccountForm && (
-            <div className="bg-gray-50 p-6 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {editingAccountId ? "Edit Account" : "Add New Account"}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Account Holder Name
-                  </label>
-                  <input
-                    name="holderName"
-                    value={accountForm.holderName}
-                    onChange={handleAccountChange}
-                    placeholder="Enter account holder name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Account Number
-                  </label>
-                  <input
-                    name="accountNumber"
-                    value={accountForm.accountNumber}
-                    onChange={handleAccountChange}
-                    placeholder="Enter account number"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    IFSC Code
-                  </label>
-                  <input
-                    name="ifsc"
-                    value={accountForm.ifsc}
-                    onChange={handleAccountChange}
-                    placeholder="Enter IFSC code"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bank Name
-                  </label>
-                  <input
-                    name="bankName"
-                    value={accountForm.bankName}
-                    onChange={handleAccountChange}
-                    placeholder="Enter bank name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={
-                    editingAccountId ? handleUpdateAccount : handleAddAccount
-                  }
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  {editingAccountId ? "Update Account" : "Add Account"}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAccountForm(false);
-                    setEditingAccountId(null);
-                    setAccountForm({
-                      holderName: "",
-                      accountNumber: "",
-                      ifsc: "",
-                      bankName: "",
-                    });
-                  }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Accounts Table */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-300">
+              <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ACCOUNT HOLDER
+                    Account Details
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ACCOUNT NUMBER
+                    Account Number
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    IFSC CODE
+                    Type
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    BANK NAME
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ACTIONS
+                    Bank Details
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {accounts.map((account) => (
-                  <tr key={account.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium text-sm">
-                          {getInitials(account.holderName)}
-                        </div>
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-gray-900">
-                            {account.holderName}
+                {banks?.data?.length ? (
+                  banks.data.map((account) => (
+                    <tr key={account.id} className="hover:bg-gray-50">
+                      {console.log(account)}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium text-sm">
+                            {getInitials(account.accountHolder || "NA")}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Account Holder
+                          <div className="ml-3">
+                            <div className="text-sm font-medium text-gray-900">
+                              {account.accountHolder || "-"}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {account.phoneNumber || "-"}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-mono text-gray-900">
-                        {account.accountNumber}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-600">
-                        {account.ifsc}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {account.bankName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditAccount(account.id)}
-                          className="text-gray-400 hover:text-blue-600 p-1"
+                      </td>
+                      <td className="px-6 py-4 font-mono text-sm text-gray-900">
+                        {String(account.accountNumber || "-")}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            account.accountType === AccountType.BUSINESS
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
                         >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAccount(account.id)}
-                          className="text-gray-400 hover:text-red-600 p-1"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                        <button className="text-gray-400 hover:text-gray-600 p-1">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {accounts.length === 0 && (
+                          {account.accountType === AccountType.BUSINESS
+                            ? "Business"
+                            : "Personal"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {account.bankName || "-"} <br />
+                        <span className="text-xs text-gray-500">
+                          IFSC: {account.ifscCode || "-"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center">
+                    <td colSpan="4" className="px-6 py-12 text-center">
                       <div className="text-gray-400 text-lg mb-2">
                         No accounts found
                       </div>
@@ -298,6 +250,19 @@ const CompanyAccounts = () => {
             </table>
           </div>
         </div>
+
+        {showAccountForm && (
+          <BankForm
+            accountForm={accountForm}
+            errors={formErrors} // ✅ fixed
+            accountTypes={accountTypes}
+            onChange={handleAccountChange}
+            onFileChange={handleFileChange}
+            onSubmit={editingAccountId ? handleEditAccount : handleAddAccount}
+            onCancel={resetForm}
+            editingAccountId={editingAccountId}
+          />
+        )}
       </div>
     </div>
   );

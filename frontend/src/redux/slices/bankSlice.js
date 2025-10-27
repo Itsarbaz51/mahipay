@@ -8,13 +8,12 @@ const baseURL = import.meta.env.VITE_API_BASE_URL;
 axios.defaults.baseURL = baseURL;
 
 const initialState = {
-  bankData: [],
+  banks: [],
   isLoading: false,
   error: null,
   success: null,
   isBankVerified: false,
 };
-
 const bankSlice = createSlice({
   name: "bank",
   initialState,
@@ -26,8 +25,8 @@ const bankSlice = createSlice({
     },
     bankSuccess: (state, action) => {
       state.isLoading = false;
-      const bankData = action.payload?.data || action.payload;
-      state.bankData = bankData;
+      const bankData = action.payload?.data.data || action.payload;
+      state.banks = bankData;
       state.success = action.payload?.message || null;
       state.error = null;
       state.isBankVerified = bankData?.status === "verified";
@@ -56,9 +55,8 @@ export const { bankRequest, bankSuccess, bankFail, resetBank } =
 export const addBank = (bankPayload) => async (dispatch) => {
   try {
     dispatch(bankRequest());
-    const { data } = await axios.post(`/bank/add-bank`, bankPayload);
+    const { data } = await axios.post(`/banks/store-bank`, bankPayload);
     dispatch(bankSuccess(data));
-    toast.success(data.message);
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
@@ -67,10 +65,24 @@ export const addBank = (bankPayload) => async (dispatch) => {
 };
 
 // get all Bank details (admin use)
-export const getAllBanks = () => async (dispatch) => {
+export const getAllBanks =
+  (payload = {}) =>
+  async (dispatch) => {
+    try {
+      dispatch(bankRequest());
+      const { data } = await axios.post(`/banks/bank-list`, payload);
+      dispatch(bankSuccess(data));
+      return data;
+    } catch (error) {
+      const errMsg = error?.response?.data?.message || error?.message;
+      dispatch(bankFail(errMsg));
+    }
+  };
+  
+export const getAllMyBanks = () => async (dispatch) => {
   try {
     dispatch(bankRequest());
-    const { data } = await axios.get(`/bank/get-all`);
+    const { data } = await axios.get(`/banks/get-all-my`);
     dispatch(bankSuccess(data));
     return data;
   } catch (error) {

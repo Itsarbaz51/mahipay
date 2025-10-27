@@ -40,6 +40,17 @@ export class AddBankController {
       );
   });
 
+  static getAllMyBanks = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) throw ApiError.internal("User ID not found in request");
+
+    const data = await BankDetailService.getAllMy(userId);
+
+    return res
+      .status(200)
+      .json(ApiResponse.success(data, "All bank details fetched successfully", 200));
+  });
+
   static show = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");

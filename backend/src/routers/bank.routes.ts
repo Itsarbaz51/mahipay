@@ -10,10 +10,15 @@ const bankRoutes = Router();
 // ===================== USER BANK ROUTES =====================
 
 // List user's added banks - ✅ Changed to GET and use query params
-bankRoutes.get(
+bankRoutes.post(
   "/bank-list",
   AuthMiddleware.isAuthenticated,
   AddBankController.index
+);
+bankRoutes.get(
+  "/get-all-my",
+  AuthMiddleware.isAuthenticated,
+  AddBankController.getAllMyBanks
 );
 
 // Show user's specific bank
