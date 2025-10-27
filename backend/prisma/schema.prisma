@@ -360,7 +360,7 @@ model UserKyc {
 model BankDetail {
   id            String      @id @default(uuid())
   accountHolder String      @map("account_holder") @db.Text
-  accountNumber String      @map("account_number") @db.VarChar(18) @unique
+  accountNumber String      @unique @map("account_number") @db.VarChar(18)
   phoneNumber   String      @map("phone_number")
   accountType   AccountType @map("account_type")
   ifscCode      String      @map("ifsc_code") @db.Text
