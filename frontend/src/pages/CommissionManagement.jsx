@@ -46,6 +46,8 @@ const CommissionManagement = () => {
     },
   } = useSelector((state) => state.commission || {});
 
+  const { currentUser} = useSelector((state) => state.auth)
+
   const currentPage = pagination.page;
   const totalPages = pagination.totalPages;
   const totalCommissions = pagination.total;
@@ -168,24 +170,25 @@ const CommissionManagement = () => {
     setOpenMenuId(menuId);
   };
 
-  const filteredCommissions = commissionSettings.filter(
-    (commission) =>
-      commission.role?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      commission.targetUser?.firstName
-        ?.toLowerCase()
-        .includes(search.toLowerCase()) ||
-      commission.service?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      commission.service?.type?.toLowerCase().includes(search.toLowerCase()) ||
-      String(commission.commissionValue).includes(search)
-  );
+  const filteredCommissions = Array.isArray(commissionSettings)
+  ? commissionSettings.filter(
+      (commission) =>
+        commission.role?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        commission.targetUser?.firstName
+          ?.toLowerCase()
+          .includes(search.toLowerCase()) ||
+        commission.service?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        commission.service?.type?.toLowerCase().includes(search.toLowerCase()) ||
+        String(commission.commissionValue).includes(search)
+    )
+  : [];
 
   return (
     <div>
       <HeaderSection
         title="Commission Management"
         tagLine="Manage commission settings for roles and users"
-        icon={DollarSign}
-        totalCount={`${totalCommissions || 0} Commission Settings`}
+       
       />
 
       {/* Search + Add Commission */}
@@ -259,7 +262,7 @@ const CommissionManagement = () => {
       />
 
       {/* Add/Edit Commission Modal */}
-      {showForm && (
+      {currentUser.role.name === "ADMIN" && showForm && (
         <div className="fixed inset-0 flex justify-center items-center bg-black/50 z-50">
           <AddCommissionModal
             onClose={handleFormClose}

@@ -31,7 +31,7 @@ import ConfirmCard from "../ui/ConfirmCard";
 import Pagination from "../ui/Pagination";
 import EmptyState from "../ui/EmptyState";
 import ActionsMenu from "../ui/ActionsMenu";
-import UserProfileView from "../../pages/UserProfileView";
+import UserProfileView from "../../pages/view/UserProfileView";
 import EditCredentialsModal from "../forms/EditCredentialsModal";
 import EditProfileImageModal from "../forms/EditProfileImageModal";
 import PermissionForm from "../forms/PermissionForm";
@@ -67,7 +67,8 @@ const MembersTable = () => {
   const [existingPermissions, setExistingPermissions] = useState([]);
   const [permissionMode, setPermissionMode] = useState("add");
 
-  const { currentPermission } = useSelector((state) => state.permission);
+  // const { currentPermission } = useSelector((state) => state.permission);
+  // const { currentUser } = useSelector((state) => state.auth);
 
   // Permission effect
   useEffect(() => {
@@ -592,7 +593,6 @@ const MembersTable = () => {
                       {getRoleDisplayName(user.role?.name)}
                     </span>
                   </td>
-
                   <td className="px-6 py-5">
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-mono">
@@ -708,12 +708,12 @@ const MembersTable = () => {
                             handleAddPermission(user);
                             setOpenMenuId(null);
                           }}
-                          onSettings={(user) => {
-                            // Handle settings
-                          }}
-                          onLoginAs={(user) => {
-                            // Handle login as
-                          }}
+                          // onSettings={(user) => {
+                          //   // Handle settings
+                          // }}
+                          // onLoginAs={(user) => {
+                          //   // Handle login as
+                          // }}
                           onToggleStatus={(user) => {
                             setActionType(
                               user.status === "IN_ACTIVE"

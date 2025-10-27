@@ -159,10 +159,7 @@ export default function UserProfileView({ userData, onClose }) {
                 </div>
               </div>
 
-              {/* Action Button */}
-              <button className="flex items-center gap-2 px-5 py-2.5 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 transition-shadow shadow-md">
-                <Edit2 size={18} /> Edit Profile
-              </button>
+             
             </div>
           </div>
 

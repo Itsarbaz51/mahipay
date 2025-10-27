@@ -42,18 +42,18 @@ const Sidebar = () => {
         "RETAILER",
       ],
     },
-    {
-      id: "add-fund",
-      label: "Add Fund",
-      icon: BadgeIndianRupee,
-      path: "/add-fund",
-      permissions: [
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
-      ],
-    },
+    // {
+    //   id: "add-fund",
+    //   label: "Add Fund",
+    //   icon: BadgeIndianRupee,
+    //   path: "/add-fund",
+    //   permissions: [
+    //     "STATE HEAD",
+    //     "MASTER DISTRIBUTOR",
+    //     "DISTRIBUTOR",
+    //     "RETAILER",
+    //   ],
+    // },
     {
       id: "members",
       label: "Members",
