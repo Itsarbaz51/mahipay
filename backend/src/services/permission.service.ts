@@ -4,18 +4,17 @@ import type {
   CheckUserPermissionPayload,
 } from "../types/permission.types.js";
 import { ApiError } from "../utils/ApiError.js";
-import logger from "../utils/WinstonLogger.js";
 
 export class RolePermissionService {
   static async createOrUpdateRolePermission(data: CheckRolePermissionPayload) {
-    const { roleId, serviceIds, moduleTypes, ...permissions } = data;
+    const { roleId, serviceIds, ...permissions } = data;
 
     if (!roleId) throw ApiError.badRequest("Role ID is required");
 
     const role = await Prisma.role.findUnique({ where: { id: roleId } });
     if (!role) throw ApiError.notFound("Role not found");
 
-    // Process each service individually (as per schema structure)
+    // Process each service individually
     const results = [];
 
     for (const serviceId of serviceIds) {
@@ -37,10 +36,6 @@ export class RolePermissionService {
         },
       });
 
-      const moduleTypesString = Array.isArray(moduleTypes)
-        ? moduleTypes.join(",")
-        : moduleTypes;
-
       let result;
 
       if (existing) {
@@ -52,7 +47,6 @@ export class RolePermissionService {
             },
           },
           data: {
-            moduleTypes: moduleTypesString,
             ...permissions,
           },
         });
@@ -61,7 +55,6 @@ export class RolePermissionService {
           data: {
             roleId,
             serviceId,
-            moduleTypes: moduleTypesString,
             ...permissions,
           },
         });
@@ -102,13 +95,7 @@ export class RolePermissionService {
       throw ApiError.notFound("No permissions found for this role");
     }
 
-    // Transform the data to match your expected format
-    const transformedPermissions = permissions.map((permission) => ({
-      ...permission,
-      moduleTypes: permission.moduleTypes.split(","),
-    }));
-
-    return transformedPermissions;
+    return permissions;
   }
 
   static async deleteRolePermission(roleId: string, serviceId: string) {
@@ -131,12 +118,12 @@ export class RolePermissionService {
 
 export class UserPermissionService {
   static async createOrUpdateUserPermission(data: CheckUserPermissionPayload) {
-    const { userId, serviceIds, moduleTypes, ...permissions } = data;
+    const { userId, serviceIds, ...permissions } = data;
 
     const user = await Prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw ApiError.notFound("User not found");
 
-    // Process each service individually (as per schema structure)
+    // Process each service individually
     const results = [];
 
     for (const serviceId of serviceIds) {
@@ -158,10 +145,6 @@ export class UserPermissionService {
         },
       });
 
-      const moduleTypesString = Array.isArray(moduleTypes)
-        ? moduleTypes.join(",")
-        : moduleTypes;
-
       let result;
 
       if (existing) {
@@ -173,7 +156,6 @@ export class UserPermissionService {
             },
           },
           data: {
-            moduleTypes: moduleTypesString,
             ...permissions,
           },
         });
@@ -182,7 +164,6 @@ export class UserPermissionService {
           data: {
             userId,
             serviceId,
-            moduleTypes: moduleTypesString,
             ...permissions,
           },
         });
@@ -227,13 +208,7 @@ export class UserPermissionService {
       throw ApiError.notFound("No permissions found for this user");
     }
 
-    // Transform the data to match your expected format
-    const transformedPermissions = permissions.map((permission) => ({
-      ...permission,
-      moduleTypes: permission.moduleTypes.split(","),
-    }));
-
-    return transformedPermissions;
+    return permissions;
   }
 
   static async deleteUserPermission(userId: string, serviceId: string) {

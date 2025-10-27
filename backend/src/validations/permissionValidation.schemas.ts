@@ -7,12 +7,6 @@ class PermissionValidationSchemas {
       serviceIds: z
         .array(z.string().uuid("Invalid service ID"))
         .min(1, "At least one service is required"),
-      moduleTypes: z.union([
-        z.string().min(1, "Module types are required"),
-        z
-          .array(z.string().min(1))
-          .min(1, "At least one module type is required"),
-      ]),
       canView: z.boolean().default(false),
       canEdit: z.boolean().default(false),
       canSetCommission: z.boolean().default(false),
@@ -26,12 +20,6 @@ class PermissionValidationSchemas {
       serviceIds: z
         .array(z.string().uuid("Invalid service ID"))
         .min(1, "At least one service is required"),
-      moduleTypes: z.union([
-        z.string().min(1, "Module types are required"),
-        z
-          .array(z.string().min(1))
-          .min(1, "At least one module type is required"),
-      ]),
       canView: z.boolean().default(false),
       canEdit: z.boolean().default(false),
       canSetCommission: z.boolean().default(false),

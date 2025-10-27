@@ -103,7 +103,6 @@ class RoleServices {
       permissions: role.rolePermissions.map((rp) => ({
         id: rp.id,
         service: rp.service,
-        moduleTypes: rp.moduleTypes,
         canView: rp.canView,
         canEdit: rp.canEdit,
         canSetCommission: rp.canSetCommission,
@@ -169,7 +168,6 @@ class RoleServices {
       const rolePermissionData = services.map((service) => ({
         roleId: role.id,
         serviceId: service.id,
-        moduleTypes: "", // Empty by default, can be set later
         canView: true,
         canEdit: false,
         canSetCommission: false,

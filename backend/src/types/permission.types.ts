@@ -2,7 +2,6 @@ export interface RolePermissionPayload {
   roleId?: string;
   userId?: string;
   serviceIds: string[];
-  moduleTypes: string | string[];
   canView: boolean;
   canEdit: boolean;
   canSetCommission: boolean;
@@ -12,7 +11,6 @@ export interface RolePermissionPayload {
 export interface CheckRolePermissionPayload {
   roleId: string;
   serviceIds: string[];
-  moduleTypes: string | string[];
   canView?: boolean;
   canEdit?: boolean;
   canSetCommission?: boolean;
@@ -22,7 +20,6 @@ export interface CheckRolePermissionPayload {
 export interface CheckUserPermissionPayload {
   userId: string;
   serviceIds: string[];
-  moduleTypes: string | string[];
   canView?: boolean;
   canEdit?: boolean;
   canSetCommission?: boolean;

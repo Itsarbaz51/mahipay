@@ -19,7 +19,6 @@ export interface RolePermissionDTO {
     type: string;
     isActive: boolean;
   };
-  moduleTypes: string;
   canView: boolean;
   canEdit: boolean;
   canSetCommission: boolean;
