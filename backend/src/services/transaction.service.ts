@@ -4,7 +4,6 @@ import {
   TxStatus,
   LedgerEntryType,
   ReferenceType,
-  ModuleType,
   PaymentType,
   Currency,
 } from "@prisma/client";

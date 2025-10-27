@@ -3,7 +3,6 @@ import { ApiError } from "../utils/ApiError.js";
 import {
   LedgerEntryType,
   ReferenceType,
-  ModuleType,
   WalletType,
 } from "@prisma/client";
 import logger from "../utils/WinstonLogger.js";

@@ -3,7 +3,7 @@ import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { WalletService } from "../services/wallet.service.js";
 import { ApiError } from "../utils/ApiError.js";
-import { WalletType, ReferenceType, ModuleType } from "@prisma/client";
+import { WalletType, ReferenceType } from "@prisma/client";
 
 export class WalletController {
   static getWallet = asyncHandler(async (req: Request, res: Response) => {
