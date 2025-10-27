@@ -6,7 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 class RoleController {
   static index = asyncHandler(async (req: Request, res: Response) => {
-    const userRoleLevel = req?.user?.roleLevel;
+    const userRoleLevel = req.user?.roleLevel;
 
     const options = {
       ...(typeof userRoleLevel === "number" && {
@@ -22,15 +22,11 @@ class RoleController {
   });
 
   static show = asyncHandler(async (req: Request, res: Response) => {
-    const userRole = req?.user?.role;
+    const userRoleLevel = req.user?.roleLevel;
     const roleId = req.params.id;
 
     if (!roleId) {
       throw ApiError.badRequest("Role ID is required");
-    }
-
-    if (userRole !== "SUPER ADMIN") {
-      throw ApiError.forbidden("Insufficient permissions");
     }
 
     const role = await RoleServices.show(roleId);
@@ -39,21 +35,32 @@ class RoleController {
       throw ApiError.notFound("Role not found");
     }
 
+    // Check if user has permission to view this role
+    if (userRoleLevel && role.level <= userRoleLevel) {
+      throw ApiError.forbidden("Insufficient permissions to view this role");
+    }
+
     return res
       .status(200)
       .json(ApiResponse.success(role, "Role fetched successfully", 200));
   });
 
   static store = asyncHandler(async (req: Request, res: Response) => {
-    const createdBy = req?.user?.id;
-    const userRole = req?.user?.role;
+    const createdBy = req.user?.id;
+    const userRoleLevel = req.user?.roleLevel;
 
     if (!createdBy) {
       throw ApiError.unauthorized("User not authenticated");
     }
 
-    if (userRole !== "ADMIN") {
+    if (userRoleLevel === undefined) {
       throw ApiError.forbidden("Insufficient permissions");
+    }
+
+    // Check if user can create roles with the requested level
+    const { level } = req.body;
+    if (level !== undefined && level <= userRoleLevel) {
+      throw ApiError.forbidden("Cannot create role with equal or lower level");
     }
 
     const role = await RoleServices.store({
@@ -61,18 +68,14 @@ class RoleController {
       createdBy,
     });
 
-    if (!role) {
-      throw ApiError.internal("Failed to create role");
-    }
-
     return res
       .status(201)
       .json(ApiResponse.success(role, "Role created successfully", 201));
   });
 
   static update = asyncHandler(async (req: Request, res: Response) => {
-    const updatedBy = req?.user?.id;
-    const userRole = req?.user?.role;
+    const updatedBy = req.user?.id;
+    const userRoleLevel = req.user?.roleLevel;
     const roleId = req.params.id;
 
     if (!updatedBy) {
@@ -83,8 +86,27 @@ class RoleController {
       throw ApiError.badRequest("Role ID is required");
     }
 
-    if (userRole !== "ADMIN") {
+    if (userRoleLevel === undefined) {
       throw ApiError.forbidden("Insufficient permissions");
+    }
+
+    // Get the existing role to check its level
+    const existingRole = await RoleServices.show(roleId);
+    if (!existingRole) {
+      throw ApiError.notFound("Role not found");
+    }
+
+    // Check if user can update this role
+    if (existingRole.level <= userRoleLevel) {
+      throw ApiError.forbidden("Cannot update role with equal or lower level");
+    }
+
+    // Check if trying to update level to invalid value
+    const { level } = req.body;
+    if (level !== undefined && level <= userRoleLevel) {
+      throw ApiError.forbidden(
+        "Cannot set role level to equal or lower than your own"
+      );
     }
 
     const role = await RoleServices.update(roleId, {
@@ -92,25 +114,32 @@ class RoleController {
       updatedBy,
     });
 
-    if (!role) {
-      throw ApiError.notFound("Role not found or update failed");
-    }
-
     return res
       .status(200)
       .json(ApiResponse.success(role, "Role updated successfully", 200));
   });
 
   static destroy = asyncHandler(async (req: Request, res: Response) => {
-    const userRole = req?.user?.role;
+    const userRoleLevel = req.user?.roleLevel;
     const roleId = req.params.id;
 
     if (!roleId) {
       throw ApiError.badRequest("Role ID is required");
     }
 
-    if (userRole !== "ADMIN") {
+    if (userRoleLevel === undefined) {
       throw ApiError.forbidden("Insufficient permissions");
+    }
+
+    // Get the existing role to check its level
+    const existingRole = await RoleServices.show(roleId);
+    if (!existingRole) {
+      throw ApiError.notFound("Role not found");
+    }
+
+    // Check if user can delete this role
+    if (existingRole.level <= userRoleLevel) {
+      throw ApiError.forbidden("Cannot delete role with equal or lower level");
     }
 
     const result = await RoleServices.destroy(roleId);

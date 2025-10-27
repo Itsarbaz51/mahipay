@@ -8,138 +8,190 @@ import logger from "../utils/WinstonLogger.js";
 
 export class RolePermissionService {
   static async createOrUpdateRolePermission(data: CheckRolePermissionPayload) {
-    const { roleId, serviceIds, ...permissions } = data;
+    const { roleId, serviceIds, moduleTypes, ...permissions } = data;
 
     if (!roleId) throw ApiError.badRequest("Role ID is required");
 
     const role = await Prisma.role.findUnique({ where: { id: roleId } });
     if (!role) throw ApiError.notFound("Role not found");
 
-    const services = await Prisma.serviceProvider.findMany({
-      where: { id: { in: serviceIds } },
-    });
+    // Process each service individually (as per schema structure)
+    const results = [];
 
-    if (services.length !== serviceIds.length) {
-      const foundIds = services.map((s) => s.id);
-      const missingIds = serviceIds.filter((id) => !foundIds.includes(id));
-      throw ApiError.notFound(`Services not found: ${missingIds.join(", ")}`);
-    }
+    for (const serviceId of serviceIds) {
+      const service = await Prisma.serviceProvider.findUnique({
+        where: { id: serviceId },
+      });
 
-    const existing = await Prisma.rolePermission.findFirst({
-      where: { roleId },
-    });
+      if (!service) {
+        throw ApiError.notFound(`Service not found: ${serviceId}`);
+      }
 
-    const serviceIdsString = serviceIds.join(",");
-
-    let result;
-
-    if (existing) {
-      result = await Prisma.rolePermission.update({
-        where: { id: existing.id },
-        data: {
-          serviceIds: serviceIdsString,
-          ...permissions,
+      // Check if permission already exists
+      const existing = await Prisma.rolePermission.findUnique({
+        where: {
+          roleId_serviceId: {
+            roleId,
+            serviceId,
+          },
         },
       });
-    } else {
-      result = await Prisma.rolePermission.create({
-        data: {
-          roleId,
-          serviceIds: serviceIdsString,
-          ...permissions,
-        },
-      });
+
+      const moduleTypesString = Array.isArray(moduleTypes)
+        ? moduleTypes.join(",")
+        : moduleTypes;
+
+      let result;
+
+      if (existing) {
+        result = await Prisma.rolePermission.update({
+          where: {
+            roleId_serviceId: {
+              roleId,
+              serviceId,
+            },
+          },
+          data: {
+            moduleTypes: moduleTypesString,
+            ...permissions,
+          },
+        });
+      } else {
+        result = await Prisma.rolePermission.create({
+          data: {
+            roleId,
+            serviceId,
+            moduleTypes: moduleTypesString,
+            ...permissions,
+          },
+        });
+      }
+
+      results.push(result);
     }
 
-    return result;
+    return results;
   }
 
   static async getRolePermissions(roleId: string) {
-    if (!roleId) ApiError.notFound("Role ID is required");
+    if (!roleId) throw ApiError.badRequest("Role ID is required");
 
-    const permissions = await Prisma.rolePermission.findFirst({
+    const permissions = await Prisma.rolePermission.findMany({
       where: { roleId },
+      include: {
+        service: {
+          select: {
+            id: true,
+            type: true,
+            code: true,
+            name: true,
+            isActive: true,
+          },
+        },
+        role: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+          },
+        },
+      },
     });
 
-    if (!permissions) {
+    if (!permissions.length) {
       throw ApiError.notFound("No permissions found for this role");
     }
 
-    const serviceIds = permissions.serviceIds.split(",");
+    // Transform the data to match your expected format
+    const transformedPermissions = permissions.map((permission) => ({
+      ...permission,
+      moduleTypes: permission.moduleTypes.split(","),
+    }));
 
-    const services = await Prisma.serviceProvider.findMany({
-      where: { id: { in: serviceIds } },
-    });
-
-    return {
-      ...permissions,
-      serviceIds,
-      services,
-    };
+    return transformedPermissions;
   }
 
-  // static async deleteRolePermission(roleId: string, serviceId: string) {
-  //   if (!roleId) ApiError.notFound("Role ID is required");
-  //   if (!serviceId) ApiError.notFound("Service ID is required");
+  static async deleteRolePermission(roleId: string, serviceId: string) {
+    if (!roleId) throw ApiError.badRequest("Role ID is required");
+    if (!serviceId) throw ApiError.badRequest("Service ID is required");
 
-  //   const existing = await Prisma.rolePermission.findUnique({
-  //     where: { roleId_serviceId: { roleId, serviceId } },
-  //   });
+    const existing = await Prisma.rolePermission.findUnique({
+      where: { roleId_serviceId: { roleId, serviceId } },
+    });
 
-  //   if (!existing) {
-  //     throw ApiError.notFound("RolePermission not found");
-  //   }
+    if (!existing) {
+      throw ApiError.notFound("RolePermission not found");
+    }
 
-  //   return Prisma.rolePermission.delete({
-  //     where: { roleId_serviceId: { roleId, serviceId } },
-  //   });
-  // }
+    return await Prisma.rolePermission.delete({
+      where: { roleId_serviceId: { roleId, serviceId } },
+    });
+  }
 }
 
 export class UserPermissionService {
   static async createOrUpdateUserPermission(data: CheckUserPermissionPayload) {
-    const { userId, serviceIds, ...permissions } = data;
+    const { userId, serviceIds, moduleTypes, ...permissions } = data;
 
     const user = await Prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw ApiError.notFound("User not found");
 
-    const services = await Prisma.serviceProvider.findMany({
-      where: { id: { in: serviceIds } },
-    });
+    // Process each service individually (as per schema structure)
+    const results = [];
 
-    if (services.length !== serviceIds.length) {
-      const foundIds = services.map((s) => s.id);
-      const missingIds = serviceIds.filter((id) => !foundIds.includes(id));
-      throw ApiError.notFound(`Services not found: ${missingIds.join(", ")}`);
-    }
+    for (const serviceId of serviceIds) {
+      const service = await Prisma.serviceProvider.findUnique({
+        where: { id: serviceId },
+      });
 
-    const existing = await Prisma.userPermission.findFirst({
-      where: { userId },
-    });
+      if (!service) {
+        throw ApiError.notFound(`Service not found: ${serviceId}`);
+      }
 
-    const serviceIdsString = serviceIds.join(",");
-
-    let result;
-
-    if (existing) {
-      result = await Prisma.userPermission.update({
-        where: { id: existing.id },
-        data: {
-          serviceIds: serviceIdsString,
-          ...permissions,
+      // Check if permission already exists
+      const existing = await Prisma.userPermission.findUnique({
+        where: {
+          userId_serviceId: {
+            userId,
+            serviceId,
+          },
         },
       });
-    } else {
-      result = await Prisma.userPermission.create({
-        data: {
-          userId,
-          serviceIds: serviceIdsString,
-          ...permissions,
-        },
-      });
+
+      const moduleTypesString = Array.isArray(moduleTypes)
+        ? moduleTypes.join(",")
+        : moduleTypes;
+
+      let result;
+
+      if (existing) {
+        result = await Prisma.userPermission.update({
+          where: {
+            userId_serviceId: {
+              userId,
+              serviceId,
+            },
+          },
+          data: {
+            moduleTypes: moduleTypesString,
+            ...permissions,
+          },
+        });
+      } else {
+        result = await Prisma.userPermission.create({
+          data: {
+            userId,
+            serviceId,
+            moduleTypes: moduleTypesString,
+            ...permissions,
+          },
+        });
+      }
+
+      results.push(result);
     }
 
-    return result;
+    return results;
   }
 
   static async getUserPermissions(userId: string) {
@@ -147,41 +199,57 @@ export class UserPermissionService {
       throw ApiError.badRequest("User ID is required");
     }
 
-    const permission = await Prisma.userPermission.findUnique({
+    const permissions = await Prisma.userPermission.findMany({
       where: { userId },
+      include: {
+        service: {
+          select: {
+            id: true,
+            type: true,
+            code: true,
+            name: true,
+            isActive: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
     });
 
-    if (!permission) {
+    if (!permissions.length) {
       throw ApiError.notFound("No permissions found for this user");
     }
 
-    const serviceIds = permission.serviceIds.split(",");
-
-    const services = await Prisma.serviceProvider.findMany({
-      where: { id: { in: serviceIds } },
-    });
-
-    return {
+    // Transform the data to match your expected format
+    const transformedPermissions = permissions.map((permission) => ({
       ...permission,
-      serviceIds,
-      services,
-    };
+      moduleTypes: permission.moduleTypes.split(","),
+    }));
+
+    return transformedPermissions;
   }
 
-  // static async deleteUserPermission(userId: string, serviceId: string) {
-  //   if (!userId) ApiError.notFound("Role ID is required");
-  //   if (!serviceId) ApiError.notFound("Service ID is required");
+  static async deleteUserPermission(userId: string, serviceId: string) {
+    if (!userId) throw ApiError.badRequest("User ID is required");
+    if (!serviceId) throw ApiError.badRequest("Service ID is required");
 
-  //   const existing = await Prisma.userPermission.findUnique({
-  //     where: { userId_serviceId: { userId, serviceId } },
-  //   });
+    const existing = await Prisma.userPermission.findUnique({
+      where: { userId_serviceId: { userId, serviceId } },
+    });
 
-  //   if (!existing) {
-  //     throw ApiError.notFound("UserPermission not found");
-  //   }
+    if (!existing) {
+      throw ApiError.notFound("UserPermission not found");
+    }
 
-  //   return Prisma.userPermission.delete({
-  //     where: { userId_serviceId: { userId, serviceId } },
-  //   });
-  // }
+    return await Prisma.userPermission.delete({
+      where: { userId_serviceId: { userId, serviceId } },
+    });
+  }
 }

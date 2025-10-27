@@ -109,6 +109,7 @@ CREATE TABLE `user_kyc` (
     `dob` DATETIME(3) NOT NULL,
     `gender` ENUM('MALE', 'FEMALE', 'OTHER') NOT NULL,
     `status` ENUM('PENDING', 'VERIFIED', 'REJECT') NOT NULL DEFAULT 'PENDING',
+    `type` ENUM('AEPS', 'USER_KYC') NOT NULL DEFAULT 'USER_KYC',
     `kyc_rejection_reason` LONGTEXT NULL,
     `address_id` VARCHAR(191) NOT NULL,
     `pan_file` VARCHAR(191) NOT NULL,

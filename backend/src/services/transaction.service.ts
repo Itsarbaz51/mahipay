@@ -4,6 +4,9 @@ import {
   TxStatus,
   LedgerEntryType,
   ReferenceType,
+  ModuleType,
+  PaymentType,
+  Currency,
 } from "@prisma/client";
 import type {
   CreateTransactionDTO,
@@ -21,12 +24,21 @@ export class TransactionService {
       userId,
       walletId,
       serviceId,
-      providerId,
+      apiEntityId,
       amount,
-      commissionAmount,
+      currency = "INR",
+      moduleType,
+      subModule,
+      paymentType,
+      commissionAmount = 0,
+      taxAmount = 0,
+      feeAmount = 0,
+      cashbackAmount = 0,
       idempotencyKey,
       referenceId,
+      externalRefId,
       requestPayload,
+      metadata,
     } = data;
 
     // Check for duplicate idempotency key
@@ -54,36 +66,61 @@ export class TransactionService {
 
     const amountBigInt = BigInt(amount);
     const commissionAmountBigInt = BigInt(commissionAmount);
+    const taxAmountBigInt = BigInt(taxAmount);
+    const feeAmountBigInt = BigInt(feeAmount);
+    const cashbackAmountBigInt = BigInt(cashbackAmount);
+
+    // Calculate net amount
+    const netAmount =
+      amountBigInt -
+      commissionAmountBigInt -
+      taxAmountBigInt -
+      feeAmountBigInt +
+      cashbackAmountBigInt;
 
     if (wallet.balance < amountBigInt) {
       throw ApiError.badRequest("Insufficient balance");
     }
 
     const transaction = await Prisma.$transaction(async (tx) => {
+      // Create transaction data object
+      const txData: any = {
+        userId,
+        walletId,
+        amount: amountBigInt,
+        currency: currency as Currency,
+        netAmount,
+        status: TxStatus.PENDING,
+        moduleType: moduleType as ModuleType,
+        paymentType: paymentType as PaymentType,
+        commissionAmount: commissionAmountBigInt,
+        taxAmount: taxAmountBigInt,
+        feeAmount: feeAmountBigInt,
+        cashbackAmount: cashbackAmountBigInt,
+        initiatedAt: new Date(),
+      };
+
+      // Add optional fields
+      if (serviceId) txData.serviceId = serviceId;
+      if (apiEntityId) txData.apiEntityId = apiEntityId;
+      if (subModule) txData.subModule = subModule;
+      if (referenceId) txData.referenceId = referenceId;
+      if (externalRefId) txData.externalRefId = externalRefId;
+      if (idempotencyKey) txData.idempotencyKey = idempotencyKey;
+      if (requestPayload)
+        txData.requestPayload = requestPayload as prisma.InputJsonValue;
+      if (metadata) txData.metadata = metadata as prisma.InputJsonValue;
+
       // Create transaction
       const newTx = await tx.transaction.create({
-        data: {
-          userId,
-          walletId,
-          serviceId,
-          providerId: providerId || null,
-          amount: amountBigInt,
-          commissionAmount: commissionAmountBigInt,
-          netAmount: amountBigInt - commissionAmountBigInt,
-          providerCharge: BigInt(0),
-          referenceId: referenceId || null,
-          idempotencyKey: idempotencyKey || null,
-          requestPayload: requestPayload
-            ? (requestPayload as prisma.InputJsonValue)
-            : prisma.JsonNull,
-          status: TxStatus.PENDING,
-        },
+        data: txData,
         include: {
           service: { select: { name: true, code: true } },
-          provider: { select: { name: true, code: true } },
+          apiEntity: { select: { entityType: true, entityId: true } },
           user: {
             select: { firstName: true, lastName: true, phoneNumber: true },
           },
+          wallet: { select: { currency: true } },
         },
       });
 
@@ -97,9 +134,10 @@ export class TransactionService {
           transactionId: newTx.id,
           entryType: LedgerEntryType.DEBIT,
           referenceType: ReferenceType.TRANSACTION,
+          moduleType: moduleType as ModuleType,
           amount: amountBigInt,
           runningBalance: newBalance,
-          narration: `Transaction initiated for ${newTx.service.name}`,
+          narration: `Transaction initiated for ${moduleType}${subModule ? ` - ${subModule}` : ""}`,
           createdBy: userId,
           idempotencyKey: idempotencyKey || null,
         },
@@ -114,6 +152,7 @@ export class TransactionService {
       logger.info("Transaction created successfully", {
         transactionId: newTx.id,
         userId,
+        moduleType,
         amount: Number(amountBigInt),
         idempotencyKey,
       });
@@ -126,7 +165,7 @@ export class TransactionService {
 
   // ---------------- REFUND TRANSACTION ----------------
   static async refundTransaction(data: RefundTransactionDTO) {
-    const { transactionId, initiatedBy, amount, reason } = data;
+    const { transactionId, initiatedBy, amount, reason, metadata } = data;
 
     const transaction = await Prisma.transaction.findUnique({
       where: { id: transactionId },
@@ -145,33 +184,38 @@ export class TransactionService {
 
     const refund = await Prisma.$transaction(async (tx) => {
       // Create refund record
+      const refundData: any = {
+        transactionId,
+        initiatedBy,
+        amount: amountBigInt,
+        status: TxStatus.REFUNDED,
+      };
+
+      if (reason) refundData.reason = reason;
+      if (metadata) refundData.metadata = metadata as prisma.InputJsonValue;
+
       const refundRecord = await tx.refund.create({
-        data: {
-          transactionId,
-          initiatedBy,
-          amount: amountBigInt,
-          reason: reason || "Refund requested",
-          status: TxStatus.REFUNDED,
-        },
+        data: refundData,
       });
 
       // Get latest ledger entry for running balance
       const latestLedger = await tx.ledgerEntry.findFirst({
-        where: { walletId: transaction.walletId! },
+        where: { walletId: transaction.walletId },
         orderBy: { createdAt: "desc" },
       });
 
       const runningBalance =
-        (latestLedger?.runningBalance || transaction.wallet!.balance) +
+        (latestLedger?.runningBalance || transaction.wallet.balance) +
         amountBigInt;
 
       // Create ledger entry for refund
       await tx.ledgerEntry.create({
         data: {
-          walletId: transaction.walletId!,
+          walletId: transaction.walletId,
           transactionId,
           entryType: LedgerEntryType.CREDIT,
           referenceType: ReferenceType.REFUND,
+          moduleType: transaction.moduleType,
           amount: amountBigInt,
           runningBalance,
           narration: `Refund for transaction ${transactionId} - ${reason || "No reason provided"}`,
@@ -181,7 +225,7 @@ export class TransactionService {
 
       // Update wallet balance
       await tx.wallet.update({
-        where: { id: transaction.walletId! },
+        where: { id: transaction.walletId },
         data: { balance: runningBalance },
       });
 
@@ -200,7 +244,7 @@ export class TransactionService {
       return {
         ...refundRecord,
         transactionReference: transaction.referenceId,
-        serviceName: transaction.service.name,
+        serviceName: transaction.service?.name,
       };
     });
 
@@ -209,12 +253,24 @@ export class TransactionService {
 
   // ---------------- GET TRANSACTIONS ----------------
   static async getTransactions(filters: GetTransactionsFilters) {
-    const { userId, status, serviceId, page, limit } = filters;
+    const {
+      userId,
+      status,
+      serviceId,
+      apiEntityId,
+      moduleType,
+      paymentType,
+      page,
+      limit,
+    } = filters;
 
     const where: any = {};
     if (userId) where.userId = userId;
-    if (status) where.status = status;
+    if (status) where.status = status as TxStatus;
     if (serviceId) where.serviceId = serviceId;
+    if (apiEntityId) where.apiEntityId = apiEntityId;
+    if (moduleType) where.moduleType = moduleType as ModuleType;
+    if (paymentType) where.paymentType = paymentType as PaymentType;
 
     const skip = (page - 1) * limit;
 
@@ -226,7 +282,7 @@ export class TransactionService {
         take: limit,
         include: {
           service: { select: { name: true, code: true } },
-          provider: { select: { name: true, code: true } },
+          apiEntity: { select: { entityType: true, entityId: true } },
           user: {
             select: { firstName: true, lastName: true, phoneNumber: true },
           },
@@ -253,7 +309,7 @@ export class TransactionService {
       where: { id },
       include: {
         service: { select: { name: true, code: true } },
-        provider: { select: { name: true, code: true } },
+        apiEntity: { select: { entityType: true, entityId: true } },
         user: {
           select: { firstName: true, lastName: true, phoneNumber: true },
         },
@@ -262,9 +318,16 @@ export class TransactionService {
           orderBy: { createdAt: "asc" },
           take: 10,
         },
-        Refund: {
+        refunds: {
           orderBy: { createdAt: "desc" },
           take: 5,
+        },
+        commissionEarnings: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+            fromUser: { select: { firstName: true, lastName: true } },
+          },
+          take: 10,
         },
       },
     });
@@ -275,7 +338,13 @@ export class TransactionService {
 
   // ---------------- UPDATE TRANSACTION STATUS ----------------
   static async updateTransactionStatus(data: UpdateTransactionStatusDTO) {
-    const { transactionId, status, responsePayload } = data;
+    const {
+      transactionId,
+      status,
+      providerReference,
+      providerResponse,
+      responsePayload,
+    } = data;
 
     const transaction = await Prisma.transaction.findUnique({
       where: { id: transactionId },
@@ -283,21 +352,31 @@ export class TransactionService {
     });
 
     if (!transaction) throw ApiError.notFound("Transaction not found");
-    if (transaction.status !== TxStatus.PENDING) {
-      throw ApiError.badRequest("Only pending transactions can be updated");
+
+    const updateData: any = {
+      status: status as TxStatus,
+    };
+
+    // Set timestamps based on status
+    if (status === TxStatus.SUCCESS) {
+      updateData.processedAt = new Date();
+      updateData.completedAt = new Date();
+    } else if (status === TxStatus.FAILED) {
+      updateData.processedAt = new Date();
     }
+
+    // Add optional fields
+    if (providerReference) updateData.providerReference = providerReference;
+    if (providerResponse)
+      updateData.providerResponse = providerResponse as prisma.InputJsonValue;
+    if (responsePayload)
+      updateData.responsePayload = responsePayload as prisma.InputJsonValue;
 
     const updatedTx = await Prisma.$transaction(async (tx) => {
       // Update transaction
       const txUpdate = await tx.transaction.update({
         where: { id: transactionId },
-        data: {
-          status: status as TxStatus,
-          responsePayload: responsePayload
-            ? (responsePayload as prisma.InputJsonValue)
-            : prisma.JsonNull,
-          completedAt: status === TxStatus.SUCCESS ? new Date() : null,
-        },
+        data: updateData,
         include: {
           service: { select: { name: true } },
           user: { select: { firstName: true, lastName: true } },
@@ -312,7 +391,7 @@ export class TransactionService {
         });
 
         const runningBalance =
-          (latestLedger?.runningBalance || transaction.wallet!.balance) +
+          (latestLedger?.runningBalance || transaction.wallet.balance) +
           transaction.amount;
 
         await tx.ledgerEntry.create({
@@ -321,6 +400,7 @@ export class TransactionService {
             transactionId,
             entryType: LedgerEntryType.CREDIT,
             referenceType: ReferenceType.REFUND,
+            moduleType: transaction.moduleType,
             amount: transaction.amount,
             runningBalance,
             narration: `Transaction failed - amount refunded`,

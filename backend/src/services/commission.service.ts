@@ -5,7 +5,7 @@ import type {
 } from "../types/commission.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
-import { CommissionType } from "@prisma/client";
+import { CommissionScope, ModuleType } from "@prisma/client";
 
 export class CommissionSettingService {
   static async createOrUpdateCommissionSetting(
@@ -17,31 +17,38 @@ export class CommissionSettingService {
       roleId,
       targetUserId,
       serviceId,
+      moduleType,
+      subModule,
       commissionType,
       commissionValue,
       minAmount,
       maxAmount,
+      minUserLevel,
       applyTDS,
       tdsPercent,
       applyGST,
       gstPercent,
+      channel,
+      userLevel,
       effectiveFrom,
       effectiveTo,
     } = data;
 
     // 1️⃣ Validate scope IDs
-    if (scope === "ROLE" && !roleId) {
+    if (scope === CommissionScope.ROLE && !roleId) {
       throw ApiError.badRequest("roleId is required for ROLE scope");
     }
-    if (scope === "USER" && !targetUserId) {
+    if (scope === CommissionScope.USER && !targetUserId) {
       throw ApiError.badRequest("targetUserId is required for USER scope");
     }
 
     // 2️⃣ Validate related entities
-    const service = await Prisma.serviceProvider.findUnique({
-      where: { id: serviceId },
-    });
-    if (!service) throw ApiError.notFound("Service not found");
+    if (serviceId) {
+      const service = await Prisma.serviceProvider.findUnique({
+        where: { id: serviceId },
+      });
+      if (!service) throw ApiError.notFound("Service not found");
+    }
 
     if (roleId) {
       const roleExists = await Prisma.role.findUnique({
@@ -57,30 +64,43 @@ export class CommissionSettingService {
       if (!userExists) throw ApiError.notFound("Target user not found");
     }
 
-    // 3️⃣ Check if record already exists for same scope + role/user + service
+    // 3️⃣ Validate and convert moduleType to enum
+    const validatedModuleType = moduleType as ModuleType;
+    if (!Object.values(ModuleType).includes(validatedModuleType)) {
+      throw ApiError.badRequest(`Invalid moduleType: ${moduleType}`);
+    }
+
+    // 4️⃣ Check if record already exists for same scope + role/user + service + module
     const existing = await Prisma.commissionSetting.findFirst({
       where: {
         scope,
         roleId: roleId ?? null,
         targetUserId: targetUserId ?? null,
-        serviceId,
+        serviceId: serviceId ?? null,
+        moduleType: validatedModuleType,
+        subModule: subModule ?? null,
       },
     });
 
-    // ✅ Normalize undefined → null
+    // ✅ Prepare payload with proper enum types
     const payload = {
       scope,
       roleId: roleId ?? null,
       targetUserId: targetUserId ?? null,
-      serviceId,
-      commissionType: CommissionType.PERCENTAGE || CommissionType.FLAT,
+      serviceId: serviceId ?? null,
+      moduleType: validatedModuleType,
+      subModule: subModule ?? null,
+      commissionType,
       commissionValue,
-      minAmount: minAmount ?? null,
-      maxAmount: maxAmount ?? null,
+      minAmount: minAmount ? BigInt(minAmount) : null,
+      maxAmount: maxAmount ? BigInt(maxAmount) : null,
+      minUserLevel: minUserLevel ?? null,
       applyTDS: applyTDS ?? false,
       tdsPercent: tdsPercent ?? null,
       applyGST: applyGST ?? false,
       gstPercent: gstPercent ?? null,
+      channel: channel ?? null,
+      userLevel: userLevel ?? null,
       effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
       effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
       createdBy,
@@ -97,26 +117,58 @@ export class CommissionSettingService {
     }
 
     const safeResult = Helper.serializeUser(result);
-
     return safeResult;
   }
 
   static async getCommissionSettingsByRoleOrUser(userId?: string) {
+    const whereClause: any = {
+      isActive: true,
+    };
+
+    if (userId) {
+      whereClause.OR = [
+        { targetUserId: userId },
+        {
+          scope: CommissionScope.ROLE,
+          role: {
+            users: {
+              some: { id: userId },
+            },
+          },
+        },
+      ];
+    }
+
     const settings = await Prisma.commissionSetting.findMany({
-      where: {
-        OR: [...(userId ? [{ targetUserId: userId }] : [])],
-        isActive: true,
-      },
+      where: whereClause,
       include: {
-        service: { select: { id: true, code: true, isActive: true } },
-        role: { select: { id: true, name: true } },
-        targetUser: { select: { id: true, username: true, email: true } },
+        service: {
+          select: { id: true, code: true, type: true, isActive: true },
+        },
+        role: { select: { id: true, name: true, level: true } },
+        targetUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
     });
 
     const safeResult = Helper.serializeUser(settings);
-
     return safeResult;
   }
 
@@ -139,6 +191,7 @@ export class CommissionSettingService {
           select: {
             id: true,
             name: true,
+            level: true,
           },
         },
         targetUser: {
@@ -166,7 +219,6 @@ export class CommissionSettingService {
     });
 
     const safeResult = Helper.serializeUser(settings);
-
     return safeResult;
   }
 }
@@ -178,32 +230,54 @@ export class CommissionEarningService {
       fromUserId,
       serviceId,
       transactionId,
+      moduleType,
+      subModule,
       amount,
       commissionAmount,
       commissionType,
       level,
+      tdsAmount,
+      gstAmount,
+      netAmount,
       createdBy,
     } = data;
 
     // 1️⃣ Validate existence of referenced records
-    const [user, fromUser, service, createdByUser] = await Promise.all([
+    const [user, transaction, createdByUser] = await Promise.all([
       Prisma.user.findUnique({ where: { id: userId } }),
-      Prisma.user.findUnique({ where: { id: fromUserId } }),
-      Prisma.serviceProvider.findUnique({ where: { id: serviceId } }),
+      Prisma.transaction.findUnique({ where: { id: transactionId } }),
       Prisma.user.findUnique({ where: { id: createdBy } }),
     ]);
 
     if (!user) throw ApiError.notFound("User not found");
-    if (!fromUser) throw ApiError.notFound("From user not found");
-    if (!service) throw ApiError.notFound("Service not found");
+    if (!transaction) throw ApiError.notFound("Transaction not found");
     if (!createdByUser) throw ApiError.notFound("Created by user not found");
 
-    // 2️⃣ Prevent duplicate record for same transaction + level
+    // Validate optional relations
+    if (fromUserId) {
+      const fromUser = await Prisma.user.findUnique({
+        where: { id: fromUserId },
+      });
+      if (!fromUser) throw ApiError.notFound("From user not found");
+    }
+
+    if (serviceId) {
+      const service = await Prisma.serviceProvider.findUnique({
+        where: { id: serviceId },
+      });
+      if (!service) throw ApiError.notFound("Service not found");
+    }
+
+    // 2️⃣ Validate and convert moduleType to enum
+    const validatedModuleType = moduleType as ModuleType;
+    if (!Object.values(ModuleType).includes(validatedModuleType)) {
+      throw ApiError.badRequest(`Invalid moduleType: ${moduleType}`);
+    }
+
+    // 3️⃣ Prevent duplicate record for same transaction + level + user
     const existing = await Prisma.commissionEarning.findFirst({
       where: {
         userId,
-        fromUserId,
-        serviceId,
         transactionId,
         level,
       },
@@ -211,30 +285,62 @@ export class CommissionEarningService {
 
     if (existing) {
       throw ApiError.badRequest(
-        "Commission earning already recorded for this transaction and level"
+        "Commission earning already recorded for this transaction, user and level"
       );
     }
 
-    // 3️⃣ Create record (ensure BigInt conversion)
+    // 4️⃣ Create record with proper enum types
     const earning = await Prisma.commissionEarning.create({
       data: {
         userId,
-        fromUserId,
-        serviceId,
+        fromUserId: fromUserId ?? null,
+        serviceId: serviceId ?? null,
         transactionId,
+        moduleType: validatedModuleType,
+        subModule: subModule ?? null,
         amount: BigInt(amount),
         commissionAmount: BigInt(commissionAmount),
         commissionType,
         level,
+        tdsAmount: tdsAmount ? BigInt(tdsAmount) : null,
+        gstAmount: gstAmount ? BigInt(gstAmount) : null,
+        netAmount: BigInt(netAmount),
         createdBy,
       },
       include: {
-        user: { select: { id: true, username: true, email: true } },
-        fromUser: { select: { id: true, username: true, email: true } },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        fromUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         service: {
           select: { id: true, type: true, code: true, isActive: true },
         },
-        createdByUser: { select: { id: true, username: true } },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        transaction: {
+          select: { id: true, referenceId: true, amount: true, status: true },
+        },
       },
     });
 
@@ -247,23 +353,61 @@ export class CommissionEarningService {
     fromUserId?: string;
     serviceId?: string;
     transactionId?: string;
+    moduleType?: ModuleType;
   }) {
-    const { userId, fromUserId, serviceId, transactionId } = filters;
+    const { userId, fromUserId, serviceId, transactionId, moduleType } =
+      filters;
+
+    const whereClause: any = {};
+
+    if (userId) whereClause.userId = userId;
+    if (fromUserId) whereClause.fromUserId = fromUserId;
+    if (serviceId) whereClause.serviceId = serviceId;
+    if (transactionId) whereClause.transactionId = transactionId;
+    if (moduleType) whereClause.moduleType = moduleType;
 
     const earnings = await Prisma.commissionEarning.findMany({
-      where: {
-        ...(userId ? { userId } : {}),
-        ...(fromUserId ? { fromUserId } : {}),
-        ...(serviceId ? { serviceId } : {}),
-        ...(transactionId ? { transactionId } : {}),
-      },
+      where: whereClause,
       include: {
-        user: { select: { id: true, username: true, email: true } },
-        fromUser: { select: { id: true, username: true, email: true } },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        fromUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         service: {
           select: { id: true, type: true, code: true, isActive: true },
         },
-        createdByUser: { select: { id: true, username: true } },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        transaction: {
+          select: {
+            id: true,
+            referenceId: true,
+            amount: true,
+            status: true,
+            moduleType: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });

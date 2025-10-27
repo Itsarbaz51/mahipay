@@ -1,11 +1,29 @@
 export interface RoleCreatePayload {
   name: string;
   description?: string | null;
+  level?: number;
 }
 
 export interface RoleUpdatePayload {
-  name: string;
+  name?: string;
   description?: string | null;
+  level?: number;
+}
+
+export interface RolePermissionDTO {
+  id: string;
+  service: {
+    id: string;
+    name: string | null;
+    code: string;
+    type: string;
+    isActive: boolean;
+  };
+  moduleTypes: string;
+  canView: boolean;
+  canEdit: boolean;
+  canSetCommission: boolean;
+  canProcess: boolean;
 }
 
 export interface RoleDTO {
@@ -16,11 +34,14 @@ export interface RoleDTO {
   description: string | null;
   createdAt?: Date;
   updatedAt?: Date;
+  userCount?: number;
+  permissionCount?: number;
+  permissions?: RolePermissionDTO[];
 }
 
 export interface RoleListResponse {
   roles: RoleDTO[];
-  pagination: {
+  pagination?: {
     page: number;
     limit: number;
     total: number;

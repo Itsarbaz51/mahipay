@@ -1,30 +1,44 @@
-import type { CommissionType } from "@prisma/client";
+import type {
+  CommissionType,
+  CommissionScope,
+  ModuleType,
+} from "@prisma/client";
 
 export interface CreateOrUpdateCommissionSetting {
-  scope: "ROLE" | "USER";
+  scope: CommissionScope;
   roleId?: string;
   targetUserId?: string;
-  serviceId: string;
-  commissionType: "FLAT" | "PERCENT";
+  serviceId?: string;
+  moduleType: ModuleType;
+  subModule?: string;
+  commissionType: CommissionType;
   commissionValue: number;
   minAmount?: number;
   maxAmount?: number;
+  minUserLevel?: number;
   applyTDS?: boolean;
   tdsPercent?: number;
   applyGST?: boolean;
   gstPercent?: number;
+  channel?: string;
+  userLevel?: number;
   effectiveFrom?: string;
   effectiveTo?: string | null;
 }
 
 export interface CreateCommissionEarning {
   userId: string;
-  fromUserId: string;
-  serviceId: string;
+  fromUserId?: string;
+  serviceId?: string;
   transactionId: string;
+  moduleType: ModuleType;
+  subModule?: string;
   amount: number | string;
   commissionAmount: number | string;
-  commissionType: CommissionType; // Enum in Prisma (CommissionType)
+  commissionType: CommissionType;
   level: number;
+  tdsAmount?: number | string;
+  gstAmount?: number | string;
+  netAmount: number | string;
   createdBy: string;
 }

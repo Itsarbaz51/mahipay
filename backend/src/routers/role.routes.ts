@@ -9,19 +9,29 @@ const roleRoutes = Router();
 roleRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"]),
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   RoleController.index
 );
 
 roleRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"]),
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   RoleController.show
 );
 
 roleRoutes.post(
-  "/create",
+  "/",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
   validateRequest(RoleValidationSchemas.store),

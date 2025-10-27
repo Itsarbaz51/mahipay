@@ -18,7 +18,19 @@ export class ServiceValidationSchemas {
           message:
             "Code can only contain uppercase letters, numbers and underscores",
         }),
+      name: z.string().nullable().optional(),
+      config: z.any().optional(),
       isActive: z.boolean().optional().default(true),
     });
+  }
+
+  static get toggleStatus() {
+    return z.object({
+      isActive: z.boolean(),
+    });
+  }
+
+  static get updateServiceProvider() {
+    return this.createServiceProvider.partial();
   }
 }

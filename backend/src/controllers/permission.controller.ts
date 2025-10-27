@@ -5,19 +5,19 @@ import {
   RolePermissionService,
   UserPermissionService,
 } from "../services/permission.service.js";
+import { ApiError } from "../utils/ApiError.js";
 
 export class RolePermissionController {
   static createOrUpdate = asyncHandler(async (req: Request, res: Response) => {
-    const permission = await RolePermissionService.createOrUpdateRolePermission(
-      req.body
-    );
+    const permissions =
+      await RolePermissionService.createOrUpdateRolePermission(req.body);
 
     return res
       .status(200)
       .json(
         ApiResponse.success(
-          permission,
-          "Role Permission saved successfully",
+          permissions,
+          "Role Permissions saved successfully",
           200
         )
       );
@@ -25,38 +25,37 @@ export class RolePermissionController {
 
   static getByRole = asyncHandler(async (req: Request, res: Response) => {
     const roleId = req.params.id;
-    const data = await RolePermissionService.getRolePermissions(
-      roleId as string
-    );
+    if (!roleId) throw ApiError.badRequest("role id is required");
+
+    const data = await RolePermissionService.getRolePermissions(roleId);
     return res
       .status(200)
-      .json(ApiResponse.success(data, "Fetched successfully", 200));
+      .json(ApiResponse.success(data, "Permissions fetched successfully", 200));
   });
 
-  // static delete = asyncHandler(async (req: Request, res: Response) => {
-  //   const { roleId, serviceId } = req.params;
-  //   await RolePermissionService.deleteRolePermission(
-  //     roleId as string,
-  //     serviceId as string
-  //   );
-  //   return res
-  //     .status(200)
-  //     .json(ApiResponse.success({}, "Deleted successfully", 200));
-  // });
+  static delete = asyncHandler(async (req: Request, res: Response) => {
+    const { roleId, serviceId } = req.params;
+    if (!serviceId) throw ApiError.badRequest("service id is required");
+    if (!roleId) throw ApiError.badRequest("role id is required");
+
+    await RolePermissionService.deleteRolePermission(roleId, serviceId);
+    return res
+      .status(200)
+      .json(ApiResponse.success({}, "Permission deleted successfully", 200));
+  });
 }
 
 export class UserPermissionController {
   static createOrUpdate = asyncHandler(async (req: Request, res: Response) => {
-    const permission = await UserPermissionService.createOrUpdateUserPermission(
-      req.body
-    );
+    const permissions =
+      await UserPermissionService.createOrUpdateUserPermission(req.body);
 
     return res
       .status(200)
       .json(
         ApiResponse.success(
-          permission,
-          "User Permission saved successfully",
+          permissions,
+          "User Permissions saved successfully",
           200
         )
       );
@@ -64,23 +63,25 @@ export class UserPermissionController {
 
   static getByUser = asyncHandler(async (req: Request, res: Response) => {
     const { userId } = req.params;
-    const data = await UserPermissionService.getUserPermissions(
-      userId as string
-    );
+
+    if (!userId) throw ApiError.badRequest("User id is required");
+
+    const data = await UserPermissionService.getUserPermissions(userId);
 
     return res
       .status(200)
-      .json(ApiResponse.success(data, "Fetched successfully", 200));
+      .json(ApiResponse.success(data, "Permissions fetched successfully", 200));
   });
 
-  // static delete = asyncHandler(async (req: Request, res: Response) => {
-  //   const { userId, serviceId } = req.params;
-  //   await UserPermissionService.deleteUserPermission(
-  //     userId as string,
-  //     serviceId as string
-  //   );
-  //   return res
-  //     .status(200)
-  //     .json(ApiResponse.success({}, "Deleted successfully", 200));
-  // });
+  static delete = asyncHandler(async (req: Request, res: Response) => {
+    const { userId, serviceId } = req.params;
+
+    if (!userId) throw ApiError.badRequest("User id is required");
+    if (!serviceId) throw ApiError.badRequest("service id is required");
+
+    await UserPermissionService.deleteUserPermission(userId, serviceId);
+    return res
+      .status(200)
+      .json(ApiResponse.success({}, "Permission deleted successfully", 200));
+  });
 }

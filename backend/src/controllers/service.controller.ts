@@ -3,6 +3,7 @@ import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ServiceProviderService } from "../services/service.service.js";
+import { ServiceValidationSchemas } from "../validations/serviceValidation.schemas.js";
 
 export class ServiceProviderController {
   static create = asyncHandler(async (req: Request, res: Response) => {
@@ -113,6 +114,22 @@ export class ServiceProviderController {
         );
     }
   );
+
+  static update = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    if (!id) throw ApiError.badRequest("Service Provider ID is required");
+
+    const serviceProvider = await ServiceProviderService.update(id, req.body);
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(
+          serviceProvider,
+          "Service Provider updated successfully",
+          200
+        )
+      );
+  });
 
   static delete = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;

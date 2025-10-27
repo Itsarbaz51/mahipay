@@ -34,10 +34,19 @@ serviceRoutes.get(
   ServiceProviderController.getById
 );
 
+// Update service provider
+serviceRoutes.put(
+  "/providers/:id",
+  AuthMiddleware.isAuthenticated,
+  validateRequest(ServiceValidationSchemas.updateServiceProvider),
+  ServiceProviderController.update
+);
+
 // Toggle active status
 serviceRoutes.patch(
   "/providers/:id/status",
   AuthMiddleware.isAuthenticated,
+  validateRequest(ServiceValidationSchemas.toggleStatus),
   ServiceProviderController.toggleActiveStatus
 );
 

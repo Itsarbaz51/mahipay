@@ -338,7 +338,7 @@ model UserKyc {
   gender             Gender
   status             KycStatus @default(PENDING)
   type               KycTypes  @default(USER_KYC)
-  kycRejectionReason String?   @default("") @map("kyc_rejection_reason") @db.LongText
+  kycRejectionReason String?   @map("kyc_rejection_reason") @db.LongText
 
   addressId String  @map("address_id")
   address   Address @relation(fields: [addressId], references: [id])

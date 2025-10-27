@@ -45,12 +45,24 @@ export class TransactionController {
   );
 
   static getTransactions = asyncHandler(async (req: Request, res: Response) => {
-    const { userId, status, serviceId, page, limit } = req.query;
+    const {
+      userId,
+      status,
+      serviceId,
+      apiEntityId,
+      moduleType,
+      paymentType,
+      page,
+      limit,
+    } = req.query;
 
     const filters = {
       userId: userId as string,
       status: status as string,
       serviceId: serviceId as string,
+      apiEntityId: apiEntityId as string,
+      moduleType: moduleType as string,
+      paymentType: paymentType as string,
       page: parseInt(page as string) || 1,
       limit: parseInt(limit as string) || 10,
     };

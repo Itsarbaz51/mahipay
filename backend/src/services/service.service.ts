@@ -18,12 +18,34 @@ export class ServiceProviderService {
       throw ApiError.badRequest("Service Provider code already exists");
     }
 
+    // Create proper data object with explicit null handling
+    const createData: any = {
+      type: data.type,
+      code: data.code,
+      isActive: data.isActive ?? true,
+      createdBy: data.createdBy,
+    };
+
+    // Handle optional fields explicitly
+    if (data.name !== undefined) {
+      createData.name = data.name || null;
+    }
+
+    if (data.config !== undefined) {
+      createData.config = data.config;
+    }
+
     const serviceProvider = await Prisma.serviceProvider.create({
-      data: {
-        type: data.type,
-        code: data.code,
-        isActive: data.isActive ?? true,
-        createdBy: data.createdBy,
+      data: createData,
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -36,6 +58,16 @@ export class ServiceProviderService {
       where: {
         createdBy: userId,
       },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
     return serviceProviders;
@@ -47,6 +79,16 @@ export class ServiceProviderService {
         createdBy: userId,
         isActive: true,
       },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
     return serviceProviders;
@@ -55,6 +97,37 @@ export class ServiceProviderService {
   static async getById(id: string) {
     const serviceProvider = await Prisma.serviceProvider.findUnique({
       where: { id },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        Transaction: {
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            moduleType: true,
+            createdAt: true,
+          },
+        },
+        CommissionSetting: {
+          take: 5,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            commissionType: true,
+            commissionValue: true,
+            moduleType: true,
+          },
+        },
+      },
     });
 
     if (!serviceProvider) throw ApiError.notFound("Service Provider not found");
@@ -62,13 +135,26 @@ export class ServiceProviderService {
   }
 
   static async toggleActiveStatus(id: string, isActive: boolean) {
-    const existing = await Prisma.serviceProvider.findUnique({ where: { id } });
+    const existing = await Prisma.serviceProvider.findUnique({
+      where: { id },
+    });
     if (!existing) throw ApiError.notFound("Service Provider not found");
 
     const updated = await Prisma.serviceProvider.update({
       where: { id },
       data: {
         isActive: isActive,
+        updatedAt: new Date(),
+      },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -80,17 +166,13 @@ export class ServiceProviderService {
   }
 
   static async delete(id: string) {
-    const existing = await Prisma.serviceProvider.findUnique({ where: { id } });
+    const existing = await Prisma.serviceProvider.findUnique({
+      where: { id },
+    });
     if (!existing) throw ApiError.notFound("Service Provider not found");
 
-    // Check if provider has related records
-    const [
-      hasTransactions,
-      hasCommissionSettings,
-      hasCommissionEarnings,
-      hasUserPermissions,
-      hasRolePermissions,
-    ] = await Promise.all([
+    // Check if provider has related records using transaction for consistency
+    const relatedRecords = await Prisma.$transaction([
       Prisma.transaction.count({ where: { serviceId: id } }),
       Prisma.commissionSetting.count({ where: { serviceId: id } }),
       Prisma.commissionEarning.count({ where: { serviceId: id } }),
@@ -98,20 +180,93 @@ export class ServiceProviderService {
       Prisma.rolePermission.count({ where: { serviceId: id } }),
     ]);
 
+    const [
+      transactionCount,
+      commissionSettingCount,
+      commissionEarningCount,
+      userPermissionCount,
+      rolePermissionCount,
+    ] = relatedRecords;
+
     if (
-      hasTransactions > 0 ||
-      hasCommissionSettings > 0 ||
-      hasCommissionEarnings > 0 ||
-      hasUserPermissions > 0 ||
-      hasRolePermissions > 0
+      transactionCount > 0 ||
+      commissionSettingCount > 0 ||
+      commissionEarningCount > 0 ||
+      userPermissionCount > 0 ||
+      rolePermissionCount > 0
     ) {
       throw ApiError.badRequest(
-        "Cannot delete Service Provider with existing related records"
+        `Cannot delete Service Provider with existing related records: 
+        ${transactionCount} transactions, 
+        ${commissionSettingCount} commission settings, 
+        ${commissionEarningCount} commission earnings,
+        ${userPermissionCount} user permissions,
+        ${rolePermissionCount} role permissions`
       );
     }
 
     await Prisma.serviceProvider.delete({ where: { id } });
     logger.info("Service Provider deleted", { id });
     return { message: "Service Provider deleted successfully" };
+  }
+
+  static async update(id: string, data: UpdateServiceProviderInput) {
+    const existing = await Prisma.serviceProvider.findUnique({
+      where: { id },
+    });
+    if (!existing) throw ApiError.notFound("Service Provider not found");
+
+    if (data.code && data.code !== existing.code) {
+      const existingCode = await Prisma.serviceProvider.findUnique({
+        where: { code: data.code },
+      });
+      if (existingCode) {
+        throw ApiError.badRequest("Service Provider code already exists");
+      }
+    }
+
+    // Create proper update data object
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+
+    // Handle each field explicitly
+    if (data.type !== undefined) {
+      updateData.type = data.type;
+    }
+
+    if (data.code !== undefined) {
+      updateData.code = data.code;
+    }
+
+    if (data.name !== undefined) {
+      updateData.name = data.name || null;
+    }
+
+    if (data.config !== undefined) {
+      updateData.config = data.config;
+    }
+
+    if (data.isActive !== undefined) {
+      updateData.isActive = data.isActive;
+    }
+
+    const updated = await Prisma.serviceProvider.update({
+      where: { id },
+      data: updateData,
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    logger.info("Service Provider updated", { id });
+    return updated;
   }
 }

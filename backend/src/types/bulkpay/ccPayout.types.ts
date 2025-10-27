@@ -22,7 +22,7 @@ export interface BulkpeSenderResponse {
   charge: number;
   gst: number;
   isActive: boolean;
-  [key: string]: any; // Add index signature for JSON compatibility
+  [key: string]: any;
 }
 
 export interface CreateBeneficiaryInput {
@@ -43,7 +43,7 @@ export interface BulkpeBeneficiaryResponse {
   message: string;
   createdAt: string;
   updatedAt: string;
-  [key: string]: any; // Add index signature for JSON compatibility
+  [key: string]: any;
 }
 
 export interface CreateCollectionInput {
@@ -51,7 +51,7 @@ export interface CreateCollectionInput {
   beneficiaryId: string;
   senderId: string;
   amount: number;
-  type: 1 | 2; // 1 for instant, 2 for T+1
+  type: 1 | 2;
   redirectUrl: string;
   cardType: "visa" | "rupay" | "master";
   additionalCharge?: number;
@@ -72,7 +72,7 @@ export interface BulkpeCollectionResponse {
   charge: number;
   gst: number;
   payouts: PayoutDetail[];
-  [key: string]: any; // Add index signature for JSON compatibility
+  [key: string]: any;
 }
 
 export interface PayoutDetail {
@@ -86,7 +86,7 @@ export interface PayoutDetail {
   paymentMode: string;
   utr: string;
   holderName: string;
-  [key: string]: any; // Add index signature for JSON compatibility
+  [key: string]: any;
 }
 
 export interface WebhookPayload {
@@ -96,5 +96,14 @@ export interface WebhookPayload {
   utr?: string;
   payouts: PayoutDetail[];
   timestamp: string;
-  [key: string]: any; // Add index signature for JSON compatibility
+  [key: string]: any;
+}
+
+export interface TransactionForCommission {
+  id: string;
+  userId: string;
+  serviceId: string;
+  amount: bigint;
+  channel?: string | null;
+  providerCharge?: bigint;
 }
