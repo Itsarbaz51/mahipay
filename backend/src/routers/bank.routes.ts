@@ -2,70 +2,21 @@ import { Router } from "express";
 import AuthMiddleware from "../middlewares/auth.middleware.js";
 import upload from "../middlewares/multer.middleware.js";
 import { validateRequest } from "../middlewares/validateRequest.js";
-import {
-  BankController,
-  AddBankController,
-} from "../controllers/bank.controller.js";
+import { AddBankController } from "../controllers/bank.controller.js";
 import BankValidationSchemas from "../validations/bankValidation.schemas.js";
 
 const bankRoutes = Router();
 
-// ===================== ADMIN BANK ROUTES =====================
-
-// List all banks
-bankRoutes.get(
-  "/list",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
-  BankController.index
-);
-
-// Show single bank
-bankRoutes.get(
-  "/show/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
-  BankController.show
-);
-
-// Create bank
-bankRoutes.post(
-  "/store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
-  upload.single("bankIcon"),
-  validateRequest(BankValidationSchemas.BankSchema),
-  BankController.store
-);
-
-// Update bank
-bankRoutes.put(
-  "/update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
-  upload.single("bankIcon"),
-  validateRequest(BankValidationSchemas.BankUpdateSchema),
-  BankController.update
-);
-
-// Delete bank
-bankRoutes.delete(
-  "/delete/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
-  BankController.destroy
-);
-
 // ===================== USER BANK ROUTES =====================
 
-// List user’s added banks
-bankRoutes.post(
+// List user's added banks - ✅ Changed to GET and use query params
+bankRoutes.get(
   "/bank-list",
   AuthMiddleware.isAuthenticated,
   AddBankController.index
 );
 
-// Show user’s specific bank
+// Show user's specific bank
 bankRoutes.get(
   "/bank-show/:id",
   AuthMiddleware.isAuthenticated,
