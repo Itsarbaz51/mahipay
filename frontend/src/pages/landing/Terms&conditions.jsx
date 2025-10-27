@@ -23,11 +23,11 @@ const sections = [
     content: [
       {
         subtitle: "Agreement to Terms",
-        text: "Monks Pay की services का उपयोग करके, आप इन Terms and Conditions से bound होने के लिए agree करते हैं। यदि आप किसी भी term से disagree करते हैं, तो कृपया हमारी services का उपयोग न करें।",
+        text: "By using Monks Pay's services, you agree to be bound by these Terms and Conditions. If you disagree with any term, please do not use our services.",
       },
       {
         subtitle: "Eligibility",
-        text: "You must be at least 18 years old and legally capable of entering into binding contracts to use our services. आपको भारत का valid resident होना चाहिए और सभी applicable laws का पालन करना होगा।",
+        text: "You must be at least 18 years old and legally capable of entering into binding contracts to use our services. You must be a valid resident of India and comply with all applicable laws.",
       },
       {
         subtitle: "Account Registration",
@@ -42,11 +42,11 @@ const sections = [
     content: [
       {
         subtitle: "Service Description",
-        text: "Monks Pay provides credit card payout services that enable instant transfers to credit cards. हम आपके funds को safely और securely process करते हैं।",
+        text: "Monks Pay provides credit card payout services that enable instant transfers to credit cards. We process your funds safely and securely.",
       },
       {
         subtitle: "Payout Processing",
-        text: "Payouts are typically processed within 5 minutes but may take up to 24-48 hours depending on bank processing times, network issues, or verification requirements.",
+        text: "Payouts are typically processed within 5 minutes but may take up to 24–48 hours depending on bank processing times, network issues, or verification requirements.",
       },
       {
         subtitle: "Transaction Limits",
@@ -54,7 +54,7 @@ const sections = [
       },
       {
         subtitle: "Service Fees",
-        text: "Our standard processing fee is 2% + GST per transaction. Fees are clearly displayed before you confirm any transaction. कोई hidden charges नहीं हैं।",
+        text: "Our standard processing fee is 2% + GST per transaction. Fees are clearly displayed before you confirm any transaction. There are no hidden charges.",
       },
       {
         subtitle: "Service Availability",
@@ -69,7 +69,7 @@ const sections = [
     content: [
       {
         subtitle: "Account Security",
-        text: "आप अपने account credentials की सुरक्षा के लिए जिम्मेदार हैं। किसी भी unauthorized access की तुरंत report करें।",
+        text: "You are responsible for the security of your account credentials. Immediately report any unauthorized access.",
       },
       {
         subtitle: "Accurate Information",
@@ -77,7 +77,7 @@ const sections = [
       },
       {
         subtitle: "Prohibited Activities",
-        text: "You agree not to use our services for any illegal activities, money laundering, fraud, or any activities that violate Indian laws including IT Act 2000, Payment and Settlement Systems Act 2007.",
+        text: "You agree not to use our services for any illegal activities, money laundering, fraud, or any activities that violate Indian laws including IT Act 2000 and Payment and Settlement Systems Act 2007.",
       },
       {
         subtitle: "Compliance",
@@ -115,7 +115,7 @@ const sections = [
     content: [
       {
         subtitle: "Refund Policy",
-        text: "Failed transactions are automatically refunded within 5-7 business days. Service fees for failed transactions are not refundable. हम सभी failed transactions को track करते हैं।",
+        text: "Failed transactions are automatically refunded within 5–7 business days. Service fees for failed transactions are not refundable. We track all failed transactions.",
       },
       {
         subtitle: "Dispute Resolution",
@@ -127,7 +127,7 @@ const sections = [
       },
       {
         subtitle: "Processing Errors",
-        text: "In case of technical errors resulting in duplicate charges or incorrect amounts, we will investigate and rectify within 7-10 business days.",
+        text: "In case of technical errors resulting in duplicate charges or incorrect amounts, we will investigate and rectify within 7–10 business days.",
       },
     ],
   },
@@ -138,7 +138,7 @@ const sections = [
     content: [
       {
         subtitle: "Service Disclaimer",
-        text: "Services are provided 'as is' without any warranties. हम reasonable efforts करते हैं लेकिन uninterrupted या error-free service की guarantee नहीं दे सकते।",
+        text: "Services are provided 'as is' without any warranties. We make reasonable efforts but cannot guarantee uninterrupted or error-free service.",
       },
       {
         subtitle: "Limitation of Liability",
@@ -165,11 +165,11 @@ const sections = [
       },
       {
         subtitle: "Termination by Monks Pay",
-        text: "हम किसी भी समय बिना prior notice के आपका account suspend या terminate कर सकते हैं यदि आप terms violate करते हैं या suspicious activity detected होती है।",
+        text: "We may suspend or terminate your account at any time without prior notice if you violate these terms or if suspicious activity is detected.",
       },
       {
         subtitle: "Effect of Termination",
-        text: "Upon termination, your right to use services immediately ceases. Any pending funds will be processed as per our standard procedures. Refunds subject to verification.",
+        text: "Upon termination, your right to use services immediately ceases. Any pending funds will be processed as per our standard procedures. Refunds are subject to verification.",
       },
     ],
   },
@@ -188,7 +188,7 @@ const sections = [
       },
       {
         subtitle: "Arbitration",
-        text: "Before initiating legal proceedings, parties agree to attempt resolution through good faith negotiation and, if necessary, binding arbitration under Indian Arbitration and Conciliation Act 1996.",
+        text: "Before initiating legal proceedings, parties agree to attempt resolution through good faith negotiation and, if necessary, binding arbitration under the Indian Arbitration and Conciliation Act 1996.",
       },
     ],
   },
@@ -199,11 +199,11 @@ const sections = [
     content: [
       {
         subtitle: "Ownership",
-        text: "All content, features, functionality, including software, text, graphics, logos, and trademarks are owned by Monks Pay and protected by Indian and international copyright laws.",
+        text: "All content, features, and functionality, including software, text, graphics, logos, and trademarks are owned by Monks Pay and protected by Indian and international copyright laws.",
       },
       {
         subtitle: "License",
-        text: "We grant you a limited, non-exclusive, non-transferable license to use our services for personal or business purposes. आप हमारे intellectual property को modify, copy, या distribute नहीं कर सकते।",
+        text: "We grant you a limited, non-exclusive, non-transferable license to use our services for personal or business purposes. You may not modify, copy, or distribute our intellectual property.",
       },
       {
         subtitle: "Feedback",
@@ -292,7 +292,7 @@ function TermsConditions() {
             Terms & Conditions
           </h1>
           <p className="text-xl md:text-2xl opacity-90 max-w-3xl mx-auto mb-4">
-            कृपया सेवा का उपयोग करने से पहले ध्यान से पढ़ें
+            Please read carefully before using the service
           </p>
           <p className="text-lg opacity-80 max-w-2xl mx-auto">
             Last Updated: January 25, 2025 | Effective Date: January 25, 2025
@@ -352,12 +352,12 @@ function TermsConditions() {
                   Welcome to Monks Pay Terms of Service
                 </h2>
                 <p className="text-gray-700 leading-relaxed mb-4">
-                  ये Terms and Conditions ("Terms") Monks Pay Private Limited
-                  ("Monks Pay," "we," "us," या "our") द्वारा प्रदान की जाने वाली
-                  credit card payout services के उपयोग को regulate करते हैं।
-                  हमारी website, mobile application, या किसी भी related services
-                  (collectively, "Services") का उपयोग करके, आप इन Terms से bound
-                  होने के लिए agree करते हैं।
+                  These Terms and Conditions ("Terms") regulate the use of
+                  credit card payout services provided by Monks Pay Private
+                  Limited ("Monks Pay," "we," "us," or "our"). By using our
+                  website, mobile application, or any related services
+                  (collectively, "Services"), you agree to be bound by these
+                  Terms.
                 </p>
                 <p className="text-gray-700 leading-relaxed mb-4">
                   These Terms constitute a legally binding agreement between you
@@ -368,10 +368,9 @@ function TermsConditions() {
                   <div className="flex items-start space-x-3">
                     <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-yellow-900">
-                      <strong>Important Notice:</strong> कृपया इन Terms को ध्यान
-                      से पढ़ें और समझें। हमारी Services का उपयोग करके, आप इन
-                      Terms को स्वीकार करते हैं और उनका पालन करने के लिए सहमत
-                      होते हैं।
+                      <strong>Important Notice:</strong> Please read and
+                      understand these Terms carefully. By using our Services,
+                      you accept these Terms and agree to follow them.
                     </p>
                   </div>
                 </div>
@@ -430,147 +429,67 @@ function TermsConditions() {
                     Amendments to Terms
                   </h3>
                   <p className="text-gray-700 leading-relaxed mb-4">
-                    हम किसी भी समय इन Terms को modify या replace कर सकते हैं।
-                    यदि revision material है, तो हम नए terms के effective होने
-                    से कम से कम 30 days पहले notice provide करने का प्रयास
-                    करेंगे।
-                  </p>
-                  <p className="text-gray-700 leading-relaxed">
-                    Revised Terms के effective होने के बाद Services का continued
-                    use आपकी उन changes को accept करने की agreement मानी जाएगी।
-                    यदि आप नए Terms से सहमत नहीं हैं, तो आपको Services का उपयोग
-                    बंद कर देना चाहिए।
+                    We may modify or replace these Terms at any time. If a
+                    revision is material, we will try to provide notice at least
+                    15 days before new terms take effect. Your continued use of
+                    our Services after any changes means you agree to the new
+                    Terms.
                   </p>
                 </div>
 
-                {/* Severability */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+                {/* Contact Info */}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-8">
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    Severability & Waiver
+                    Contact Information
                   </h3>
-                  <p className="text-gray-700 leading-relaxed mb-4">
-                    <strong>Severability:</strong> यदि इन Terms का कोई provision
-                    invalid या unenforceable पाया जाता है, तो वह provision हटा
-                    दिया जाएगा और बाकी Terms पूर्ण force और effect में बने
-                    रहेंगे।
+                  <p className="text-gray-700 mb-4">
+                    For questions regarding these Terms or our Services, contact
+                    us at:
                   </p>
-                  <p className="text-gray-700 leading-relaxed">
-                    <strong>Waiver:</strong> किसी भी right या provision को
-                    enforce करने में हमारी failure को उस right या provision की
-                    waiver नहीं माना जाएगा।
-                  </p>
+                  <div className="space-y-1 text-gray-700">
+                    <p>
+                      <strong>Company:</strong> Monks Pay Private Limited
+                    </p>
+                    <p>
+                      <strong>Email:</strong>{" "}
+                      <a
+                        href="mailto:support@monkspay.com"
+                        className="text-indigo-600 hover:underline"
+                      >
+                        support@monkspay.com
+                      </a>
+                    </p>
+                    <p>
+                      <strong>Address:</strong> 21, Ajmer Road, Vaishali Nagar,
+                      Jaipur, Rajasthan, India - 302021
+                    </p>
+                  </div>
                 </div>
 
-                {/* Entire Agreement */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    Entire Agreement
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed">
-                    These Terms, along with our Privacy Policy and any other
-                    legal notices published by us, constitute the entire
-                    agreement between you and Monks Pay regarding the Services.
-                    ये Terms किसी भी prior agreements या understandings को
-                    supersede करते हैं।
-                  </p>
-                </div>
-
-                {/* Contact for Terms */}
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    Questions About Terms?
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed mb-6">
-                    यदि आपके इन Terms के बारे में कोई questions हैं, तो कृपया
-                    हमसे संपर्क करें:
-                  </p>
-                  <div className="space-y-3">
-                    <div className="flex items-start space-x-3">
-                      <FileText className="w-5 h-5 text-indigo-600 mt-1" />
-                      <div>
-                        <p className="font-semibold text-gray-900">Email</p>
-                        <p className="text-gray-700">legal@monkspay.com</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <Globe className="w-5 h-5 text-indigo-600 mt-1" />
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          Registered Office
-                        </p>
-                        <p className="text-gray-700">
-                          Monks Pay Private Limited
-                          <br />
-                          123 Business Tower, Jaipur, Rajasthan 302001, India
-                        </p>
-                      </div>
+                {/* Final Notice */}
+                <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-red-900 mb-1">
+                        Legal Disclaimer
+                      </h4>
+                      <p className="text-sm text-red-800 leading-relaxed">
+                        Monks Pay is a regulated payment facilitator in
+                        compliance with Indian financial laws. Misuse of our
+                        services for unlawful activities will result in
+                        immediate legal action under applicable laws including
+                        the IT Act 2000 and PMLA 2002.
+                      </p>
                     </div>
                   </div>
                 </div>
+
+                <p className="text-center text-gray-600 text-sm mt-8">
+                  © 2025 Monks Pay Private Limited. All Rights Reserved.
+                </p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Acknowledgment Section */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="bg-white rounded-2xl shadow-lg p-8 md:p-12">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              By Using Monks Pay, You Acknowledge
-            </h2>
-            <ul className="text-left space-y-3 mb-8 max-w-2xl mx-auto">
-              <li className="flex items-start space-x-3">
-                <CheckCircle className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                <span className="text-gray-700">
-                  आपने इन Terms and Conditions को पढ़ा और समझा है
-                </span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <CheckCircle className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                <span className="text-gray-700">
-                  You agree to be bound by these Terms
-                </span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <CheckCircle className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                <span className="text-gray-700">
-                  आप 18 वर्ष या उससे अधिक आयु के हैं
-                </span>
-              </li>
-              <li className="flex items-start space-x-3">
-                <CheckCircle className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                <span className="text-gray-700">
-                  You have the legal capacity to enter into this agreement
-                </span>
-              </li>
-            </ul>
-            <button className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-full font-semibold hover:shadow-lg transition">
-              I Accept the Terms
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
-        <div className="max-w-4xl mx-auto px-6 text-center text-white">
-          <h2 className="text-4xl font-bold mb-6">
-            Ready to Start with Monks Pay?
-          </h2>
-          <p className="text-xl mb-8 opacity-90">
-            Safe, secure, और instant credit card payouts के लिए आज ही sign up
-            करें
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <button className="bg-white text-indigo-600 px-8 py-4 rounded-full font-semibold hover:bg-gray-100 transition shadow-lg">
-              Create Account
-            </button>
-            <button className="border-2 border-white text-white px-8 py-4 rounded-full font-semibold hover:bg-white hover:text-indigo-600 transition">
-              Learn More
-            </button>
           </div>
         </div>
       </section>
