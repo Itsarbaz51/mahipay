@@ -111,13 +111,6 @@ enum SettlementType {
 }
 
 // ==================== NEW REUSABLE ENUMS ====================
-enum ModuleType {
-  CC_PAYOUT
-  BBPS
-  RECHARGE
-  DMT
-  AEPS
-}
 
 enum PaymentType {
   COLLECTION
@@ -263,8 +256,8 @@ model ApiEntity {
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
 
-  moduleType ModuleType @map("module_type")
-  subModule  String?    @map("sub_module")
+  serviceId String?          @map("service_id")
+  service   ServiceProvider? @relation(fields: [serviceId], references: [id])
 
   // Status
   status   EntityStatus @default(PENDING)
@@ -287,7 +280,7 @@ model ApiEntity {
   transactions Transaction[]
   apiWebhooks  ApiWebhook[]
 
-  @@index([userId, moduleType])
+  @@index([userId, serviceId])
   @@index([entityType, entityId])
   @@index([reference])
   @@index([status, createdAt])
@@ -490,29 +483,22 @@ model CommissionSetting {
   targetUser   User?   @relation("CommissionTargetUser", fields: [targetUserId], references: [id])
 
   // Module-specific commission
-  moduleType ModuleType       @map("module_type")
-  subModule  String?          @map("sub_module")
-  serviceId  String?          @map("service_id")
-  service    ServiceProvider? @relation(fields: [serviceId], references: [id])
+  serviceId String?          @map("service_id")
+  service   ServiceProvider? @relation(fields: [serviceId], references: [id])
 
   // Commission structure
   commissionType  CommissionType @map("commission_type")
   commissionValue Decimal        @map("commission_value") @db.Decimal(12, 4)
 
   // Conditions
-  minAmount    BigInt? @map("min_amount")
-  maxAmount    BigInt? @map("max_amount")
-  minUserLevel Int?    @map("min_user_level")
+  minAmount BigInt? @map("min_amount")
+  maxAmount BigInt? @map("max_amount")
 
   // Tax configuration
   applyTDS   Boolean  @default(false)
   tdsPercent Decimal? @map("tds_percent") @db.Decimal(5, 2)
   applyGST   Boolean  @default(false)
   gstPercent Decimal? @map("gst_percent") @db.Decimal(5, 2)
-
-  // Additional filters
-  channel   String? // "WEB", "MOBILE", "API", etc.
-  userLevel Int?    @map("user_level")
 
   createdBy     String @map("created_by")
   createdByUser User   @relation("CommissionSettingCreatedBy", fields: [createdBy], references: [id])
@@ -524,7 +510,7 @@ model CommissionSetting {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  @@index([moduleType, subModule, scope, roleId, targetUserId])
+  @@index([scope, roleId, targetUserId])
   @@index([isActive, effectiveFrom, effectiveTo])
   @@map("commission_settings")
 }
@@ -542,15 +528,10 @@ model CommissionEarning {
   fromUserId String? @map("from_user_id")
   fromUser   User?   @relation("CommissionEarningFromUser", fields: [fromUserId], references: [id])
 
-  // Module context
-  moduleType ModuleType @map("module_type")
-  subModule  String?    @map("sub_module")
-
   // Commission details
   amount           BigInt
   commissionAmount BigInt         @map("commission_amount")
   commissionType   CommissionType @map("commission_type")
-  level            Int
 
   // Financial tracking
   tdsAmount BigInt? @map("tds_amount")
@@ -569,7 +550,7 @@ model CommissionEarning {
   service   ServiceProvider? @relation(fields: [serviceId], references: [id])
 
   @@index([transactionId, userId])
-  @@index([moduleType, createdAt])
+  @@index([createdAt])
   @@index([userId, createdAt])
   @@map("commission_earnings")
 }
@@ -593,6 +574,8 @@ model ServiceProvider {
   CommissionEarning CommissionEarning[]
   UserPermission    UserPermission[]
   RolePermission    RolePermission[]
+  ApiEntity         ApiEntity[]
+  LedgerEntry       LedgerEntry[]
 
   @@map("service_providers")
 }
@@ -708,8 +691,9 @@ model Transaction {
   status    TxStatus @default(PENDING)
 
   // Module tracking - YAHAN SE SAB MODULES CONNECT HONGE
-  moduleType  ModuleType  @map("module_type")
-  subModule   String?     @map("sub_module")
+  serviceId String?          @map("service_id")
+  service   ServiceProvider? @relation(fields: [serviceId], references: [id])
+
   paymentType PaymentType @map("payment_type")
 
   // Relationships - REUSABLE FOR ALL MODULES
@@ -718,9 +702,6 @@ model Transaction {
 
   walletId String @map("wallet_id")
   wallet   Wallet @relation(fields: [walletId], references: [id])
-
-  serviceId String?          @map("service_id")
-  service   ServiceProvider? @relation(fields: [serviceId], references: [id])
 
   apiEntityId String?    @map("api_entity_id")
   apiEntity   ApiEntity? @relation(fields: [apiEntityId], references: [id])
@@ -755,9 +736,9 @@ model Transaction {
   apiWebhooks        ApiWebhook[]
   AuditLog           AuditLog[]
 
-  @@index([userId, moduleType, status])
+  @@index([userId, status])
   @@index([idempotencyKey])
-  @@index([moduleType, subModule, createdAt])
+  @@index([serviceId, createdAt])
   @@index([externalRefId])
   @@index([providerReference])
   @@index([status, createdAt])
@@ -772,9 +753,10 @@ model LedgerEntry {
   walletId      String       @map("wallet_id")
   wallet        Wallet       @relation(fields: [walletId], references: [id])
 
-  entryType     LedgerEntryType @map("entry_type")
-  referenceType ReferenceType   @map("reference_type")
-  moduleType    ModuleType      @map("module_type")
+  entryType     LedgerEntryType  @map("entry_type")
+  referenceType ReferenceType    @map("reference_type")
+  serviceId     String?          @map("service_id")
+  service       ServiceProvider? @relation(fields: [serviceId], references: [id])
 
   amount         BigInt
   runningBalance BigInt @map("running_balance")
@@ -788,7 +770,7 @@ model LedgerEntry {
 
   @@index([transactionId])
   @@index([walletId, createdAt])
-  @@index([moduleType, referenceType])
+  @@index([serviceId, referenceType])
   @@index([idempotencyKey])
   @@map("ledger_entries")
 }

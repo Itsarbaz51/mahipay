@@ -55,8 +55,7 @@ CREATE TABLE `api_entities` (
     `entity_id` VARCHAR(191) NOT NULL,
     `reference` VARCHAR(191) NULL,
     `user_id` VARCHAR(191) NOT NULL,
-    `module_type` ENUM('CC_PAYOUT', 'BBPS', 'RECHARGE', 'DMT', 'AEPS') NOT NULL,
-    `sub_module` VARCHAR(191) NULL,
+    `service_id` VARCHAR(191) NULL,
     `status` ENUM('ACTIVE', 'INACTIVE', 'PENDING', 'REJECTED', 'SUSPENDED') NOT NULL DEFAULT 'PENDING',
     `is_active` BOOLEAN NOT NULL DEFAULT true,
     `provider` ENUM('BULKPE', 'PAYTM', 'RAZORPAY', 'CCAVENUE', 'BILLDESK', 'AIRTEL', 'JIO', 'OTHER') NOT NULL DEFAULT 'BULKPE',
@@ -69,7 +68,7 @@ CREATE TABLE `api_entities` (
 
     UNIQUE INDEX `api_entities_entity_id_key`(`entity_id`),
     UNIQUE INDEX `api_entities_reference_key`(`reference`),
-    INDEX `api_entities_user_id_module_type_idx`(`user_id`, `module_type`),
+    INDEX `api_entities_user_id_service_id_idx`(`user_id`, `service_id`),
     INDEX `api_entities_entity_type_entity_id_idx`(`entity_type`, `entity_id`),
     INDEX `api_entities_reference_idx`(`reference`),
     INDEX `api_entities_status_created_at_idx`(`status`, `created_at`),
@@ -130,15 +129,17 @@ CREATE TABLE `bank_details` (
     `account_number` VARCHAR(18) NOT NULL,
     `phone_number` VARCHAR(191) NOT NULL,
     `account_type` ENUM('PERSONAL', 'BUSINESS') NOT NULL,
+    `ifsc_code` TEXT NOT NULL,
+    `bank_name` TEXT NOT NULL,
     `bank_proof_file` VARCHAR(191) NOT NULL,
     `is_verified` BOOLEAN NOT NULL DEFAULT false,
     `is_primary` BOOLEAN NOT NULL DEFAULT false,
     `user_id` VARCHAR(191) NOT NULL,
-    `bank_id` VARCHAR(191) NOT NULL,
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `deleted_at` DATETIME(3) NULL,
 
+    UNIQUE INDEX `bank_details_account_number_key`(`account_number`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -220,20 +221,15 @@ CREATE TABLE `commission_settings` (
     `scope` ENUM('ROLE', 'USER') NOT NULL DEFAULT 'ROLE',
     `role_id` VARCHAR(191) NULL,
     `target_user_id` VARCHAR(191) NULL,
-    `module_type` ENUM('CC_PAYOUT', 'BBPS', 'RECHARGE', 'DMT', 'AEPS') NOT NULL,
-    `sub_module` VARCHAR(191) NULL,
     `service_id` VARCHAR(191) NULL,
     `commission_type` ENUM('FLAT', 'PERCENTAGE') NOT NULL,
     `commission_value` DECIMAL(12, 4) NOT NULL,
     `min_amount` BIGINT NULL,
     `max_amount` BIGINT NULL,
-    `min_user_level` INTEGER NULL,
     `applyTDS` BOOLEAN NOT NULL DEFAULT false,
     `tds_percent` DECIMAL(5, 2) NULL,
     `applyGST` BOOLEAN NOT NULL DEFAULT false,
     `gst_percent` DECIMAL(5, 2) NULL,
-    `channel` VARCHAR(191) NULL,
-    `user_level` INTEGER NULL,
     `created_by` VARCHAR(191) NOT NULL,
     `is_active` BOOLEAN NOT NULL DEFAULT true,
     `effectiveFrom` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -241,7 +237,7 @@ CREATE TABLE `commission_settings` (
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `commission_settings_module_type_sub_module_scope_role_id_tar_idx`(`module_type`, `sub_module`, `scope`, `role_id`, `target_user_id`),
+    INDEX `commission_settings_scope_role_id_target_user_id_idx`(`scope`, `role_id`, `target_user_id`),
     INDEX `commission_settings_is_active_effectiveFrom_effectiveTo_idx`(`is_active`, `effectiveFrom`, `effectiveTo`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -252,12 +248,9 @@ CREATE TABLE `commission_earnings` (
     `transaction_id` VARCHAR(191) NOT NULL,
     `user_id` VARCHAR(191) NOT NULL,
     `from_user_id` VARCHAR(191) NULL,
-    `module_type` ENUM('CC_PAYOUT', 'BBPS', 'RECHARGE', 'DMT', 'AEPS') NOT NULL,
-    `sub_module` VARCHAR(191) NULL,
     `amount` BIGINT NOT NULL,
     `commission_amount` BIGINT NOT NULL,
     `commission_type` ENUM('FLAT', 'PERCENTAGE') NOT NULL,
-    `level` INTEGER NOT NULL,
     `tds_amount` BIGINT NULL,
     `gst_amount` BIGINT NULL,
     `net_amount` BIGINT NOT NULL,
@@ -268,7 +261,7 @@ CREATE TABLE `commission_earnings` (
     `serviceId` VARCHAR(191) NULL,
 
     INDEX `commission_earnings_transaction_id_user_id_idx`(`transaction_id`, `user_id`),
-    INDEX `commission_earnings_module_type_created_at_idx`(`module_type`, `created_at`),
+    INDEX `commission_earnings_created_at_idx`(`created_at`),
     INDEX `commission_earnings_user_id_created_at_idx`(`user_id`, `created_at`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -374,12 +367,10 @@ CREATE TABLE `transactions` (
     `currency` ENUM('INR', 'USD', 'EUR', 'GBP', 'AED') NOT NULL DEFAULT 'INR',
     `netAmount` BIGINT NOT NULL,
     `status` ENUM('PENDING', 'SUCCESS', 'FAILED', 'REVERSED', 'REFUNDED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
-    `module_type` ENUM('CC_PAYOUT', 'BBPS', 'RECHARGE', 'DMT', 'AEPS') NOT NULL,
-    `sub_module` VARCHAR(191) NULL,
+    `service_id` VARCHAR(191) NULL,
     `payment_type` ENUM('COLLECTION', 'PAYOUT', 'REFUND', 'REVERSAL', 'COMMISSION', 'FEE', 'TAX', 'ADJUSTMENT', 'CHARGE', 'FUND_REQ_BANK', 'FUND_REQ_RAZORPAY') NOT NULL,
     `user_id` VARCHAR(191) NOT NULL,
     `wallet_id` VARCHAR(191) NOT NULL,
-    `service_id` VARCHAR(191) NULL,
     `api_entity_id` VARCHAR(191) NULL,
     `providerCharge` BIGINT NULL,
     `commissionAmount` BIGINT NULL,
@@ -397,9 +388,9 @@ CREATE TABLE `transactions` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `transactions_user_id_module_type_status_idx`(`user_id`, `module_type`, `status`),
+    INDEX `transactions_user_id_status_idx`(`user_id`, `status`),
     INDEX `transactions_idempotency_key_idx`(`idempotency_key`),
-    INDEX `transactions_module_type_sub_module_createdAt_idx`(`module_type`, `sub_module`, `createdAt`),
+    INDEX `transactions_service_id_createdAt_idx`(`service_id`, `createdAt`),
     INDEX `transactions_external_ref_id_idx`(`external_ref_id`),
     INDEX `transactions_provider_reference_idx`(`provider_reference`),
     INDEX `transactions_status_createdAt_idx`(`status`, `createdAt`),
@@ -413,7 +404,7 @@ CREATE TABLE `ledger_entries` (
     `wallet_id` VARCHAR(191) NOT NULL,
     `entry_type` ENUM('DEBIT', 'CREDIT') NOT NULL,
     `reference_type` ENUM('TRANSACTION', 'COMMISSION', 'REFUND', 'ADJUSTMENT', 'BONUS', 'CHARGE', 'FEE', 'TAX', 'PAYOUT', 'COLLECTION') NOT NULL,
-    `module_type` ENUM('CC_PAYOUT', 'BBPS', 'RECHARGE', 'DMT', 'AEPS') NOT NULL,
+    `service_id` VARCHAR(191) NULL,
     `amount` BIGINT NOT NULL,
     `running_balance` BIGINT NOT NULL,
     `narration` TEXT NOT NULL,
@@ -424,7 +415,7 @@ CREATE TABLE `ledger_entries` (
 
     INDEX `ledger_entries_transaction_id_idx`(`transaction_id`),
     INDEX `ledger_entries_wallet_id_created_at_idx`(`wallet_id`, `created_at`),
-    INDEX `ledger_entries_module_type_reference_type_idx`(`module_type`, `reference_type`),
+    INDEX `ledger_entries_service_id_reference_type_idx`(`service_id`, `reference_type`),
     INDEX `ledger_entries_idempotency_key_idx`(`idempotency_key`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -500,6 +491,9 @@ ALTER TABLE `users` ADD CONSTRAINT `users_role_id_fkey` FOREIGN KEY (`role_id`) 
 ALTER TABLE `api_entities` ADD CONSTRAINT `api_entities_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `api_entities` ADD CONSTRAINT `api_entities_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `api_webhooks` ADD CONSTRAINT `api_webhooks_transaction_id_fkey` FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -513,9 +507,6 @@ ALTER TABLE `user_kyc` ADD CONSTRAINT `user_kyc_address_id_fkey` FOREIGN KEY (`a
 
 -- AddForeignKey
 ALTER TABLE `bank_details` ADD CONSTRAINT `bank_details_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `bank_details` ADD CONSTRAINT `bank_details_bank_id_fkey` FOREIGN KEY (`bank_id`) REFERENCES `banks`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `addresses` ADD CONSTRAINT `addresses_state_id_fkey` FOREIGN KEY (`state_id`) REFERENCES `states`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -575,13 +566,13 @@ ALTER TABLE `settings` ADD CONSTRAINT `settings_user_id_fkey` FOREIGN KEY (`user
 ALTER TABLE `login_logs` ADD CONSTRAINT `login_logs_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `transactions` ADD CONSTRAINT `transactions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `transactions` ADD CONSTRAINT `transactions_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `transactions` ADD CONSTRAINT `transactions_wallet_id_fkey` FOREIGN KEY (`wallet_id`) REFERENCES `wallets`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `transactions` ADD CONSTRAINT `transactions_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `transactions` ADD CONSTRAINT `transactions_api_entity_id_fkey` FOREIGN KEY (`api_entity_id`) REFERENCES `api_entities`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
@@ -591,6 +582,9 @@ ALTER TABLE `ledger_entries` ADD CONSTRAINT `ledger_entries_transaction_id_fkey`
 
 -- AddForeignKey
 ALTER TABLE `ledger_entries` ADD CONSTRAINT `ledger_entries_wallet_id_fkey` FOREIGN KEY (`wallet_id`) REFERENCES `wallets`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `ledger_entries` ADD CONSTRAINT `ledger_entries_service_id_fkey` FOREIGN KEY (`service_id`) REFERENCES `service_providers`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `refunds` ADD CONSTRAINT `refunds_transaction_id_fkey` FOREIGN KEY (`transaction_id`) REFERENCES `transactions`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
