@@ -10,6 +10,7 @@ import type { Request } from "express";
 import crypto from "crypto";
 import fs from "fs";
 import logger from "./WinstonLogger.js";
+import { Decimal } from "@prisma/client/runtime/library";
 
 class Helper {
   static async hashPassword(password: string): Promise<string> {
@@ -85,6 +86,42 @@ class Helper {
     }
 
     return serialized;
+  }
+
+  static serializeCommisssion(data: any): any {
+    if (!data) return data;
+
+    // Handle arrays
+    if (Array.isArray(data)) {
+      return data.map((item) => this.serializeCommisssion(item));
+    }
+
+    // Handle objects
+    if (typeof data === "object" && data !== null) {
+      const serialized: Record<string, any> = {};
+
+      for (const key in data) {
+        const value = data[key];
+
+        if (typeof value === "bigint") {
+          serialized[key] = value.toString();
+        } 
+        // ✅ Convert Prisma Decimal to number (or string)
+        else if (value instanceof Decimal) {
+          serialized[key] = value.toNumber(); // or value.toString()
+        } 
+        else if (typeof value === "object" && value !== null) {
+          serialized[key] = this.serializeCommisssion(value);
+        } 
+        else {
+          serialized[key] = value;
+        }
+      }
+
+      return serialized;
+    }
+
+    return data;
   }
 
   static async sendEmail({ to, subject, text, html }: any) {

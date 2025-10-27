@@ -588,9 +588,6 @@ model UserPermission {
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
 
-  // Module permissions
-  moduleTypes String @map("module_types") // Comma-separated module types
-
   canView          Boolean @default(false) @map("can_view")
   canEdit          Boolean @default(false) @map("can_edit")
   canSetCommission Boolean @default(false) @map("can_set_commission")
@@ -611,8 +608,6 @@ model RolePermission {
   role      Role            @relation(fields: [roleId], references: [id])
   serviceId String          @map("service_id")
   service   ServiceProvider @relation(fields: [serviceId], references: [id])
-
-  moduleTypes String @map("module_types") // Comma-separated module types
 
   canView          Boolean @default(false) @map("can_view")
   canEdit          Boolean @default(false) @map("can_edit")

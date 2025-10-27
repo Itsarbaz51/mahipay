@@ -35,7 +35,6 @@ commissionRoutes.post(
 );
 
 // Commission Earning Routes
-
 commissionRoutes.post(
   "/earn",
   AuthMiddleware.isAuthenticated,
@@ -45,7 +44,7 @@ commissionRoutes.post(
 );
 
 commissionRoutes.get(
-  "/",
+  "/earnings",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
   CommissionEarningController.getAll
