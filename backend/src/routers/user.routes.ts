@@ -49,25 +49,52 @@ userRoutes.get(
   UserController.getAllUsersByRole
 );
 
-userRoutes.post(
+userRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
   UserController.getAllUsersByParentId
 );
+
 userRoutes.get(
   "/children/:userId",
   AuthMiddleware.isAuthenticated,
   UserController.getAllUsersByChildrenId
 );
+
 userRoutes.get(
   "/count/parent/:parentId",
   AuthMiddleware.isAuthenticated,
   UserController.getAllUsersCountByParentId
 );
+
 userRoutes.get(
   "/count/children/:userId",
   AuthMiddleware.isAuthenticated,
   UserController.getAllUsersCountByChildrenId
+);
+
+userRoutes.patch(
+  "/:userId/deactivate",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  validateRequest(UserValidationSchemas.deactivateUser),
+  UserController.deactivateUser
+);
+
+userRoutes.patch(
+  "/:userId/reactivate",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  validateRequest(UserValidationSchemas.reactivateUser),
+  UserController.reactivateUser
+);
+
+userRoutes.delete(
+  "/:userId/delete",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  validateRequest(UserValidationSchemas.deleteUser),
+  UserController.deleteUser
 );
 
 export default userRoutes;

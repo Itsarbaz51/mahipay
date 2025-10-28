@@ -220,6 +220,8 @@ export const updateUserProfileImage =
   };
 
 export const updateProfile = (userId, profileData) => async (dispatch) => {
+  console.log(profileData);
+
   try {
     dispatch(userSubmitRequest());
 
@@ -310,6 +312,7 @@ export const getAllUsersByRole = (roleId) => async (dispatch) => {
   }
 };
 
+// ✅ UPDATED: Changed from POST to GET with query parameters
 export const getAllUsersByParentId =
   (filters = {}) =>
   async (dispatch) => {
@@ -317,21 +320,43 @@ export const getAllUsersByParentId =
       dispatch(userRequest());
       dispatch(setFilters(filters));
 
-      const { data } = await axios.post(`/users`, filters);
+      // Use query parameters instead of POST body
+      const params = new URLSearchParams();
+
+      // Add all filter parameters
+      Object.keys(filters).forEach((key) => {
+        if (
+          filters[key] !== undefined &&
+          filters[key] !== null &&
+          filters[key] !== ""
+        ) {
+          params.append(key, filters[key]);
+        }
+      });
+
+      // Ensure default parameters
+      if (!filters.page) params.append("page", "1");
+      if (!filters.limit) params.append("limit", "10");
+      if (!filters.sort) params.append("sort", "desc");
+      if (!filters.status) params.append("status", "ALL");
+
+      const { data } = await axios.get(`/users?${params.toString()}`);
+
+      const requestedPage = filters.page || 1;
 
       dispatch(
         setUserData({
           users: data.data.users,
           total: data.data.total,
-          page: data.data.page,
-          limit: data.data.limit,
-          totalPages: data.data.totalPages,
+          page: data.data.page ?? requestedPage,
+          limit: data.data.limit ?? filters.limit ?? 10,
+          totalPages:
+            data.data.totalPages ??
+            Math.ceil((data.data.total || 0) / (filters.limit || 10)),
         })
       );
 
       dispatch(userSuccess(data));
-      // toast.success(data.message);
-
       return data;
     } catch (error) {
       const errMsg =
@@ -339,8 +364,6 @@ export const getAllUsersByParentId =
         error?.message ||
         "Failed to fetch users";
       dispatch(userFail(errMsg));
-      // toast.userFail(errMsg);
-
       throw new Error(errMsg);
     }
   };
@@ -363,48 +386,99 @@ export const getAllUsersByChildrenId = (userId) => async (dispatch) => {
   }
 };
 
-export const updateUserStatus = (userId, status) => async (dispatch) => {
-  try {
-    dispatch(userSubmitRequest());
-    const { data } = await axios.patch(`/users/${userId}/status`, { status });
+export const deactivateUser =
+  ({ userId, reason }) =>
+  async (dispatch) => {
+    try {
+      dispatch(userSubmitRequest());
 
-    dispatch(updateUserInList(data.data.user));
-    dispatch(userSuccess(data));
+      // Ensure reason is always a string
+      const finalReason = reason || "Deactivated by admin";
 
-    // SINGLE TOAST
-    const action = status === "ACTIVE" ? "activated" : "deactivated";
-    toast.success(`User ${action} successfully!`);
+      const { data } = await axios.patch(`/users/${userId}/deactivate`, {
+        reason: finalReason,
+      });
 
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to update user status";
-    dispatch(userFail(errMsg));
+      dispatch(userSuccess(data));
+      dispatch(updateUserInList(data.data.user));
 
-    // SINGLE TOAST
-    toast.error(errMsg);
-    throw new Error(errMsg);
-  }
-};
+      if (data.message) {
+        toast.success(data.message || "User deactivated successfully!");
+      }
 
-export const searchUsers = (searchTerm) => async (dispatch) => {
-  try {
-    dispatch(userRequest());
-    dispatch(setFilters({ search: searchTerm }));
+      return data;
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to deactivate user";
+      dispatch(userFail(errMsg));
+      toast.error(errMsg);
+      throw new Error(errMsg);
+    }
+  };
 
-    const { data } = await axios.post(`/users/parent`, { search: searchTerm });
+export const reactivateUser =
+  ({ userId, reason }) =>
+  async (dispatch) => {
+    try {
+      dispatch(userSubmitRequest());
 
-    dispatch(setUsers(data.data.users));
-    dispatch(userSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message || error?.message || "Search failed";
-    dispatch(userFail(errMsg));
-    throw new Error(errMsg);
-  }
-};
+      // Ensure reason is always a string
+      const finalReason = reason || "Reactivated by admin";
+
+      const { data } = await axios.patch(`/users/${userId}/reactivate`, {
+        reason: finalReason,
+      });
+
+      dispatch(userSuccess(data));
+      dispatch(updateUserInList(data.data.user));
+
+      if (data.message) {
+        toast.success(data.message || "User reactivated successfully!");
+      }
+
+      return data;
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to reactivate user";
+      dispatch(userFail(errMsg));
+      toast.error(errMsg);
+      throw new Error(errMsg);
+    }
+  };
+
+export const deleteUser =
+  ({ userId, reason }) =>
+  async (dispatch) => {
+    try {
+      dispatch(userSubmitRequest());
+
+      const finalReason = reason || "Deleted by admin";
+
+      const { data } = await axios.delete(`/users/${userId}/delete`, {
+        data: { reason: finalReason }, // Send as request body
+      });
+
+      dispatch(userSuccess(data));
+      dispatch(updateUserInList(data.data.user));
+
+      if (data.message) {
+        toast.success(data.message || "User deleted successfully!");
+      }
+
+      return data;
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete user";
+      dispatch(userFail(errMsg));
+      toast.error(errMsg);
+      throw new Error(errMsg);
+    }
+  };
 
 export default userSlice.reducer;

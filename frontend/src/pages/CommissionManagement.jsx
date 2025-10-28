@@ -46,7 +46,7 @@ const CommissionManagement = () => {
     },
   } = useSelector((state) => state.commission || {});
 
-  const { currentUser} = useSelector((state) => state.auth)
+  const { currentUser } = useSelector((state) => state.auth);
 
   const currentPage = pagination.page;
   const totalPages = pagination.totalPages;
@@ -171,24 +171,27 @@ const CommissionManagement = () => {
   };
 
   const filteredCommissions = Array.isArray(commissionSettings)
-  ? commissionSettings.filter(
-      (commission) =>
-        commission.role?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        commission.targetUser?.firstName
-          ?.toLowerCase()
-          .includes(search.toLowerCase()) ||
-        commission.service?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        commission.service?.type?.toLowerCase().includes(search.toLowerCase()) ||
-        String(commission.commissionValue).includes(search)
-    )
-  : [];
+    ? commissionSettings.filter(
+        (commission) =>
+          commission.role?.name?.toLowerCase().includes(search.toLowerCase()) ||
+          commission.targetUser?.firstName
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+          commission.service?.name
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+          commission.service?.type
+            ?.toLowerCase()
+            .includes(search.toLowerCase()) ||
+          String(commission.commissionValue).includes(search)
+      )
+    : [];
 
   return (
     <div>
       <HeaderSection
         title="Commission Management"
         tagLine="Manage commission settings for roles and users"
-       
       />
 
       {/* Search + Add Commission */}
@@ -229,15 +232,17 @@ const CommissionManagement = () => {
               {isLoading ? "Refreshing..." : "Refresh"}
             </button>
 
-            <ButtonField
-              name="Add Commission"
-              isOpen={() => {
-                setSelectedCommission(null);
-                setShowForm(true);
-              }}
-              icon={Plus}
-              css
-            />
+            {currentUser.role.name === "ADMIN" && (
+              <ButtonField
+                name="Add Commission"
+                isOpen={() => {
+                  setSelectedCommission(null);
+                  setShowForm(true);
+                }}
+                icon={Plus}
+                css
+              />
+            )}
           </div>
         </div>
       </div>

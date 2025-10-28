@@ -3,10 +3,9 @@ import {
   Key,
   CreditCard,
   User,
-  Settings,
-  LogIn,
   Power,
   Shield,
+  Trash2, // 🧩 Added delete icon
 } from "lucide-react";
 
 const ActionsMenu = ({
@@ -16,11 +15,10 @@ const ActionsMenu = ({
   onEdit,
   onEditPassword,
   onEditPin,
-  // onSettings,
-  // onLoginAs,
   onToggleStatus,
   onClose,
   onPermission,
+  onDelete, // 🧩 Added delete handler
 }) => {
   const menuItems = [
     {
@@ -29,14 +27,12 @@ const ActionsMenu = ({
       onClick: () => onView(user),
       color: "text-blue-600",
     },
-
     {
       icon: User,
-      label: "Edit Profile Image",
+      label: "Change Profile",
       onClick: () => onEditProfile(user),
       color: "text-green-600",
     },
-
     {
       icon: Edit,
       label: "Edit Profile",
@@ -61,23 +57,25 @@ const ActionsMenu = ({
       onClick: () => onEditPin(user),
       color: "text-red-600",
     },
-    // {
-    //   icon: Settings,
-    //   label: "Settings",
-    //   onClick: () => onSettings(user),
-    //   color: "text-gray-600",
-    // },
-    // {
-    //   icon: LogIn,
-    //   label: "Login As User",
-    //   onClick: () => onLoginAs(user),
-    //   color: "text-indigo-600",
-    // },
     {
       icon: Power,
-      label: user.status === "ACTIVE" ? "Deactivate" : "Activate",
+      label:
+        user.status === "ACTIVE" || user.status === "DELETE"
+          ? "Deactivate"
+          : "Activate",
       onClick: () => onToggleStatus(user),
-      color: user.status === "ACTIVE" ? "text-red-600" : "text-green-600",
+      color:
+        user.status === "ACTIVE" || user.status === "DELETE"
+          ? "text-red-600"
+          : "text-green-600",
+    },
+
+    {
+      icon: Trash2,
+      label: "Delete User",
+      onClick: () => onDelete(user),
+      color: "text-red-700",
+      isDanger: true,
     },
   ];
 
@@ -90,7 +88,9 @@ const ActionsMenu = ({
             item.onClick();
             onClose();
           }}
-          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          className={`w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors ${
+            item.isDanger ? "hover:bg-red-50" : ""
+          }`}
         >
           <item.icon className={`w-4 h-4 mr-3 ${item.color}`} />
           {item.label}

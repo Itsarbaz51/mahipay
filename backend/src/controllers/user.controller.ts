@@ -32,8 +32,6 @@ class UserController {
       throw ApiError.internal("User creation failed!");
     }
 
-    // await UserServices.createAndSendEmailVerification(user);
-
     const safeUser = Helper.serializeUser(user);
 
     logger.info("User registration completed successfully", {
@@ -184,7 +182,7 @@ class UserController {
       const parentId = req.user?.id;
 
       if (!parentId) {
-        throw ApiError.internal("Parent ID is required");
+        throw ApiError.unauthorized("User not authenticated");
       }
 
       const {
@@ -192,7 +190,8 @@ class UserController {
         limit = "10",
         sort = "desc",
         status = "ALL",
-      } = req.body;
+        search = "",
+      } = req.query;
 
       const parsedPage = parseInt(page as string, 10) || 1;
       const parsedLimit = parseInt(limit as string, 10) || 10;
@@ -201,11 +200,11 @@ class UserController {
 
       // Accept ALL but validate against real enum values
       const allowedStatuses = ["ALL", ...Object.values(UserStatus)];
-      const upperStatus = (status as string).toUpperCase();
+      const upperStatus = ((status as string) || "ALL").toUpperCase();
 
       const parsedStatus = allowedStatuses.includes(upperStatus)
         ? upperStatus
-        : UserStatus.ACTIVE;
+        : "ALL";
 
       const { users, total } = await UserServices.getAllUsersByParentId(
         parentId,
@@ -214,6 +213,7 @@ class UserController {
           limit: parsedLimit,
           sort: parsedSort,
           status: parsedStatus as UserStatus | "ALL",
+          search: search as string,
         }
       );
 
@@ -312,6 +312,164 @@ class UserController {
         );
     }
   );
+
+  static deactivateUser = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const deactivatedBy = req.user?.id;
+    const { reason } = req.body;
+
+    console.log("🔍 DEBUG - Deactivate User:", {
+      userId,
+      deactivatedBy,
+      reason,
+      user: req.user,
+    });
+
+    if (!deactivatedBy) {
+      throw ApiError.unauthorized("User not authenticated");
+    }
+
+    if (!userId) {
+      throw ApiError.badRequest("User ID is required");
+    }
+
+    try {
+      const user = await UserServices.deactivateUser(
+        userId,
+        deactivatedBy,
+        reason
+      );
+
+      const safeUser = Helper.serializeUser(user);
+
+      logger.info("User deactivated via controller", {
+        userId,
+        deactivatedBy,
+      });
+
+      return res
+        .status(200)
+        .json(
+          ApiResponse.success(
+            { user: safeUser },
+            "User deactivated successfully",
+            200
+          )
+        );
+    } catch (error: any) {
+      logger.error("Controller error in deactivateUser:", {
+        userId,
+        deactivatedBy,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  });
+
+  static reactivateUser = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const reactivatedBy = req.user?.id;
+    const { reason } = req.body;
+
+    console.log("🔍 DEBUG - Reactivate User:", {
+      userId,
+      reactivatedBy,
+      reason,
+      user: req.user,
+    });
+
+    if (!reactivatedBy) {
+      throw ApiError.unauthorized("User not authenticated");
+    }
+
+    if (!userId) {
+      throw ApiError.badRequest("User ID is required");
+    }
+
+    try {
+      const user = await UserServices.reactivateUser(
+        userId,
+        reactivatedBy,
+        reason
+      );
+
+      const safeUser = Helper.serializeUser(user);
+
+      logger.info("User reactivated via controller", {
+        userId,
+        reactivatedBy,
+      });
+
+      return res
+        .status(200)
+        .json(
+          ApiResponse.success(
+            { user: safeUser },
+            "User reactivated successfully",
+            200
+          )
+        );
+    } catch (error: any) {
+      logger.error("Controller error in reactivateUser:", {
+        userId,
+        reactivatedBy,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  });
+
+  static deleteUser = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const deletedBy = req.user?.id;
+    const { reason } = req.body;
+
+    console.log("🔍 DEBUG - Delete User:", {
+      userId,
+      deletedBy,
+      reason,
+      user: req.user,
+    });
+
+    if (!deletedBy) {
+      throw ApiError.unauthorized("User not authenticated");
+    }
+
+    if (!userId) {
+      throw ApiError.badRequest("User ID is required");
+    }
+
+    try {
+      const user = await UserServices.deleteUser(userId, deletedBy, reason);
+
+      const safeUser = Helper.serializeUser(user);
+
+      logger.info("User deleted via controller", {
+        userId,
+        deletedBy,
+      });
+
+      return res
+        .status(200)
+        .json(
+          ApiResponse.success(
+            { user: safeUser },
+            "User deleted successfully",
+            200
+          )
+        );
+    } catch (error: any) {
+      logger.error("Controller error in deleteUser:", {
+        userId,
+        deletedBy,
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  });
 }
 
 export default UserController;

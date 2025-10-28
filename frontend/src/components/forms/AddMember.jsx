@@ -62,6 +62,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
     }
 
     if (errors[name]) setErrors({ ...errors, [name]: "" });
+    if (message.text) setMessage({ type: "", text: "" }); // Clear message on change
   };
 
   const handleFileChange = (e) => {
@@ -82,45 +83,73 @@ export default function AddMember({ onClose, onSuccess, editData }) {
 
     if (!formData.email) newErrors.email = "Email is required";
     if (!formData.firstName) newErrors.firstName = "First name is required";
+    if (!formData.lastName) newErrors.lastName = "Last name is required";
     if (!formData.phoneNumber)
       newErrors.phoneNumber = "Phone number is required";
+
+    // ✅ Role validation for both new and edit modes
     if (!formData.roleId) newErrors.roleId = "Role is required";
 
     if (!editData) {
       if (!formData.password) newErrors.password = "Password is required";
+      if (formData.password.length < 8)
+        newErrors.password = "Password must be at least 8 characters";
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = "Passwords do not match";
       }
       if (!formData.transactionPin)
         newErrors.transactionPin = "Transaction PIN is required";
+      if (
+        formData.transactionPin.length < 4 ||
+        formData.transactionPin.length > 6
+      ) {
+        newErrors.transactionPin = "Transaction PIN must be 4-6 digits";
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // FIXED: handleSubmit function with auto-close
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
-      setMessage({ type: "error", text: "Please fix validation errors" });
+      setMessage({
+        type: "error",
+        text: "Please fill the details before proceed",
+      });
       return;
     }
 
     setLoading(true);
     setMessage({ type: "", text: "" });
+    setErrors({}); // Clear previous errors
 
     try {
       let res;
 
       if (editData) {
-        // Edit case
-        const submitData = { ...formData };
-        // Remove empty fields for edit
-        if (!submitData.password) delete submitData.password;
-        if (!submitData.confirmPassword) delete submitData.confirmPassword;
-        if (!submitData.transactionPin) delete submitData.transactionPin;
+        // ✅ Edit case - include email and role in update data
+        const submitData = {
+          username: formData.username,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email, // ✅ Email included for edit
+          phoneNumber: formData.phoneNumber,
+          roleId: formData.roleId, // ✅ Role included for edit
+        };
+
+        // Remove undefined fields
+        Object.keys(submitData).forEach((key) => {
+          if (
+            submitData[key] === undefined ||
+            submitData[key] === null ||
+            submitData[key] === ""
+          ) {
+            delete submitData[key];
+          }
+        });
 
         res = await dispatch(updateProfile(editData.id, submitData));
       } else {
@@ -138,8 +167,13 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         res = await dispatch(register(form));
       }
 
-      // Check multiple success conditions
-      if (res?.success || res?.status === "success" || res?.data?.success) {
+      // ✅ Check for success using multiple patterns
+      if (
+        res?.success ||
+        res?.status === "success" ||
+        res?.data?.success ||
+        res?.payload?.success
+      ) {
         setMessage({
           type: "success",
           text: editData
@@ -147,26 +181,34 @@ export default function AddMember({ onClose, onSuccess, editData }) {
             : "Member added successfully!",
         });
 
-        // FIXED: Auto-close on success after short delay
-        setTimeout(() => {
-          onSuccess(); // Refresh list in parent
-          onClose(); // Close the form modal
-        }, 1500);
-      }
-    } catch (error) {
-      const backendErrors = error?.response?.data?.errors;
-      if (backendErrors && Array.isArray(backendErrors)) {
-        const formattedErrors = {};
-        backendErrors.forEach((err) => {
-          formattedErrors[err.field] = err.message;
-        });
-        setErrors(formattedErrors);
+        onSuccess();
+        onClose();
       } else {
+        // ✅ Handle API error responses
+        const errorData = res?.error || res?.payload || res?.data;
+        const errorMessage = errorData?.message || "Operation failed";
+
         setMessage({
           type: "error",
-          text: error?.response?.data?.message || "Something went wrong",
+          text: errorMessage,
         });
+
+        // ✅ Set field-specific errors if available
+        if (errorData?.errors && Array.isArray(errorData.errors)) {
+          const formattedErrors = {};
+          errorData.errors.forEach((err) => {
+            formattedErrors[err.field] = err.message;
+          });
+          setErrors(formattedErrors);
+        }
       }
+    } catch (error) {
+      // ✅ Catch network or other errors
+      console.error("Form submission error:", error);
+      setMessage({
+        type: "error",
+        text: error?.message || "Something went wrong. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
@@ -190,6 +232,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
           <button
             onClick={onClose}
             className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all duration-200"
+            disabled={loading}
           >
             ✕
           </button>
@@ -214,51 +257,46 @@ export default function AddMember({ onClose, onSuccess, editData }) {
               {/* Username - Always show in both modes */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Username {!editData && "*"}
+                  Username *
                 </label>
                 <input
                   type="text"
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
-                  disabled={!editData} // Disabled only for new members (auto-filled from email)
                   className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                    !editData
-                      ? "bg-gray-100 cursor-not-allowed border-gray-300"
-                      : errors.username
+                    errors.username
                       ? "border-red-400 focus:ring-red-300 bg-red-50"
                       : "border-gray-300 focus:ring-blue-400"
                   }`}
-                  placeholder={editData ? "Username" : "Auto-filled from email"}
+                  placeholder="Username"
                 />
                 {errors.username && (
                   <p className="text-red-500 text-sm mt-1">{errors.username}</p>
                 )}
               </div>
 
-              {/* Email - Only show for new members */}
-              {!editData && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                      errors.email
-                        ? "border-red-400 focus:ring-red-300 bg-red-50"
-                        : "border-gray-300 focus:ring-blue-400"
-                    }`}
-                    placeholder="email@example.com"
-                  />
-                  {errors.email && (
-                    <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-                  )}
-                </div>
-              )}
+              {/* ✅ Email - Show for both new and edit modes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.email
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
+                  placeholder="email@example.com"
+                />
+                {errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                )}
+              </div>
 
               {/* First Name - Always show */}
               <div>
@@ -287,16 +325,23 @@ export default function AddMember({ onClose, onSuccess, editData }) {
               {/* Last Name - Always show */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Last Name {editData ? "" : "(Optional)"}
+                  Last Name *
                 </label>
                 <input
                   type="text"
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border rounded-xl border-gray-300 focus:ring-2 focus:ring-blue-400"
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.lastName
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
                   placeholder="Last name"
                 />
+                {errors.lastName && (
+                  <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>
+                )}
               </div>
 
               {/* Phone Number - Always show */}
@@ -330,38 +375,38 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                 )}
               </div>
 
-              {/* Role - Only show for new members */}
-              {!editData && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Role *
-                  </label>
-                  <select
-                    name="roleId"
-                    value={formData.roleId}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                      errors.roleId
-                        ? "border-red-400 focus:ring-red-300 bg-red-50"
-                        : "border-gray-300 focus:ring-blue-400"
-                    }`}
-                  >
-                    <option value="">Select a role</option>
-                    {roles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name || role.roleName}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.roleId && (
-                    <p className="text-red-500 text-sm mt-1">{errors.roleId}</p>
-                  )}
-                </div>
-              )}
+              {/* ✅ Role - Show for both new and edit modes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Role *
+                </label>
+                <select
+                  name="roleId"
+                  value={formData.roleId}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                    errors.roleId
+                      ? "border-red-400 focus:ring-red-300 bg-red-50"
+                      : "border-gray-300 focus:ring-blue-400"
+                  }`}
+                >
+                  <option value="">Select a role</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name || role.roleName}
+                    </option>
+                  ))}
+                </select>
+                {errors.roleId && (
+                  <p className="text-red-500 text-sm mt-1">{errors.roleId}</p>
+                )}
+              </div>
 
-              {/* Password - Only show for new members */}
+              {/* ❌ REMOVED: Password and Transaction PIN fields for edit mode */}
+              {/* Only show password fields for new members */}
               {!editData && (
                 <>
+                  {/* Password - Only show for new members */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Password *
@@ -377,7 +422,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                             ? "border-red-400 focus:ring-red-300 bg-red-50"
                             : "border-gray-300 focus:ring-blue-400"
                         }`}
-                        placeholder="Enter password"
+                        placeholder="Enter password (min 8 characters)"
                       />
                       <button
                         type="button"
@@ -428,63 +473,60 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                       </p>
                     )}
                   </div>
-                </>
-              )}
 
-              {/* Transaction Pin - Only show for new members */}
-              {!editData && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Transaction PIN *
-                  </label>
-                  <input
-                    type="text"
-                    name="transactionPin"
-                    value={formData.transactionPin}
-                    onChange={handleChange}
-                    maxLength={6}
-                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                      errors.transactionPin
-                        ? "border-red-400 focus:ring-red-300 bg-red-50"
-                        : "border-gray-300 focus:ring-blue-400"
-                    }`}
-                    placeholder="6-digit PIN"
-                  />
-                  {errors.transactionPin && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {errors.transactionPin}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Profile Image - Only show for new members */}
-              {!editData && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Profile Image
-                  </label>
-                  <div className="flex items-center gap-4">
+                  {/* Transaction Pin - Only show for new members */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Transaction PIN *
+                    </label>
                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="w-full"
+                      type="text"
+                      name="transactionPin"
+                      value={formData.transactionPin}
+                      onChange={handleChange}
+                      maxLength={6}
+                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                        errors.transactionPin
+                          ? "border-red-400 focus:ring-red-300 bg-red-50"
+                          : "border-gray-300 focus:ring-blue-400"
+                      }`}
+                      placeholder="6-digit PIN"
                     />
-                    {imagePreview && (
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-16 h-16 object-cover rounded-full border border-gray-300"
-                      />
+                    {errors.transactionPin && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.transactionPin}
+                      </p>
                     )}
                   </div>
-                  {errors.profileImage && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {errors.profileImage}
-                    </p>
-                  )}
-                </div>
+
+                  {/* Profile Image - Only show for new members */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Profile Image
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="w-full"
+                        disabled={loading}
+                      />
+                      {imagePreview && (
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-16 h-16 object-cover rounded-full border border-gray-300"
+                        />
+                      )}
+                    </div>
+                    {errors.profileImage && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.profileImage}
+                      </p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
@@ -493,7 +535,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
               <button
                 type="submit"
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading
                   ? editData

@@ -1,11 +1,4 @@
-import {
-  UserStatus,
-  WalletType,
-  Currency,
-  KycStatus,
-  Gender,
-  AccountType,
-} from "@prisma/client";
+import { UserStatus, WalletType, Currency } from "@prisma/client";
 import Prisma from "../db/db.js";
 import type { RegisterPayload, User } from "../types/auth.types.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -224,12 +217,15 @@ class UserServices {
       firstName?: string;
       lastName?: string;
       phoneNumber?: string;
+      email?: string;
+      roleId?: string; // role name
     }
   ): Promise<User> {
-    const { username, phoneNumber, firstName, lastName } = updateData;
+    const { username, phoneNumber, firstName, lastName, email, roleId } =
+      updateData;
 
-    // Check if username or phoneNumber already exists (excluding current user)
-    if (username || phoneNumber) {
+    // Check for duplicates (excluding current user)
+    if (username || phoneNumber || email) {
       const existingUser = await Prisma.user.findFirst({
         where: {
           AND: [
@@ -238,6 +234,7 @@ class UserServices {
               OR: [
                 ...(username ? [{ username }] : []),
                 ...(phoneNumber ? [{ phoneNumber }] : []),
+                ...(email ? [{ email }] : []),
               ],
             },
           ],
@@ -245,24 +242,34 @@ class UserServices {
       });
 
       if (existingUser) {
-        if (existingUser.username === username) {
+        if (existingUser.username === username)
           throw ApiError.badRequest("Username already taken");
-        }
-        if (existingUser.phoneNumber === phoneNumber) {
+        if (existingUser.phoneNumber === phoneNumber)
           throw ApiError.badRequest("Phone number already registered");
-        }
+        if (existingUser.email === email)
+          throw ApiError.badRequest("Email already registered");
       }
     }
 
-    // Apply proper casing to names if provided
-    const formattedData: any = { ...updateData };
-    if (firstName) {
-      formattedData.firstName = this.formatName(firstName);
-    }
-    if (lastName) {
-      formattedData.lastName = this.formatName(lastName);
+    // Prepare data for update
+    const formattedData: any = {};
+
+    if (username) formattedData.username = username.trim();
+    if (firstName) formattedData.firstName = this.formatName(firstName);
+    if (lastName) formattedData.lastName = this.formatName(lastName);
+    if (phoneNumber) formattedData.phoneNumber = phoneNumber;
+    if (email) formattedData.email = email.trim().toLowerCase();
+
+    // Handle role update
+    if (roleId) {
+      const roleRecord = await Prisma.role.findUnique({
+        where: { id: roleId },
+      });
+      if (!roleRecord) throw ApiError.badRequest("Invalid role");
+      formattedData.role = { connect: { id: roleRecord.id } };
     }
 
+    // Update user
     const updatedUser = await Prisma.user.update({
       where: { id: userId },
       data: formattedData,
@@ -298,19 +305,19 @@ class UserServices {
       },
     });
 
-    // Update cache and clear related cache with TTL
+    // Update cache
     await cacheUser(
       userId,
       Helper.serializeUser(updatedUser),
       this.USER_CACHE_TTL
     );
-
     await this.clearUserRelatedCache(
       userId,
       updatedUser.parentId,
       updatedUser.roleId
     );
 
+    // Audit log
     await Prisma.auditLog.create({
       data: {
         userId,
@@ -658,11 +665,14 @@ class UserServices {
       limit?: number;
       sort?: "asc" | "desc";
       status?: UserStatus | "ALL";
+      search?: string;
     } = {}
   ): Promise<{ users: User[]; total: number }> {
     const parent = await Prisma.user.findUnique({
       where: { id: parentId },
-      select: { id: true },
+      include: {
+        role: true,
+      },
     });
 
     if (!parent) {
@@ -674,15 +684,76 @@ class UserServices {
       limit = 10,
       sort = "desc",
       status = UserStatus.ACTIVE,
+      search = "",
     } = options;
 
     const skip = (page - 1) * limit;
     const isAll = status === "ALL";
 
-    const queryWhere: any = {
-      parentId,
-      ...(isAll ? {} : { status }),
-    };
+    // ✅ ADMIN role ka ID find karo
+    const adminRole = await Prisma.role.findFirst({
+      where: { name: "ADMIN" },
+      select: { id: true },
+    });
+
+    // Base query conditions
+    let queryWhere: any =
+      parent.role?.name === "ADMIN"
+        ? {
+            // ✅ ADMIN ke liye: sab users lekin ADMIN role wale exclude karo
+            ...(adminRole && {
+              roleId: {
+                not: adminRole.id, // ADMIN role ID wale users ko exclude karo
+              },
+            }),
+            ...(isAll ? {} : { status }),
+          }
+        : {
+            // Non-ADMIN users ke liye: sirf unke children
+            parentId,
+            ...(isAll ? {} : { status }),
+          };
+
+    // ✅ FIXED: Search conditions without mode (case insensitive ke liye)
+    if (search && search.trim() !== "") {
+      const searchTerm = search.toLowerCase(); // ✅ Manual case insensitive ke liye
+
+      const searchConditions = {
+        OR: [
+          {
+            username: {
+              contains: searchTerm,
+              // ✅ mode: "insensitive" remove karo
+            },
+          },
+          {
+            firstName: {
+              contains: searchTerm,
+            },
+          },
+          {
+            lastName: {
+              contains: searchTerm,
+            },
+          },
+          {
+            email: {
+              contains: searchTerm,
+            },
+          },
+          {
+            phoneNumber: {
+              contains: searchTerm,
+            },
+          },
+        ],
+      };
+
+      queryWhere = {
+        ...queryWhere,
+        ...searchConditions,
+      };
+    }
 
     const [users, total] = await Promise.all([
       Prisma.user.findMany({
@@ -721,7 +792,10 @@ class UserServices {
         skip,
         take: limit,
       }),
-      Prisma.user.count({ where: queryWhere }),
+      // ✅ FIXED: Simple count without mode
+      Prisma.user.count({
+        where: queryWhere,
+      }),
     ]);
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
@@ -1181,6 +1255,423 @@ class UserServices {
       children: children.map((child) => Helper.serializeUser(child)),
       siblings: siblings.map((sibling) => Helper.serializeUser(sibling)),
     };
+  }
+
+  static async deactivateUser(
+    userId: string,
+    deactivatedBy: string,
+    reason?: string
+  ): Promise<User> {
+    try {
+      const user = await Prisma.user.findUnique({
+        where: { id: userId },
+        include: { role: true },
+      });
+
+      if (!user) {
+        throw ApiError.notFound("User not found");
+      }
+
+      // if (user.status === UserStatus.DELETE) {
+      //   throw ApiError.badRequest("User is already deleted");
+      // }
+
+      if (user.status === UserStatus.IN_ACTIVE) {
+        throw ApiError.badRequest("User is already deactivated");
+      }
+
+      // Check if deactivatedBy user has permission to deactivate
+      const deactivator = await Prisma.user.findUnique({
+        where: { id: deactivatedBy },
+        include: { role: true },
+      });
+
+      if (!deactivator) {
+        throw ApiError.unauthorized("Invalid deactivator user");
+      }
+
+      // Allow ADMIN, parent, or users with higher role level to deactivate
+      const isAdmin = deactivator.role.name === "ADMIN";
+      const isParent = user.parentId === deactivatedBy;
+      const hasHigherRole = deactivator.role.level > user.role.level;
+
+      if (!isAdmin && !isParent && !hasHigherRole) {
+        throw ApiError.forbidden(
+          "You don't have permission to deactivate this user"
+        );
+      }
+
+      const updatedUser = await Prisma.user.update({
+        where: { id: userId },
+        data: {
+          status: UserStatus.IN_ACTIVE,
+          updatedAt: new Date(),
+        },
+        include: {
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
+          wallets: true,
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      // Update cache and clear related cache
+      await cacheUser(
+        userId,
+        Helper.serializeUser(updatedUser),
+        this.USER_CACHE_TTL
+      );
+
+      await this.clearUserRelatedCache(
+        userId,
+        updatedUser.parentId,
+        updatedUser.roleId
+      );
+
+      await Prisma.auditLog.create({
+        data: {
+          userId: deactivatedBy,
+          action: "DEACTIVATE_USER",
+          entityType: "User",
+          metadata: {
+            previousStatus: user.status,
+            newStatus: UserStatus.IN_ACTIVE,
+            reason: reason || "No reason provided",
+            deactivatedBy,
+            timestamp: new Date().toISOString(),
+            targetUserId: userId,
+          },
+        },
+      });
+
+      logger.info("User deactivated successfully", {
+        userId,
+        deactivatedBy,
+        previousStatus: user.status,
+        reason,
+      });
+
+      return updatedUser;
+    } catch (error: any) {
+      logger.error("Failed to deactivate user", {
+        userId,
+        deactivatedBy,
+        error: error.message,
+        stack: error.stack,
+      });
+
+      if (error instanceof ApiError) throw error;
+
+      // Specific error message for Prisma errors
+      if (error.code) {
+        logger.error("Prisma error details:", {
+          code: error.code,
+          meta: error.meta,
+        });
+      }
+
+      throw ApiError.internal("Failed to deactivate user. Please try again.");
+    }
+  }
+
+  static async reactivateUser(
+    userId: string,
+    reactivatedBy: string,
+    reason?: string
+  ): Promise<User> {
+    try {
+      const user = await Prisma.user.findUnique({
+        where: { id: userId },
+        include: { role: true },
+      });
+
+      if (!user) {
+        throw ApiError.notFound("User not found");
+      }
+
+      if (user.status === UserStatus.DELETE) {
+        throw ApiError.badRequest("Cannot reactivate a deleted user");
+      }
+
+      if (user.status === UserStatus.ACTIVE) {
+        throw ApiError.badRequest("User is already active");
+      }
+
+      // Check if reactivatedBy user has permission to reactivate
+      const activator = await Prisma.user.findUnique({
+        where: { id: reactivatedBy },
+        include: { role: true },
+      });
+
+      if (!activator) {
+        throw ApiError.unauthorized("Invalid activator user");
+      }
+
+      // Allow ADMIN, parent, or users with higher role level to reactivate
+      const isAdmin = activator.role.name === "ADMIN";
+      const isParent = user.parentId === reactivatedBy;
+      const hasHigherRole = activator.role.level > user.role.level;
+
+      if (!isAdmin && !isParent && !hasHigherRole) {
+        throw ApiError.forbidden(
+          "You don't have permission to reactivate this user"
+        );
+      }
+
+      const updatedUser = await Prisma.user.update({
+        where: { id: userId },
+        data: {
+          status: UserStatus.ACTIVE, // Changed from IN_ACTIVE to ACTIVE
+          updatedAt: new Date(),
+        },
+        include: {
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
+          wallets: true,
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      // Update cache and clear related cache
+      await cacheUser(
+        userId,
+        Helper.serializeUser(updatedUser),
+        this.USER_CACHE_TTL
+      );
+
+      await this.clearUserRelatedCache(
+        userId,
+        updatedUser.parentId,
+        updatedUser.roleId
+      );
+
+      // Create reactivation audit log (FIXED: was using DEACTIVATE_USER)
+      await Prisma.auditLog.create({
+        data: {
+          userId: reactivatedBy, // FIXED: was using deactivatedBy
+          action: "REACTIVATE_USER", // FIXED: was DEACTIVATE_USER
+          entityType: "User",
+          metadata: {
+            previousStatus: user.status,
+            newStatus: UserStatus.ACTIVE, // FIXED: was IN_ACTIVE
+            reason: reason || "No reason provided",
+            reactivatedBy, // FIXED: was deactivatedBy
+            timestamp: new Date().toISOString(),
+            targetUserId: userId,
+          },
+        },
+      });
+
+      logger.info("User reactivated successfully", {
+        userId,
+        reactivatedBy, // FIXED: was deactivatedBy
+        previousStatus: user.status,
+        reason,
+      });
+
+      return updatedUser;
+    } catch (error: any) {
+      logger.error("Failed to reactivate user", {
+        // FIXED: error message
+        userId,
+        reactivatedBy, // FIXED: was deactivatedBy
+        error: error.message,
+        stack: error.stack,
+      });
+
+      if (error instanceof ApiError) throw error;
+
+      // Specific error message for Prisma errors
+      if (error.code) {
+        logger.error("Prisma error details:", {
+          code: error.code,
+          meta: error.meta,
+        });
+      }
+
+      throw ApiError.internal("Failed to reactivate user. Please try again.");
+    }
+  }
+
+  static async deleteUser(
+    userId: string,
+    deletedBy: string,
+    reason?: string
+  ): Promise<User> {
+    try {
+      const user = await Prisma.user.findUnique({
+        where: { id: userId },
+        include: { role: true },
+      });
+
+      if (!user) {
+        throw ApiError.notFound("User not found");
+      }
+
+      // if (user.status === UserStatus.DELETE) {
+      //   throw ApiError.badRequest("User is already deleted");
+      // }
+
+      // Check if deletedBy user has permission to delete (ONLY ADMIN)
+      const deleter = await Prisma.user.findUnique({
+        where: { id: deletedBy },
+        include: { role: true },
+      });
+
+      if (!deleter) {
+        throw ApiError.unauthorized("Invalid deleter user");
+      }
+
+      // ONLY ADMIN can delete users
+      const isAdmin = deleter.role.name === "ADMIN";
+      if (!isAdmin) {
+        throw ApiError.forbidden("Only ADMIN can delete users");
+      }
+
+      const updatedUser = await Prisma.user.update({
+        where: { id: userId },
+        data: {
+          status: UserStatus.DELETE,
+          updatedAt: new Date(),
+          deletedAt: new Date(),
+        },
+        include: {
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
+          wallets: true,
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      // Update cache and clear related cache
+      await cacheUser(
+        userId,
+        Helper.serializeUser(updatedUser),
+        this.USER_CACHE_TTL
+      );
+
+      await this.clearUserRelatedCache(
+        userId,
+        updatedUser.parentId,
+        updatedUser.roleId
+      );
+
+      await Prisma.auditLog.create({
+        data: {
+          userId: deletedBy,
+          action: "DELETE_USER",
+          entityType: "User",
+          metadata: {
+            previousStatus: user.status,
+            newStatus: UserStatus.DELETE,
+            reason: reason || "No reason provided",
+            deletedBy,
+            timestamp: new Date().toISOString(),
+            targetUserId: userId,
+          },
+        },
+      });
+
+      logger.info("User deleted successfully", {
+        userId,
+        deletedBy,
+        previousStatus: user.status,
+        reason,
+      });
+
+      return updatedUser;
+    } catch (error: any) {
+      logger.error("Failed to delete user", {
+        userId,
+        deletedBy,
+        error: error.message,
+        stack: error.stack,
+      });
+
+      if (error instanceof ApiError) throw error;
+
+      // Specific error message for Prisma errors
+      if (error.code) {
+        logger.error("Prisma error details:", {
+          code: error.code,
+          meta: error.meta,
+        });
+      }
+
+      throw ApiError.internal("Failed to delete user. Please try again.");
+    }
   }
 
   // ===================== HELPER METHODS =====================

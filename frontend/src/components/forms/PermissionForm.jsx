@@ -20,6 +20,7 @@ const PermissionForm = ({
   const [serviceSearchTerm, setServiceSearchTerm] = useState("");
   const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const serviceSearchRef = useRef(null);
 
@@ -107,15 +108,16 @@ const PermissionForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(""); // Clear previous errors
 
     if (formData.serviceIds.length === 0) {
-      alert("Please select at least one service");
+      setError("Please select at least one service");
       return;
     }
 
     if (!formData.userId) {
       console.error("Missing userId in formData", formData);
-      alert("User ID is missing. Please check the selected user.");
+      setError("User ID is missing. Please check the selected user.");
       return;
     }
 
@@ -133,19 +135,26 @@ const PermissionForm = ({
       };
 
       await onSubmit(permissionData);
+      // ✅ Success par parent component handle karega - yahan form band nahi hoga
     } catch (error) {
       console.error("Failed to submit permission:", error);
+      setError(error.message || "Failed to update permissions");
+      // ❌ Error aaye toh form band nahi hoga
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleInputChange = useCallback((field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  }, []);
+  const handleInputChange = useCallback(
+    (field, value) => {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+      if (error) setError(""); // Clear error on any input change
+    },
+    [error]
+  );
 
   const getSelectedServiceNames = useCallback(() => {
     return formData.serviceIds.map((serviceId) => {
@@ -200,6 +209,13 @@ const PermissionForm = ({
               </svg>
             </button>
           </div>
+
+          {/* ✅ Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* User/Role Information (Read-only) */}
