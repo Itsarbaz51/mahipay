@@ -1,7 +1,12 @@
-import type { Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { ZodError } from "zod";
 
-export const errorHandler = (err: unknown, res: Response) => {
+export const errorHandler = (
+  err: unknown,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   if (err instanceof ZodError) {
     return res.status(400).json({
       status: "fail",

@@ -14,15 +14,15 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState("");
 
   const dispatch = useDispatch();
-  const { currentUser } = useSelector((state) => state.auth);
+  const currentUser = useSelector((state) => state.auth.currentUser);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Only allow numbers for PIN fields
-    if (name.includes("Pin") || name.includes("PIN")) {
+    if (name.includes("Pin") || name.includes("PIN") || name.includes("pin")) {
       const numericValue = value.replace(/\D/g, "");
       setFormData((prev) => ({ ...prev, [name]: numericValue }));
     } else {
@@ -30,12 +30,13 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
     }
 
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+    if (apiError) setApiError("");
   };
 
   const validateForm = () => {
     const newErrors = {};
 
-    // Current password is always required
+    // ✅ CURRENT PASSWORD IS ALWAYS REQUIRED (based on backend schema)
     if (!formData.currentPassword) {
       newErrors.currentPassword = "Current password is required";
     }
@@ -47,10 +48,13 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         newErrors.newPassword = "Password must be at least 8 characters";
       }
 
-      if (formData.newPassword !== formData.confirmNewPassword) {
+      if (!formData.confirmNewPassword) {
+        newErrors.confirmNewPassword = "Please confirm your new password";
+      } else if (formData.newPassword !== formData.confirmNewPassword) {
         newErrors.confirmNewPassword = "New passwords do not match";
       }
     } else if (type === "pin") {
+      // ✅ CURRENT TRANSACTION PIN IS REQUIRED WHEN UPDATING PIN
       if (!formData.currentTransactionPin) {
         newErrors.currentTransactionPin = "Current transaction PIN is required";
       } else if (
@@ -69,9 +73,19 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         newErrors.newTransactionPin = "New PIN must be 4-6 digits";
       }
 
-      if (formData.newTransactionPin !== formData.confirmNewTransactionPin) {
+      if (!formData.confirmNewTransactionPin) {
+        newErrors.confirmNewTransactionPin = "Please confirm your new PIN";
+      } else if (
+        formData.newTransactionPin !== formData.confirmNewTransactionPin
+      ) {
         newErrors.confirmNewTransactionPin = "New PINs do not match";
       }
+    }
+
+    // ✅ BACKEND VALIDATION: At least one update should be requested
+    if (!formData.newPassword && !formData.newTransactionPin) {
+      newErrors.general =
+        "Either new password or new transaction PIN must be provided";
     }
 
     setErrors(newErrors);
@@ -83,75 +97,100 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
     if (!validateForm()) return;
 
     setLoading(true);
+    setApiError("");
+
     try {
+      // ✅ FIXED: Create payload that matches backend schema exactly
       const payload = {
         currentPassword: formData.currentPassword,
-        ...(type === "password"
-          ? {
-              newPassword: formData.newPassword,
-              confirmNewPassword: formData.confirmNewPassword,
-            }
-          : {
-              currentTransactionPin: formData.currentTransactionPin,
-              newTransactionPin: formData.newTransactionPin,
-              confirmNewTransactionPin: formData.confirmNewTransactionPin,
-            }),
       };
 
-      const currentUserId = currentUser?.id;
+      // Only include password fields if updating password
+      if (type === "password" && formData.newPassword) {
+        payload.newPassword = formData.newPassword;
+        payload.confirmNewPassword = formData.confirmNewPassword;
+      }
 
-      // Dispatch and wait for the result
+      // Only include PIN fields if updating PIN
+      if (type === "pin" && formData.newTransactionPin) {
+        payload.currentTransactionPin = formData.currentTransactionPin;
+        payload.newTransactionPin = formData.newTransactionPin;
+        payload.confirmNewTransactionPin = formData.confirmNewTransactionPin;
+      }
+
+      // ✅ Allow updating both password and PIN simultaneously if needed
+      if (formData.newPassword && formData.newTransactionPin) {
+        payload.newPassword = formData.newPassword;
+        payload.confirmNewPassword = formData.confirmNewPassword;
+        payload.currentTransactionPin = formData.currentTransactionPin;
+        payload.newTransactionPin = formData.newTransactionPin;
+        payload.confirmNewTransactionPin = formData.confirmNewTransactionPin;
+      }
+
+      console.log("Submitting credentials update:", {
+        userId,
+        type,
+        payload,
+      });
+
       const result = await dispatch(
         updateCredentials({
-          userId,
+          userId: userId,
           credentialsData: payload,
-          currentUserId,
+          currentUserId: currentUser?.id,
         })
       );
 
-      console.log("Update credentials result:", result);
+      console.log("Update credentials success:", result);
 
-      // Check if the action was successful using Redux Toolkit pattern
-      if (updateCredentials.fulfilled.match(result)) {
-        // Success case
-        toast.success(
-          `${
-            type === "password" ? "Password" : "Transaction PIN"
-          } updated successfully!`
-        );
+      // ✅ SUCCESS CASE ONLY
+      toast.success(
+        `${
+          type === "password" ? "Password" : "Transaction PIN"
+        } updated successfully!`
+      );
 
-        // Reset form
-        setFormData({
-          currentPassword: "",
-          newPassword: "",
-          confirmNewPassword: "",
-          currentTransactionPin: "",
-          newTransactionPin: "",
-          confirmNewTransactionPin: "",
-        });
+      // ✅ Reset form
+      setFormData({
+        currentPassword: "",
+        newPassword: "",
+        confirmNewPassword: "",
+        currentTransactionPin: "",
+        newTransactionPin: "",
+        confirmNewTransactionPin: "",
+      });
 
-        // Only call onSuccess to close modal when update is successful
-        onSuccess();
-      } else {
-        // Error case - show error but keep modal open
-        const errorMessage =
-          result.error?.message ||
-          result.payload?.message ||
-          "Failed to update credentials";
-        toast.error(errorMessage);
-        // Don't call onSuccess() - modal stays open
-      }
+      // ✅ ONLY call onSuccess when successful
+      onSuccess();
     } catch (error) {
       console.error("Credentials update error:", error);
-      toast.error(error.message || "Something went wrong");
-      // Don't call onSuccess() here - keep modal open on error
+
+      const errorMsg = error.message || "Something went wrong";
+      setApiError(errorMsg);
+
+      // ✅ ERROR SHOWS IN FORM, NO TOAST (already handled in slice)
+      console.log("Redux error, modal staying open:", errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleClose = () => {
+    if (loading) {
+      toast.info("Please wait, operation in progress...");
+      return;
+    }
+    onClose();
+  };
+
   const getTitle = () => {
     return type === "password" ? "Change Password" : "Change Transaction PIN";
+  };
+
+  const getDescription = () => {
+    return type === "password"
+      ? "Update password securely"
+      : "Update transaction PIN (4-6 digits)";
   };
 
   return (
@@ -159,15 +198,25 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md">
         <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 rounded-t-xl">
           <h2 className="text-xl font-semibold text-white">{getTitle()}</h2>
-          <p className="text-blue-100 text-sm">
-            {type === "password"
-              ? "Update your password securely"
-              : "Update your transaction PIN (4-6 digits)"}
-          </p>
+          <p className="text-blue-100 text-sm">{getDescription()}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Current Password - Always Required */}
+          {apiError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm font-medium">{apiError}</p>
+            </div>
+          )}
+
+          {errors.general && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-yellow-700 text-sm font-medium">
+                {errors.general}
+              </p>
+            </div>
+          )}
+
+          {/* ✅ CURRENT PASSWORD IS ALWAYS REQUIRED */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Current Password *
@@ -184,6 +233,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                   : "border-gray-300 focus:ring-blue-400"
               }`}
               placeholder="Enter current password"
+              disabled={loading}
             />
             {errors.currentPassword && (
               <p className="text-red-500 text-sm mt-1">
@@ -210,6 +260,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                       : "border-gray-300 focus:ring-blue-400"
                   }`}
                   placeholder="At least 8 characters"
+                  disabled={loading}
                 />
                 {errors.newPassword && (
                   <p className="text-red-500 text-sm mt-1">
@@ -234,6 +285,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                       : "border-gray-300 focus:ring-blue-400"
                   }`}
                   placeholder="Confirm new password"
+                  disabled={loading}
                 />
                 {errors.confirmNewPassword && (
                   <p className="text-red-500 text-sm mt-1">
@@ -261,6 +313,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                       : "border-gray-300 focus:ring-blue-400"
                   }`}
                   placeholder="4-6 digits"
+                  disabled={loading}
                 />
                 {errors.currentTransactionPin && (
                   <p className="text-red-500 text-sm mt-1">
@@ -286,6 +339,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                       : "border-gray-300 focus:ring-blue-400"
                   }`}
                   placeholder="4-6 digits"
+                  disabled={loading}
                 />
                 {errors.newTransactionPin && (
                   <p className="text-red-500 text-sm mt-1">
@@ -311,6 +365,7 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
                       : "border-gray-300 focus:ring-blue-400"
                   }`}
                   placeholder="Confirm new PIN"
+                  disabled={loading}
                 />
                 {errors.confirmNewTransactionPin && (
                   <p className="text-red-500 text-sm mt-1">
@@ -324,16 +379,16 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
           <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={loading}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading
                 ? "Updating..."

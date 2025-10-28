@@ -8,6 +8,7 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
   const [profileImage, setProfileImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(user.profileImage || "");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const fileInputRef = useRef(null);
 
   const dispatch = useDispatch();
@@ -17,17 +18,18 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
     if (file) {
       // Validate file type
       if (!file.type.startsWith("image/")) {
-        toast.error("Please select a valid image file (JPEG, PNG, etc.)");
+        setError("Please select a valid image file (JPEG, PNG, etc.)");
         return;
       }
 
       // Validate file size (5MB max)
       if (file.size > 5 * 1024 * 1024) {
-        toast.error("Image size should be less than 5MB");
+        setError("Image size should be less than 5MB");
         return;
       }
 
       setProfileImage(file);
+      setError(""); // Clear error
 
       // Create preview
       const reader = new FileReader();
@@ -41,6 +43,7 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
   const removeImage = () => {
     setProfileImage(null);
     setImagePreview(user.profileImage || "");
+    setError(""); // Clear error
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -50,11 +53,13 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
     e.preventDefault();
 
     if (!profileImage) {
-      toast.error("Please select an image to update");
+      setError("Please select an image to update");
       return;
     }
 
     setLoading(true);
+    setError("");
+
     try {
       const formData = new FormData();
       formData.append("profileImage", profileImage);
@@ -62,12 +67,27 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
       // Use the new action with user ID
       const res = await dispatch(updateUserProfileImage(user.id, formData));
 
-      if (res?.status === "success" || res?.data?.status === "success") {
+      // ✅ Check multiple success patterns
+      if (
+        res?.success === true ||
+        res?.data?.success === true ||
+        res?.payload?.success
+      ) {
         toast.success("Profile image updated successfully!");
-        onSuccess();
+        onSuccess(); // ✅ Only close on success
+      } else {
+        // ✅ Handle error response
+        const errorMessage =
+          res?.error?.message ||
+          res?.payload?.message ||
+          "Failed to update profile image";
+        setError(errorMessage);
+        // ❌ Form band nahi hoga - error show hoga
       }
     } catch (error) {
-      toast.error(error.message || "Failed to update profile image");
+      console.error("Profile image update error:", error);
+      setError(error.message || "Failed to update profile image");
+      // ❌ Form band nahi hoga - error show hoga
     } finally {
       setLoading(false);
     }
@@ -76,7 +96,7 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
   return (
     <div className="fixed inset-0 bg-opacity-50 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md">
-       <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5   rounded-t-xl">
+        <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 rounded-t-xl">
           <h2 className="text-xl font-semibold text-white">
             Update Profile Image
           </h2>
@@ -86,6 +106,13 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
+          {/* ✅ Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
+
           {/* Image Preview and Upload */}
           <div className="flex flex-col items-center space-y-4 mb-6">
             <div className="relative">
@@ -107,6 +134,7 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
                   type="button"
                   onClick={removeImage}
                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                  disabled={loading}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -122,10 +150,15 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
                 accept="image/*"
                 className="hidden"
                 id="profileImageInput"
+                disabled={loading}
               />
               <label
                 htmlFor="profileImageInput"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-colors"
+                className={`inline-flex items-center px-4 py-2 rounded-lg cursor-pointer transition-colors ${
+                  loading
+                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
               >
                 <Camera className="w-4 h-4 mr-2" />
                 {profileImage ? "Change Image" : "Choose Image"}
@@ -137,14 +170,13 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
             </div>
           </div>
 
-         
-
           {/* Action Buttons */}
           <div className="flex justify-between space-x-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={loading}
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

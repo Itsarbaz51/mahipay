@@ -713,7 +713,6 @@ model Transaction {
   refunds            Refund[]
   commissionEarnings CommissionEarning[]
   apiWebhooks        ApiWebhook[]
-  AuditLog           AuditLog[]
 
   @@index([userId, status])
   @@index([idempotencyKey])
@@ -791,9 +790,6 @@ model AuditLog {
   ipAddress  String? // request origin
   metadata   Json?
   createdAt  DateTime @default(now())
-
-  // Transaction relation (for the missing relation error)
-  transaction Transaction? @relation(fields: [entityId], references: [id])
 
   @@index([entityType, entityId])
   @@map("audit_logs")

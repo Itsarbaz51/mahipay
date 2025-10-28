@@ -20,7 +20,13 @@ commissionRoutes.get(
 commissionRoutes.get(
   "/setting/created-by-me",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+    "RETAIlER",
+  ]),
   CommissionSettingController.getByCreatedBy
 );
 

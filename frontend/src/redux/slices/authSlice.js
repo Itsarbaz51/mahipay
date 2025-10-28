@@ -49,7 +49,11 @@ const authSlice = createSlice({
         "Access denied",
       ];
 
-      if (logoutErrors.includes(action.payload)) {
+      if (
+        logoutErrors.some((logoutError) =>
+          action.payload?.includes(logoutError)
+        )
+      ) {
         // Real auth error → logout user
         state.isAuthenticated = false;
         state.currentUser = null;
@@ -57,6 +61,27 @@ const authSlice = createSlice({
         // Stay logged in for normal business logic errors
         state.isAuthenticated = true;
       }
+
+      if (action.payload) {
+        toast.error(action.payload);
+      }
+    },
+    // ✅ CREDENTIAL UPDATE SPECIFIC REDUCERS
+    credentialsUpdateRequest: (state) => {
+      // Don't set isLoading=true for credential updates
+      state.error = null;
+      state.success = null;
+    },
+    credentialsUpdateSuccess: (state, action) => {
+      state.success =
+        action.payload?.message || "Credentials updated successfully";
+      state.error = null;
+      // Don't touch isLoading or isAuthenticated
+    },
+    credentialsUpdateFail: (state, action) => {
+      state.error = action.payload;
+      state.success = null;
+      // Don't touch isLoading or isAuthenticated
 
       if (action.payload) {
         toast.error(action.payload);
@@ -96,12 +121,6 @@ const authSlice = createSlice({
       state.success = null;
       state.error = null;
     },
-    updateCredentialsSuccess: (state, action) => {
-      state.isLoading = false;
-      state.success =
-        action.payload?.message || "Credentials updated successfully";
-      state.error = null;
-    },
   },
 });
 
@@ -109,6 +128,9 @@ export const {
   authRequest,
   authSuccess,
   authFail,
+  credentialsUpdateRequest, // ✅ NEW
+  credentialsUpdateSuccess, // ✅ NEW
+  credentialsUpdateFail,
   logoutUser,
   clearError,
   clearSuccess,
@@ -116,7 +138,6 @@ export const {
   setAuthentication,
   setLoading,
   clearAuthState,
-  updateCredentialsSuccess,
 } = authSlice.actions;
 
 // Async Actions
@@ -189,12 +210,14 @@ export const verifyAuth = () => async (dispatch) => {
   }
 };
 
-// FIXED: createAsyncThunk removed - using regular async action
+// ✅ FIXED: updateCredentials - No authRequest, only credential specific actions
 export const updateCredentials =
   ({ userId, credentialsData, currentUserId }) =>
   async (dispatch) => {
     try {
-      dispatch(authRequest());
+      // ✅ Use credentialsUpdateRequest instead of authRequest
+      dispatch(credentialsUpdateRequest());
+
       const { data } = await axios.put(
         `/auth/${userId}/credentials`,
         credentialsData
@@ -205,11 +228,11 @@ export const updateCredentials =
       if (credentialsData.newPassword && isUpdatingOwnAccount) {
         // ✅ User updated own password → stay logged in
         toast.success("Password updated successfully!");
-        dispatch(updateCredentialsSuccess(data));
+        dispatch(credentialsUpdateSuccess(data));
         return { ...data, logout: false };
       } else {
-        // ✅ Admin updated someone else’s password
-        dispatch(updateCredentialsSuccess(data));
+        // ✅ Admin updated someone else's password
+        dispatch(credentialsUpdateSuccess(data));
         toast.success(data.message);
         return { ...data, logout: false };
       }
@@ -218,7 +241,9 @@ export const updateCredentials =
         error?.response?.data?.message ||
         error?.message ||
         "Credentials update failed";
-      dispatch(authFail(errMsg));
+
+      // ✅ Use credentialsUpdateFail instead of authFail
+      dispatch(credentialsUpdateFail(errMsg));
       throw new Error(errMsg);
     }
   };

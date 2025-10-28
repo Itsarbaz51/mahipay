@@ -19,10 +19,12 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   getAllUsersByParentId,
   getUserById,
-  updateUserStatus,
   setCurrentUser,
   clearUserError,
   clearUserSuccess,
+  deactivateUser,
+  reactivateUser,
+  deleteUser,
 } from "../../redux/slices/userSlice";
 
 import HeaderSection from "../ui/HeaderSection";
@@ -55,7 +57,6 @@ const MembersTable = () => {
   const [showEditPin, setShowEditPin] = useState(false);
   const [showPasswords, setShowPasswords] = useState({});
   const [showPins, setShowPins] = useState({});
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const dispatch = useDispatch();
   const searchTimeoutRef = useRef(null);
@@ -67,8 +68,144 @@ const MembersTable = () => {
   const [existingPermissions, setExistingPermissions] = useState([]);
   const [permissionMode, setPermissionMode] = useState("add");
 
-  // const { currentPermission } = useSelector((state) => state.permission);
-  // const { currentUser } = useSelector((state) => state.auth);
+  // Users state
+  const usersState = useSelector((state) => state.users || {});
+
+  // ✅ CURRENT LOGGED-IN USER ka data get karo
+  const authState = useSelector((state) => state.auth || {});
+  const currentLoggedInUser = authState.currentUser || {};
+  const currentUserRole = currentLoggedInUser.role?.name || "";
+
+  const {
+    users = [],
+    isLoading = false,
+    currentUser: viewedUser = null,
+    pagination = {
+      page: 1,
+      limit: 10,
+      total: 0,
+      totalPages: 0,
+    },
+    error: userError,
+    success: userSuccess,
+  } = usersState;
+
+  const currentPage = pagination.page || 1;
+  const totalPages = pagination.totalPages || 0;
+  const totalUsers = pagination.total || 0;
+  const limit = pagination.limit || 10;
+
+  const services =
+    useSelector((state) => state.services.serviceProviders) || [];
+
+  // ✅ Check if current user is ADMIN
+  const isAdminUser = currentUserRole === "ADMIN";
+
+  // ✅ FIXED: Simplified loadUsers function without currentPage dependency
+  const loadUsers = useCallback(
+    async (page = currentPage, searchTerm = search, forceRefresh = false) => {
+      try {
+        const params = {
+          page,
+          limit,
+          sort: "desc",
+          status: "ALL",
+        };
+
+        if (searchTerm && searchTerm.trim() !== "") {
+          params.search = searchTerm;
+        }
+
+        if (forceRefresh) {
+          params.timestamp = Date.now();
+        }
+
+        await dispatch(getAllUsersByParentId(params));
+      } catch (error) {
+        console.error("Failed to load users:", error);
+        toast.error(error.message || "Failed to load users");
+      }
+    },
+    [dispatch, limit]
+  );
+
+  // ✅ FIXED: Page change handler
+  const handlePageChange = useCallback(
+    (page) => {
+      if (page >= 1 && page <= totalPages) {
+        loadUsers(page, search);
+      }
+    },
+    [totalPages, loadUsers, search]
+  );
+
+  // ✅ FIXED: Manual refresh
+  const handleManualRefresh = useCallback(() => {
+    loadUsers(currentPage, search, true);
+    toast.info("Refreshing data...");
+  }, [loadUsers, currentPage, search]);
+
+  // Toast handling
+  useEffect(() => {
+    if (userError) {
+      toast.error(userError);
+      dispatch(clearUserError());
+    }
+
+    if (userSuccess) {
+      const lowerSuccess = userSuccess.toLowerCase();
+      const isGenericSuccess = ![
+        "registered",
+        "updated",
+        "created",
+        "added",
+        "activated",
+        "deactivated",
+      ].some((word) => lowerSuccess.includes(word));
+
+      if (isGenericSuccess) {
+        toast.success(userSuccess);
+      }
+      dispatch(clearUserSuccess());
+    }
+  }, [userError, userSuccess, dispatch]);
+
+  // ✅ FIXED: Initial load only once
+  useEffect(() => {
+    if (!initialLoadRef.current) {
+      initialLoadRef.current = true;
+      loadUsers();
+    }
+  }, [loadUsers]);
+
+  // ✅ FIXED: Search with debouncing - directly dispatch instead of using loadUsers
+  useEffect(() => {
+    if (!initialLoadRef.current) return;
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      // Direct dispatch for search to avoid dependency issues
+      dispatch(
+        getAllUsersByParentId({
+          page: 1, // Reset to page 1 when searching
+          limit,
+          sort: "desc",
+          status: "ALL",
+          search,
+          timestamp: Date.now(),
+        })
+      );
+    }, 500);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [search, dispatch, limit]);
 
   // Permission effect
   useEffect(() => {
@@ -85,9 +222,6 @@ const MembersTable = () => {
         });
     }
   }, [dispatch, showPermissionModal, permissionUser]);
-
-  const services =
-    useSelector((state) => state.services.serviceProviders) || [];
 
   // Service providers effect
   useEffect(() => {
@@ -116,7 +250,7 @@ const MembersTable = () => {
     } catch (error) {
       setPermissionMode("add");
       setExistingPermissions([]);
-      console.log("No existing permissions found, using add mode");
+      console.log("No existing permissions found, using add mode", error);
     }
 
     setShowPermissionModal(true);
@@ -153,146 +287,6 @@ const MembersTable = () => {
     setPermissionMode("add");
     setExistingPermissions([]);
   };
-
-  // Users state
-  const usersState = useSelector((state) => state.users || {});
-
-  const {
-    users = [],
-    isLoading = false,
-    currentUser: viewedUser = null,
-    pagination = {
-      page: 1,
-      limit: 10,
-      total: 0,
-      totalPages: 0,
-    },
-    error: userError,
-    success: userSuccess,
-  } = usersState;
-
-  const currentPage = pagination.page || 1;
-  const totalPages = pagination.totalPages || 0;
-  const totalUsers = pagination.total || 0;
-  const limit = pagination.limit || 10;
-
-  // Load users function
-  const loadUsers = useCallback(
-    async (searchTerm = "", forceRefresh = false, isSearch = false) => {
-      try {
-        const params = {
-          page: isSearch ? 1 : currentPage,
-          limit,
-          sort: "desc",
-          status: "ALL",
-          search: searchTerm,
-        };
-
-        if (forceRefresh) {
-          params.timestamp = Date.now();
-          params.refresh = true;
-        }
-
-        await dispatch(getAllUsersByParentId(params));
-      } catch (error) {
-        console.error("Failed to load users:", error);
-        toast.error(error.message || "Failed to load users");
-      }
-    },
-    [dispatch, currentPage, limit]
-  );
-
-  // Toast handling
-  useEffect(() => {
-    if (userError) {
-      toast.error(userError);
-      dispatch(clearUserError());
-    }
-
-    if (userSuccess) {
-      const lowerSuccess = userSuccess.toLowerCase();
-      const isGenericSuccess = ![
-        "registered",
-        "updated",
-        "created",
-        "added",
-        "activated",
-        "deactivated",
-      ].some((word) => lowerSuccess.includes(word));
-
-      if (isGenericSuccess) {
-        toast.success(userSuccess);
-      }
-      dispatch(clearUserSuccess());
-    }
-  }, [userError, userSuccess, dispatch]);
-
-  // Initial load
-  useEffect(() => {
-    if (!initialLoadRef.current) {
-      initialLoadRef.current = true;
-      loadUsers();
-    }
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [loadUsers]);
-
-  // Search with debouncing
-  useEffect(() => {
-    if (!initialLoadRef.current) return;
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      loadUsers(search, true, true);
-    }, 500);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [search, loadUsers]);
-
-  // Refresh trigger
-  useEffect(() => {
-    if (refreshTrigger > 0 && initialLoadRef.current) {
-      loadUsers(search, true);
-    }
-  }, [refreshTrigger, loadUsers, search]);
-
-  // Manual refresh
-  const handleManualRefresh = useCallback(() => {
-    setRefreshTrigger((prev) => prev + 1);
-    toast.info("Refreshing data...");
-  }, []);
-
-  // Page change
-  const handlePageChange = useCallback(
-    (page) => {
-      if (page >= 1 && page <= totalPages) {
-        dispatch(
-          getAllUsersByParentId({
-            page,
-            limit,
-            sort: "desc",
-            status: "ALL",
-            search,
-            timestamp: Date.now(),
-          })
-        ).catch((error) => {
-          toast.error(error.message || "Failed to load page");
-        });
-      }
-    },
-    [dispatch, totalPages, limit, search]
-  );
 
   // Role colors and display names
   const getRoleColor = (roleName) => {
@@ -355,30 +349,49 @@ const MembersTable = () => {
     }));
   };
 
-  // Confirm action
-  const confirmAction = async () => {
+  const confirmAction = async (reason) => {
     if (actionType && selectedUser) {
       try {
-        const newStatus =
-          selectedUser.status === "ACTIVE" ? "IN_ACTIVE" : "ACTIVE";
-        await dispatch(updateUserStatus(selectedUser.id, newStatus));
+        const finalReason = reason?.trim() || `${actionType}d by admin`;
 
-        toast.success(
-          `User ${
-            newStatus === "ACTIVE" ? "activated" : "deactivated"
-          } successfully!`
-        );
+        if (actionType === "Deactivate") {
+          await dispatch(
+            deactivateUser({
+              userId: selectedUser.id,
+              reason: finalReason,
+            })
+          );
+        } else if (actionType === "Activate") {
+          await dispatch(
+            reactivateUser({
+              userId: selectedUser.id,
+              reason: finalReason,
+            })
+          );
+        } else if (actionType === "Delete") {
+          await dispatch(
+            deleteUser({
+              userId: selectedUser.id,
+              reason: finalReason,
+            })
+          );
+        }
+
+        toast.success(`User ${actionType.toLowerCase()}d successfully!`);
 
         setTimeout(() => {
           handleManualRefresh();
         }, 500);
       } catch (error) {
-        console.error("Failed to update user status:", error);
-        toast.error(error.message || "Failed to update user status");
+        console.error(`Failed to ${actionType.toLowerCase()} user:`, error);
+        toast.error(
+          error.message || `Failed to ${actionType.toLowerCase()} user`
+        );
       }
     }
     setShowActionModal(false);
     setSelectedUser(null);
+    setActionType("");
   };
 
   // View user
@@ -483,15 +496,18 @@ const MembersTable = () => {
               {isLoading ? "Refreshing..." : "Refresh"}
             </button>
 
-            <ButtonField
-              name="Add Member"
-              isOpen={() => {
-                setSelectedUser(null);
-                setShowForm(true);
-              }}
-              icon={Users}
-              css
-            />
+            {/* ✅ Add Member button bhi sirf ADMIN ke liye show karo */}
+            {isAdminUser && (
+              <ButtonField
+                name="Add Member"
+                isOpen={() => {
+                  setSelectedUser(null);
+                  setShowForm(true);
+                }}
+                icon={Users}
+                css
+              />
+            )}
           </div>
         </div>
       </div>
@@ -525,9 +541,12 @@ const MembersTable = () => {
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Status
               </th>
-              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
-                Actions
-              </th>
+              {/* ✅ Actions column header bhi sirf ADMIN ke liye show karo */}
+              {isAdminUser && (
+                <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
 
@@ -593,6 +612,8 @@ const MembersTable = () => {
                       {getRoleDisplayName(user.role?.name)}
                     </span>
                   </td>
+
+                  {/* Password Column */}
                   <td className="px-6 py-5">
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-mono">
@@ -602,7 +623,7 @@ const MembersTable = () => {
                       </span>
                       <button
                         onClick={() => togglePasswordVisibility(user.id)}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-500 hover:text-gray-700 transition-colors"
                         title={showPasswords[user.id] ? "Hide" : "Show"}
                       >
                         {showPasswords[user.id] ? (
@@ -614,6 +635,7 @@ const MembersTable = () => {
                     </div>
                   </td>
 
+                  {/* Transaction PIN Column */}
                   <td className="px-6 py-5">
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-mono">
@@ -623,7 +645,7 @@ const MembersTable = () => {
                       </span>
                       <button
                         onClick={() => togglePinVisibility(user.id)}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-500 hover:text-gray-700 transition-colors"
                         title={showPins[user.id] ? "Hide" : "Show"}
                       >
                         {showPins[user.id] ? (
@@ -658,77 +680,92 @@ const MembersTable = () => {
                       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
                         user.status === "IN_ACTIVE"
                           ? "bg-red-100 text-red-800 border-red-300"
-                          : "bg-green-100 text-green-800 border-green-300"
+                          : user.status === "ACTIVE"
+                          ? "bg-green-100 text-green-800 border-green-300"
+                          : user.status === "DELETE"
+                          ? "bg-gray-100 text-gray-800 border-gray-300"
+                          : "bg-yellow-100 text-yellow-800 border-yellow-300"
                       }`}
                     >
-                      {user.status === "IN_ACTIVE" ? "Inactive" : "Active"}
+                      {user.status === "IN_ACTIVE"
+                        ? "Inactive"
+                        : user.status === "ACTIVE"
+                        ? "Active"
+                        : user.status === "DELETE"
+                        ? "Deleted"
+                        : user.status || "Unknown"}
                     </span>
                   </td>
 
-                  <td className="px-6 py-5 text-center relative">
-                    <div className="inline-block relative">
-                      <button
-                        className="p-2 rounded-full hover:bg-gray-100"
-                        onClick={() =>
-                          setOpenMenuId(openMenuId === user.id ? null : user.id)
-                        }
-                      >
-                        {openMenuId === user.id ? (
-                          <X className="w-5 h-5 text-gray-600" />
-                        ) : (
-                          <MoreVertical className="w-5 h-5 text-gray-600" />
-                        )}
-                      </button>
+                  {/* ✅ Actions column sirf ADMIN ke liye show karo */}
+                  {isAdminUser && (
+                    <td className="px-6 py-5 text-center relative">
+                      <div className="inline-block relative">
+                        <button
+                          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                          onClick={() =>
+                            setOpenMenuId(
+                              openMenuId === user.id ? null : user.id
+                            )
+                          }
+                        >
+                          {openMenuId === user.id ? (
+                            <X className="w-5 h-5 text-gray-600" />
+                          ) : (
+                            <MoreVertical className="w-5 h-5 text-gray-600" />
+                          )}
+                        </button>
 
-                      {openMenuId === user.id && (
-                        <ActionsMenu
-                          user={user}
-                          onView={handleViewUser}
-                          onEdit={(user) => {
-                            setSelectedUser(user);
-                            setShowForm(true);
-                            setOpenMenuId(null);
-                          }}
-                          onEditProfile={(user) => {
-                            setSelectedUser(user);
-                            setShowEditProfile(true);
-                            setOpenMenuId(null);
-                          }}
-                          onEditPassword={(user) => {
-                            setSelectedUser(user);
-                            setShowEditPassword(true);
-                            setOpenMenuId(null);
-                          }}
-                          onEditPin={(user) => {
-                            setSelectedUser(user);
-                            setShowEditPin(true);
-                            setOpenMenuId(null);
-                          }}
-                          onPermission={(user) => {
-                            handleAddPermission(user);
-                            setOpenMenuId(null);
-                          }}
-                          // onSettings={(user) => {
-                          //   // Handle settings
-                          // }}
-                          // onLoginAs={(user) => {
-                          //   // Handle login as
-                          // }}
-                          onToggleStatus={(user) => {
-                            setActionType(
-                              user.status === "IN_ACTIVE"
-                                ? "Activate"
-                                : "Deactivate"
-                            );
-                            setSelectedUser(user);
-                            setShowActionModal(true);
-                            setOpenMenuId(null);
-                          }}
-                          onClose={() => setOpenMenuId(null)}
-                        />
-                      )}
-                    </div>
-                  </td>
+                        {openMenuId === user.id && (
+                          <ActionsMenu
+                            user={user}
+                            onView={handleViewUser}
+                            onEdit={(user) => {
+                              setSelectedUser(user);
+                              setShowForm(true);
+                              setOpenMenuId(null);
+                            }}
+                            onEditProfile={(user) => {
+                              setSelectedUser(user);
+                              setShowEditProfile(true);
+                              setOpenMenuId(null);
+                            }}
+                            onEditPassword={(user) => {
+                              setSelectedUser(user);
+                              setShowEditPassword(true);
+                              setOpenMenuId(null);
+                            }}
+                            onEditPin={(user) => {
+                              setSelectedUser(user);
+                              setShowEditPin(true);
+                              setOpenMenuId(null);
+                            }}
+                            onPermission={(user) => {
+                              handleAddPermission(user);
+                              setOpenMenuId(null);
+                            }}
+                            onToggleStatus={(user) => {
+                              setActionType(
+                                user.status === "IN_ACTIVE"
+                                  ? "Activate"
+                                  : "Deactivate"
+                              );
+                              setSelectedUser(user);
+                              setShowActionModal(true);
+                              setOpenMenuId(null);
+                            }}
+                            onDelete={(user) => {
+                              setActionType("Delete");
+                              setSelectedUser(user);
+                              setShowActionModal(true);
+                              setOpenMenuId(null);
+                            }}
+                            onClose={() => setOpenMenuId(null)}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -765,7 +802,7 @@ const MembersTable = () => {
           <div className="relative max-w-[90%] max-h-[85%]">
             <button
               onClick={() => setPreviewImage(null)}
-              className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300"
+              className="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300 transition-colors"
             >
               ×
             </button>
@@ -783,6 +820,7 @@ const MembersTable = () => {
       {showActionModal && (
         <ConfirmCard
           actionType={actionType}
+          user={selectedUser}
           isClose={() => setShowActionModal(false)}
           isSubmit={confirmAction}
         />
