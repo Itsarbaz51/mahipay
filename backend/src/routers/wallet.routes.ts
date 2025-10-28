@@ -78,7 +78,13 @@ walletRoutes.get(
 walletRoutes.get(
   "/balance/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "ADMIN", "USER"]),
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+    "RETAIlER",
+  ]),
   validateRequest(WallletValidationSchemas.getWalletBalanceSchema),
   WalletController.getWalletBalance
 );
@@ -87,7 +93,13 @@ walletRoutes.get(
 walletRoutes.get(
   "/transactions/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN", "ADMIN", "USER"]),
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+    "RETAIlER",
+  ]),
   validateRequest(WallletValidationSchemas.walletTransactionsSchema),
   WalletController.getWalletTransactions
 );

@@ -1,5 +1,5 @@
 // seed.ts
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { hashSync } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -53,111 +53,6 @@ async function main() {
         "Bijapur",
       ],
     },
-    {
-      stateName: "Tamil Nadu",
-      stateCode: "33",
-      cities: [
-        "Chennai",
-        "Coimbatore",
-        "Madurai",
-        "Tiruchirappalli",
-        "Salem",
-        "Tirunelveli",
-        "Vellore",
-        "Erode",
-        "Thoothukudi",
-      ],
-    },
-    {
-      stateName: "Uttar Pradesh",
-      stateCode: "09",
-      cities: [
-        "Lucknow",
-        "Kanpur",
-        "Varanasi",
-        "Agra",
-        "Meerut",
-        "Allahabad",
-        "Ghaziabad",
-        "Noida",
-        "Bareilly",
-      ],
-    },
-    {
-      stateName: "Gujarat",
-      stateCode: "24",
-      cities: [
-        "Ahmedabad",
-        "Surat",
-        "Vadodara",
-        "Rajkot",
-        "Bhavnagar",
-        "Jamnagar",
-        "Gandhinagar",
-        "Junagadh",
-        "Anand",
-      ],
-    },
-    {
-      stateName: "Rajasthan",
-      stateCode: "08",
-      cities: [
-        "Jaipur",
-        "Jodhpur",
-        "Udaipur",
-        "Kota",
-        "Bikaner",
-        "Ajmer",
-        "Bhilwara",
-        "Alwar",
-        "Sikar",
-      ],
-    },
-    {
-      stateName: "West Bengal",
-      stateCode: "19",
-      cities: [
-        "Kolkata",
-        "Howrah",
-        "Durgapur",
-        "Asansol",
-        "Siliguri",
-        "Malda",
-        "Bardhaman",
-        "Habra",
-        "Kharagpur",
-      ],
-    },
-    {
-      stateName: "Telangana",
-      stateCode: "36",
-      cities: [
-        "Hyderabad",
-        "Warangal",
-        "Nizamabad",
-        "Karimnagar",
-        "Khammam",
-        "Ramagundam",
-        "Mahbubnagar",
-        "Adilabad",
-        "Nalgonda",
-      ],
-    },
-    {
-      stateName: "Kerala",
-      stateCode: "32",
-      cities: [
-        "Thiruvananthapuram",
-        "Kochi",
-        "Kozhikode",
-        "Kollam",
-        "Thrissur",
-        "Kannur",
-        "Alappuzha",
-        "Kottayam",
-        "Palakkad",
-      ],
-    },
   ];
 
   const createdStates: Record<string, any> = {};
@@ -207,13 +102,42 @@ async function main() {
     }
   }
 
-  // ===== 2. Create Roles =====
+  // ===== 2. Create Admin User First =====
+  console.log("\n👑 Creating admin user first...");
+
+  const adminPassword = hashSync("Admin@123", 10);
+  const adminPin = hashSync("1234", 10);
+
+  const admin = await prisma.user.upsert({
+    where: { email: "admin1@gmail.com" },
+    update: {},
+    create: {
+      username: "admin",
+      firstName: "Admin",
+      lastName: "User",
+      profileImage: "https://via.placeholder.com/150",
+      email: "admin1@gmail.com",
+      phoneNumber: "9999999991",
+      password: adminPassword,
+      transactionPin: adminPin,
+      // Role will be set after creation
+      roleId: "", // Temporary empty string
+      hierarchyLevel: 0,
+      hierarchyPath: "0",
+      status: "ACTIVE",
+      isKycVerified: true,
+    },
+  });
+
+  console.log(`✅ Created Admin: ${admin.username}`);
+
+  // ===== 3. Create Roles with Admin as createdBy =====
   console.log("\n👥 Creating roles...");
 
   const roles = [
     { name: "ADMIN", level: 0, description: "System Administrator" },
-    { name: "STATE HEAD", level: 1, description: "State Head" },
-    { name: "MASTER DISTRIBUTOR", level: 2, description: "Master Distributor" },
+    { name: "STATE_HEAD", level: 1, description: "State Head" },
+    { name: "MASTER_DISTRIBUTOR", level: 2, description: "Master Distributor" },
     { name: "DISTRIBUTOR", level: 3, description: "Distributor" },
     { name: "RETAILER", level: 4, description: "Retailer" },
   ];
@@ -223,55 +147,28 @@ async function main() {
   for (const role of roles) {
     const created = await prisma.role.upsert({
       where: { level: role.level },
-      update: {},
+      update: { createdBy: admin.id },
       create: {
         name: role.name,
         level: role.level,
         description: role.description,
+        createdBy: admin.id,
       },
     });
     createdRoles[role.level] = created;
     console.log(`✅ Role created: ${created.name}`);
   }
 
-  // ===== 3. Create Admin Users =====
-  console.log("\n👑 Creating admin users...");
+  // ===== 4. Update Admin with correct Role ID =====
+  console.log("\n🔄 Updating admin with correct role...");
+  await prisma.user.update({
+    where: { id: admin.id },
+    data: { roleId: createdRoles[0].id },
+  });
 
-  const adminData = [
-    { username: "admin", email: "admin1@gmail.com", phone: "9999999991" },
-  ];
+  const admins = [admin];
 
-  const admins: any[] = [];
-
-  for (const data of adminData) {
-    const password = hashSync("Admin@123", 10);
-    const pin = hashSync("1234", 10);
-
-    const admin = await prisma.user.upsert({
-      where: { email: data.email },
-      update: {},
-      create: {
-        username: data.username,
-        firstName: data.username,
-        lastName: "User",
-        email: data.email,
-        phoneNumber: data.phone,
-        password: password,
-        transactionPin: pin,
-        roleId: createdRoles[0].id,
-        hierarchyLevel: 0,
-        hierarchyPath: "0",
-        status: "ACTIVE",
-        isKycVerified: true,
-        profileImage: "https://via.placeholder.com/150",
-      },
-    });
-
-    admins.push(admin);
-    console.log(`✅ Created Admin: ${admin.username}`);
-  }
-
-  // ===== 4. Helper Functions =====
+  // ===== 5. Helper Functions =====
   let phoneCounter = 1000000;
   const nextPhone = () => `9${phoneCounter++}`;
 
@@ -336,6 +233,7 @@ async function main() {
           username,
           firstName: role.name.split("_")[0],
           lastName: `${i + 1}`,
+          profileImage: "https://via.placeholder.com/150",
           email,
           phoneNumber: nextPhone(),
           password,
@@ -346,7 +244,6 @@ async function main() {
           parentId: parent.id,
           status: "ACTIVE",
           isKycVerified: true,
-          profileImage: "https://via.placeholder.com/150",
         },
       });
 
@@ -360,7 +257,7 @@ async function main() {
     return users;
   }
 
-  // ===== 5. Build Hierarchy =====
+  // ===== 6. Build Hierarchy =====
   console.log("\n🏗️ Building user hierarchy...");
 
   const allUsersByLevel: Record<number, any[]> = { 0: admins };
@@ -382,7 +279,7 @@ async function main() {
     }
   }
 
-  // ===== 6. Create Wallets =====
+  // ===== 7. Create Wallets =====
   console.log("\n💰 Creating wallets...");
 
   const allUsers = Object.values(allUsersByLevel).flat();
@@ -405,7 +302,7 @@ async function main() {
     console.log(`   💳 Wallet created for ${user.username}`);
   }
 
-  // ===== 7. Create Service Providers =====
+  // ===== 8. Create Service Providers =====
   console.log("\n🏢 Creating service providers...");
 
   const serviceProviders = [
@@ -425,7 +322,7 @@ async function main() {
         code: provider.code,
         name: provider.name,
         isActive: true,
-        createdBy: admins[0].id,
+        createdBy: admin.id,
         config: {
           apiKey: "demo_key",
           baseUrl: "https://api.demo.com/v1",
@@ -436,14 +333,16 @@ async function main() {
     console.log(`✅ Service provider created: ${provider.name}`);
   }
 
-  // ===== 8. Create System Settings =====
+  // ===== 9. Create System Settings =====
   console.log("\n⚙️ Creating system settings...");
 
   // First check if system settings already exist
   const existingSettings = await prisma.systemSetting.findFirst();
 
   if (!existingSettings) {
-    // Create with all required fields including createdAt and updatedAt
+    // Create system settings with all required fields including timestamps
+    const now = new Date();
+
     await prisma.systemSetting.create({
       data: {
         companyName: "Fintech Platform",
@@ -462,9 +361,9 @@ async function main() {
           currency: "INR",
           timezone: "Asia/Kolkata",
         },
-        userId: admins[0].id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        userId: admin.id,
+        createdAt: now,
+        updatedAt: now,
       },
     });
     console.log(`✅ System settings created`);
@@ -472,46 +371,96 @@ async function main() {
     console.log(`✅ System settings already exist`);
   }
 
-  // ===== 9. Create Banks =====
-  console.log("\n🏦 Creating banks...");
+  // ===== 10. Create Bank Details for Users =====
+  console.log("\n🏦 Creating bank details for users...");
 
   const banks = [
+    { bankName: "State Bank of India", ifscCode: "SBIN0000001" },
+    { bankName: "HDFC Bank", ifscCode: "HDFC0000001" },
+    { bankName: "ICICI Bank", ifscCode: "ICIC0000001" },
+    { bankName: "Axis Bank", ifscCode: "UTIB0000001" },
+  ];
+
+  // Create bank details for first 10 users
+  const usersToAddBanks = allUsers.slice(0, 10);
+
+  for (let i = 0; i < usersToAddBanks.length; i++) {
+    const user = usersToAddBanks[i];
+    const bank = banks[i % banks.length];
+
+    if (!bank) continue; // Type guard
+
+    try {
+      await prisma.bankDetail.create({
+        data: {
+          accountHolder: `${user.firstName} ${user.lastName}`,
+          accountNumber: `123456789${i.toString().padStart(3, "0")}`,
+          phoneNumber: user.phoneNumber,
+          accountType: "PERSONAL",
+          ifscCode: bank.ifscCode,
+          bankName: bank.bankName,
+          bankProofFile: "https://via.placeholder.com/150",
+          isVerified: true,
+          isPrimary: true,
+          userId: user.id,
+        },
+      });
+      console.log(`✅ Bank detail created for ${user.username}`);
+    } catch (err: any) {
+      console.log(
+        `⚠️ Bank detail creation failed for ${user.username}: ${err.message}`
+      );
+    }
+  }
+
+  // ===== 11. Create Sample Commission Settings =====
+  console.log("\n💰 Creating commission settings...");
+
+  const commissionSettings = [
     {
-      bankName: "State Bank of India",
-      ifscCode: "SBIN0000001",
-      bankIcon: "https://via.placeholder.com/50",
+      scope: "ROLE" as const,
+      roleId: createdRoles[4].id, // RETAILER
+      commissionType: "PERCENTAGE" as const,
+      commissionValue: new Prisma.Decimal(1.5),
+      minAmount: BigInt(1000),
+      maxAmount: BigInt(100000),
+      applyTDS: true,
+      tdsPercent: new Prisma.Decimal(5.0),
+      applyGST: true,
+      gstPercent: new Prisma.Decimal(18.0),
     },
     {
-      bankName: "HDFC Bank",
-      ifscCode: "HDFC0000001",
-      bankIcon: "https://via.placeholder.com/50",
-    },
-    {
-      bankName: "ICICI Bank",
-      ifscCode: "ICIC0000001",
-      bankIcon: "https://via.placeholder.com/50",
-    },
-    {
-      bankName: "Axis Bank",
-      ifscCode: "UTIB0000001",
-      bankIcon: "https://via.placeholder.com/50",
+      scope: "ROLE" as const,
+      roleId: createdRoles[3].id, // DISTRIBUTOR
+      commissionType: "PERCENTAGE" as const,
+      commissionValue: new Prisma.Decimal(1.0),
+      minAmount: BigInt(5000),
+      maxAmount: BigInt(500000),
+      applyTDS: true,
+      tdsPercent: new Prisma.Decimal(5.0),
+      applyGST: true,
+      gstPercent: new Prisma.Decimal(18.0),
     },
   ];
 
-  for (const bankData of banks) {
-    try {
-      // Create bank directly without upsert to avoid the ifscCode issue
-      await prisma.banks.create({
-        data: bankData,
-      });
-      console.log(`✅ Bank created: ${bankData.bankName}`);
-    } catch (err: any) {
-      if (err.code === "P2002") {
-        console.log(`✅ Bank already exists: ${bankData.bankName}`);
-      } else {
-        console.log(`⚠️ Bank ${bankData.bankName} error: ${err.message}`);
-      }
-    }
+  for (const setting of commissionSettings) {
+    await prisma.commissionSetting.create({
+      data: {
+        ...setting,
+        createdBy: admin.id,
+        isActive: true,
+        effectiveFrom: new Date(),
+      },
+    });
+
+    // Find role name for logging
+    const roleEntries = Object.entries(createdRoles);
+    const roleEntry = roleEntries.find(
+      ([key, role]) => role.id === setting.roleId
+    );
+    const roleName = roleEntry ? roleEntry[1].name : "Unknown";
+
+    console.log(`✅ Commission setting created for ${roleName}`);
   }
 
   console.log("\n🎉 Hierarchical seeding completed successfully!");
@@ -526,7 +475,8 @@ async function main() {
   console.log(`👤 Total Users: ${allUsers.length}`);
   console.log(`💰 Wallets: ${allUsers.length}`);
   console.log(`🏢 Service Providers: ${serviceProviders.length}`);
-  console.log(`🏦 Banks: ${banks.length}`);
+  console.log(`🏦 Bank Details: ${usersToAddBanks.length}`);
+  console.log(`💰 Commission Settings: ${commissionSettings.length}`);
 
   console.log("\n🏷️ State Codes Created:");
   Object.values(createdStates).forEach((state) => {
