@@ -59,7 +59,7 @@ export const {
 
 export default loginLogsSlice.reducer;
 
-// ------------------ Fetch all login logs (admin/user) --------------------------
+// ------------------ Fetch all login logs (admin) --------------------------
 export const getLoginLogs =
   (params = {}) =>
   async (dispatch) => {

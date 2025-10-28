@@ -9,10 +9,9 @@ import {
   Play,
   LogOut,
   History,
-  BadgeIndianRupee,
   Wallet,
   LogInIcon,
-  RedoDot,
+  Landmark,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
@@ -87,6 +86,18 @@ const Sidebar = () => {
         "RETAILER",
       ],
     },
+    {
+      id: "Bank",
+      label: "Bank Details",
+      icon: Landmark,
+      path: "/bank-details",
+      permissions: [
+        "ADMIN",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR"
+      ],
+    },
 
     // --- SERVICE ---
     {
@@ -147,10 +158,10 @@ const Sidebar = () => {
       path: "/settings",
       permissions: [
         "ADMIN",
-        // "STATE HEAD",
-        // "MASTER DISTRIBUTOR",
-        // "DISTRIBUTOR",
-        // "RETAILER",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
       ],
     },
   ];
@@ -183,6 +194,7 @@ const Sidebar = () => {
       "permission",
       "login-logs",
       "audit-logs",
+      "Bank",
     ].includes(item.id)
   );
 

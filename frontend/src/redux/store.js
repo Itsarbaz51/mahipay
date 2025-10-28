@@ -10,6 +10,7 @@ import AddressReducer from "./slices/addressSlice.js";
 import serviceReducer from "./slices/serviceSlice.js";
 import permissionReducer from "./slices/permissionSlice.js";
 import loginLogsReducer from "./slices/loginLogsSlice.js";
+import settingReducer from "./slices/settingSlice.js";
 
 const store = configureStore({
   reducer: {
@@ -24,6 +25,7 @@ const store = configureStore({
     services: serviceReducer,
     permission: permissionReducer,
     logs: loginLogsReducer,
+    setting: settingReducer,
   },
 });
 

@@ -4,6 +4,7 @@ import type {
   CheckUserPermissionPayload,
 } from "../types/permission.types.js";
 import { ApiError } from "../utils/ApiError.js";
+import { clearPattern, getCacheWithPrefix, setCacheWithPrefix } from "../utils/redisCasheHelper.js";
 
 export class RolePermissionService {
   static async createOrUpdateRolePermission(data: CheckRolePermissionPayload) {
@@ -63,11 +64,17 @@ export class RolePermissionService {
       results.push(result);
     }
 
+    await clearPattern(`rolePermissions:get:${roleId}`);
     return results;
   }
 
   static async getRolePermissions(roleId: string) {
     if (!roleId) throw ApiError.badRequest("Role ID is required");
+
+    const cacheKey = `rolePermissions:get:${roleId}`;
+    const cached = await getCacheWithPrefix("rolePermissions", cacheKey);
+    if (cached) return cached;
+
 
     const permissions = await Prisma.rolePermission.findMany({
       where: { roleId },
@@ -95,6 +102,8 @@ export class RolePermissionService {
       throw ApiError.notFound("No permissions found for this role");
     }
 
+    await setCacheWithPrefix("rolePermissions", cacheKey, permissions, 180);
+
     return permissions;
   }
 
@@ -109,10 +118,14 @@ export class RolePermissionService {
     if (!existing) {
       throw ApiError.notFound("RolePermission not found");
     }
-
-    return await Prisma.rolePermission.delete({
+    const deleted = await Prisma.rolePermission.delete({
       where: { roleId_serviceId: { roleId, serviceId } },
     });
+
+    await clearPattern(`rolePermissions:get:${roleId}`);
+
+    return deleted;
+
   }
 }
 
@@ -172,6 +185,8 @@ export class UserPermissionService {
       results.push(result);
     }
 
+    await clearPattern(`userPermissions:get:${userId}`);
+
     return results;
   }
 
@@ -179,6 +194,10 @@ export class UserPermissionService {
     if (!userId) {
       throw ApiError.badRequest("User ID is required");
     }
+
+    const cacheKey = `userPermissions:get:${userId}`;
+    const cached = await getCacheWithPrefix("userPermissions", cacheKey);
+    if (cached) return cached;
 
     const permissions = await Prisma.userPermission.findMany({
       where: { userId },
@@ -208,6 +227,8 @@ export class UserPermissionService {
       throw ApiError.notFound("No permissions found for this user");
     }
 
+    await setCacheWithPrefix("userPermissions", cacheKey, permissions, 180);
+
     return permissions;
   }
 
@@ -222,9 +243,14 @@ export class UserPermissionService {
     if (!existing) {
       throw ApiError.notFound("UserPermission not found");
     }
-
-    return await Prisma.userPermission.delete({
+    const deleted = await Prisma.userPermission.delete({
       where: { userId_serviceId: { userId, serviceId } },
     });
+
+    await clearPattern(`userPermissions:get:${userId}`);
+
+
+    return deleted;
+
   }
 }

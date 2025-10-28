@@ -357,7 +357,7 @@ const PermissionForm = ({
                   </span>
                 </label>
 
-                <label className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                {/* <label className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   <input
                     type="checkbox"
                     checked={formData.canEdit}
@@ -370,9 +370,9 @@ const PermissionForm = ({
                   <span className="text-sm font-medium text-gray-700">
                     Can Edit
                   </span>
-                </label>
+                </label> */}
 
-                <label className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                {/* <label className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   <input
                     type="checkbox"
                     checked={formData.canSetCommission}
@@ -385,7 +385,7 @@ const PermissionForm = ({
                   <span className="text-sm font-medium text-gray-700">
                     Can Set Commission
                   </span>
-                </label>
+                </label> */}
               </div>
             </div>
 

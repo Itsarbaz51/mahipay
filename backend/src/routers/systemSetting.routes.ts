@@ -7,30 +7,6 @@ import SystemSettingValidationSchemas from "../validations/systemSettingValidati
 
 const systemSettingRoutes = Router();
 
-// Create system setting (logo + favicon upload)
-systemSettingRoutes.post(
-  "/store",
-  AuthMiddleware.isAuthenticated,
-  upload.fields([
-    { name: "companyLogo", maxCount: 1 },
-    { name: "favIcon", maxCount: 1 },
-  ]),
-  validateRequest(SystemSettingValidationSchemas.createSchema),
-  SystemSettingController.create
-);
-
-// Update system setting (logo + favicon optional)
-systemSettingRoutes.put(
-  "/update/:id",
-  AuthMiddleware.isAuthenticated,
-  upload.fields([
-    { name: "companyLogo", maxCount: 1 },
-    { name: "favIcon", maxCount: 1 },
-  ]),
-  validateRequest(SystemSettingValidationSchemas.updateSchema),
-  SystemSettingController.update
-);
-
 // Get system setting by ID
 systemSettingRoutes.get(
   "/show",

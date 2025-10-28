@@ -55,13 +55,13 @@ export function RoleList({ roles, onEdit, onDelete, onPermission }) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex gap-2">
-                    <button
+                    {/* <button
                       onClick={() => onEdit(role, idx)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-medium rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all shadow-sm"
                     >
                       <Edit2 size={14} />
                       Edit
-                    </button>
+                    </button> */}
                     <button
                       onClick={() => onPermission(role, idx)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm"
@@ -69,13 +69,13 @@ export function RoleList({ roles, onEdit, onDelete, onPermission }) {
                       <Shield size={14} />
                       Permission
                     </button>
-                    <button
+                    {/* <button
                       onClick={() => onDelete(role)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-medium rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-sm"
                     >
                       <Trash2 size={14} />
                       Delete
-                    </button>
+                    </button> */}
                   </div>
                 </td>
               </tr>

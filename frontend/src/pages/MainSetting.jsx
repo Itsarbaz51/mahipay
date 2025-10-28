@@ -5,11 +5,12 @@ import {
   upsertSystemSetting,
 } from "../redux/slices/settingSlice";
 import { useDispatch, useSelector } from "react-redux";
+import { toast } from "react-toastify";
 
 const MainSetting = () => {
   const dispatch = useDispatch();
   const {
-    data,
+    data = null,
     loading: isLoading,
     error,
     success,

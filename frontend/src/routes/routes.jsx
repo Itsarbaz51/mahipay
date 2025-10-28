@@ -17,7 +17,7 @@ import Login from "../pages/auth/Login";
 
 // 🔹 Protected Pages
 import Dashboard from "../pages/Dashboard";
-import TransactionHistory from "../pages/TransactionHistory";
+import TransactionHistory from "../components/tabels/TransactionHistory.jsx";
 import Reports from "../pages/Reports";
 
 import AllKycTable from "../components/tabels/AllKycTable";
@@ -35,6 +35,7 @@ import AuditLogs from "../pages/AuditLogs";
 import LoginLogs from "../pages/LoginLogs.jsx";
 import PrivacyPolicy from "../pages/landing/Privacypolicy";
 import TermsConditions from "../pages/landing/Terms&conditions";
+import BanksTable from "../components/tabels/BanksTable.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -74,6 +75,7 @@ export const createRouter = () => {
           <Route path="profile/:id" element={<UserProfilePage />} />
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="login-logs" element={<LoginLogs />} />
+          <Route path="bank-details" element={<BanksTable />} />
         </Route>
 
         <Route

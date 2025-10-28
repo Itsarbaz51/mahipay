@@ -4,16 +4,18 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 axios.defaults.withCredentials = true;
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-axios.defaults.baseURL = baseURL;
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const initialState = {
-  banks: [],
+  bankList: [],
+  myBankList: [],
+  bankDetail: null,
   isLoading: false,
   error: null,
   success: null,
   isBankVerified: false,
 };
+
 const bankSlice = createSlice({
   name: "bank",
   initialState,
@@ -23,40 +25,70 @@ const bankSlice = createSlice({
       state.error = null;
       state.success = null;
     },
-    bankSuccess: (state, action) => {
+    bankListSuccess: (state, action) => {
       state.isLoading = false;
-      const bankData = action.payload?.data.data || action.payload;
-      state.banks = bankData;
+      state.bankList = action.payload?.data || [];
       state.success = action.payload?.message || null;
       state.error = null;
-      state.isBankVerified = bankData?.status === "verified";
+    },
+    myBankListSuccess: (state, action) => {
+      state.isLoading = false;
+      state.myBankList = action.payload?.data || [];
+      state.success = action.payload?.message || null;
+      state.error = null;
+      if (action.payload?.data?.status)
+        state.isBankVerified = action.payload.data.status === "verified";
+    },
+    bankDetailSuccess: (state, action) => {
+      state.isLoading = false;
+      state.bankDetail = action.payload?.data || null;
+      state.success = action.payload?.message || null;
+      state.error = null;
+      if (action.payload?.data?.status)
+        state.isBankVerified = action.payload.data.status === "verified";
+    },
+    bankActionSuccess: (state, action) => {
+      state.isLoading = false;
+      state.success = action.payload?.message || "Bank action completed";
+      state.error = null;
+      if (action.payload?.data?.status)
+        state.isBankVerified = action.payload.data.status === "verified";
     },
     bankFail: (state, action) => {
       state.isLoading = false;
       state.error = action.payload;
-      if (action.payload) toast.error(state.error);
+      if (action.payload) toast.error(action.payload);
     },
     resetBank: (state) => {
-      state.bankData = null;
       state.isLoading = false;
-      state.isBankVerified = false;
-      state.success = null;
       state.error = null;
+      state.success = null;
+      state.bankDetail = null;
+      state.isBankVerified = false;
     },
   },
 });
 
-export const { bankRequest, bankSuccess, bankFail, resetBank } =
-  bankSlice.actions;
+export const {
+  bankRequest,
+  bankListSuccess,
+  myBankListSuccess,
+  bankDetailSuccess,
+  bankActionSuccess,
+  bankFail,
+  resetBank,
+} = bankSlice.actions;
 
-// ---------------- API Actions ------------------
+export default bankSlice.reducer;
 
-// submit Bank details
+// ------------------ API Actions ------------------
+
+// Add bank
 export const addBank = (bankPayload) => async (dispatch) => {
   try {
     dispatch(bankRequest());
     const { data } = await axios.post(`/banks/store-bank`, bankPayload);
-    dispatch(bankSuccess(data));
+    dispatch(bankActionSuccess(data));
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
@@ -64,26 +96,41 @@ export const addBank = (bankPayload) => async (dispatch) => {
   }
 };
 
-// get all Bank details (admin use)
+export const updateBank = (payload) => async (dispatch) => {
+  try {
+    dispatch(bankRequest());
+    const { data } = await axios.put(
+      `/banks/bank-update/${payload.id}`,
+      payload.data
+    );
+    dispatch(bankActionSuccess(data));
+  } catch (error) {
+    const errMsg = error?.response?.data?.message || error?.message;
+    dispatch(bankFail(errMsg));
+  }
+};
+
+// Get all banks (admin)
 export const getAllBanks =
   (payload = {}) =>
   async (dispatch) => {
     try {
       dispatch(bankRequest());
       const { data } = await axios.post(`/banks/bank-list`, payload);
-      dispatch(bankSuccess(data));
+      dispatch(bankListSuccess(data));
       return data;
     } catch (error) {
       const errMsg = error?.response?.data?.message || error?.message;
       dispatch(bankFail(errMsg));
     }
   };
-  
+
+// Get my banks (user)
 export const getAllMyBanks = () => async (dispatch) => {
   try {
     dispatch(bankRequest());
     const { data } = await axios.get(`/banks/get-all-my`);
-    dispatch(bankSuccess(data));
+    dispatch(myBankListSuccess(data));
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
@@ -91,12 +138,25 @@ export const getAllMyBanks = () => async (dispatch) => {
   }
 };
 
-// verify Bank details (admin use)
-export const verifyBank = (bankId, status) => async (dispatch) => {
+// Get bank detail
+export const getBankDetail = (bankId) => async (dispatch) => {
   try {
     dispatch(bankRequest());
-    const { data } = await axios.put(`/bank/verify/${bankId}`, { status });
-    dispatch(bankSuccess(data));
+    const { data } = await axios.get(`/banks/bank-show/${bankId}`);
+    dispatch(bankDetailSuccess(data));
+    return data;
+  } catch (error) {
+    const errMsg = error?.response?.data?.message || error?.message;
+    dispatch(bankFail(errMsg));
+  }
+};
+
+// Verify bank
+export const verifyBank = (payload) => async (dispatch) => {
+  try {
+    dispatch(bankRequest());
+    const { data } = await axios.put(`/banks/bank-verify`,  payload );
+    dispatch(bankActionSuccess(data));
     dispatch(getAllBanks());
     return data;
   } catch (error) {
@@ -105,44 +165,14 @@ export const verifyBank = (bankId, status) => async (dispatch) => {
   }
 };
 
-// delete Bank details (admin use)
+// Delete bank
 export const deleteBank = (bankId) => async (dispatch) => {
   try {
     dispatch(bankRequest());
-    const { data } = await axios.delete(`/bank/delete/${bankId}`);
-    dispatch(bankSuccess(data));
+    const { data } = await axios.delete(`/banks/bank-delete/${bankId}`);
+    dispatch(bankActionSuccess(data));
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
     dispatch(bankFail(errMsg));
   }
 };
-
-export const getAdminBank = () => async (dispatch) => {
-  try {
-    dispatch(bankRequest());
-    const { data } = await axios.get(`/bank/get-admin-bank`);
-    dispatch(bankSuccess(data));
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(bankFail(errMsg));
-  }
-};
-
-export const addBankWithVerify = (bankData) => async (dispatch) => {
-  try {
-    dispatch(bankRequest());
-
-    const { data } = await axios.post(`/payout/verify-add-bank`, bankData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
-
-    dispatch(bankSuccess(data));
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(bankFail(errMsg));
-  }
-};
-
-export default bankSlice.reducer;

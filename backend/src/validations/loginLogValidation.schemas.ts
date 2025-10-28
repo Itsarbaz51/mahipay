@@ -59,14 +59,18 @@ class LoginLogsValidationSchemas {
             }
         );
     }
-
     static get ListLoginLogsSchema() {
         return z.object({
             page: z.coerce.number().int().positive().optional().default(1),
             limit: z.coerce.number().int().positive().max(100).optional().default(10),
             startDate: z.coerce.date().optional(),
             endDate: z.coerce.date().optional(),
-            search: z.string().min(1).max(255).optional(),
+            search: z
+                .string()
+                .max(255)
+                .optional()
+                .or(z.literal(''))
+                .transform((val) => (val?.trim() === '' ? undefined : val?.trim())),
         }).refine(
             (data) => {
                 if (data.startDate && data.endDate) {

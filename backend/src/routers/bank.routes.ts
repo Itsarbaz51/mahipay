@@ -7,9 +7,8 @@ import BankValidationSchemas from "../validations/bankValidation.schemas.js";
 
 const bankRoutes = Router();
 
-// ===================== USER BANK ROUTES =====================
+// ===================== BANK ROUTES =====================
 
-// List user's added banks - ✅ Changed to GET and use query params
 bankRoutes.post(
   "/bank-list",
   AuthMiddleware.isAuthenticated,
@@ -21,7 +20,7 @@ bankRoutes.get(
   AddBankController.getAllMyBanks
 );
 
-// Show user's specific bank
+// Show s specific bank
 bankRoutes.get(
   "/bank-show/:id",
   AuthMiddleware.isAuthenticated,
@@ -37,7 +36,7 @@ bankRoutes.post(
   AddBankController.store
 );
 
-// Update user bank detail
+// Update bank detail
 bankRoutes.put(
   "/bank-update/:id",
   AuthMiddleware.isAuthenticated,
@@ -46,11 +45,19 @@ bankRoutes.put(
   AddBankController.update
 );
 
-// Delete user bank
+// Delete bank
 bankRoutes.delete(
   "/bank-delete/:id",
   AuthMiddleware.isAuthenticated,
   AddBankController.destroy
+);
+
+// ================= BANK Admin manage =================
+bankRoutes.put(
+  "/bank-verify",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AddBankController.verify
 );
 
 export default bankRoutes;

@@ -6,11 +6,16 @@ import type {
     LoginLogListResponse,
     UserLoginLogsParams,
 } from "../types/loginLog.types.js";
+import { clearPattern, getCacheWithPrefix, setCacheWithPrefix } from "../utils/redisCasheHelper.js";
 
 export class LoginLogService {
     async getAllLoginLogs(payload: LoginLogFilterParams): Promise<LoginLogListResponse> {
         const { page = 1, limit = 10, userId, startDate, endDate, search } = payload;
         const skip = (page - 1) * limit;
+
+        const cacheKey = `loginLogs:list:${userId || "all"}:${page}:${limit}:${startDate || ""}:${endDate || ""}:${search || ""}`;
+        const cached = await getCacheWithPrefix<LoginLogListResponse>("loginLogs", cacheKey);
+        if (cached) return cached;
 
         const where: any = {};
 
@@ -22,22 +27,22 @@ export class LoginLogService {
         }
         if (search) {
             where.OR = [
-                { domainName: { contains: search, mode: "insensitive" } },
-                { ipAddress: { contains: search, mode: "insensitive" } },
-                { location: { contains: search, mode: "insensitive" } },
+                { domainName: { contains: search } },
+                { ipAddress: { contains: search } },
+                { location: { contains: search } },
                 {
                     user: {
                         OR: [
-                            { firstName: { contains: search, mode: "insensitive" } },
-                            { lastName: { contains: search, mode: "insensitive" } },
-                            { email: { contains: search, mode: "insensitive" } }
+                            { firstName: { contains: search } },
+                            { lastName: { contains: search } },
+                            { email: { contains: search } }
                         ]
                     }
                 }
             ];
         }
 
-        // Fetch logs and total count
+        // Fetch logs and total count in parallel
         const [loginLogs, total] = await Promise.all([
             Prisma.loginLogs.findMany({
                 where,
@@ -59,7 +64,7 @@ export class LoginLogService {
         ]);
 
         const totalPages = Math.ceil(total / limit);
-        return {
+        const result: LoginLogListResponse = {
             data: loginLogs,
             pagination: {
                 currentPage: page,
@@ -70,10 +75,18 @@ export class LoginLogService {
                 hasPrev: page > 1
             }
         };
+
+        await setCacheWithPrefix("loginLogs", cacheKey, result, 120);
+
+        return result;
     }
 
     async getLoginLogById(id: string) {
-        return await Prisma.loginLogs.findUnique({
+        const cacheKey = `loginLogs:getById:${id}`;
+        const cached = await getCacheWithPrefix<any>("loginLogs", `getById:${id}`);
+        if (cached) return cached;
+
+        const log = await Prisma.loginLogs.findUnique({
             where: { id },
             include: {
                 user: {
@@ -86,10 +99,13 @@ export class LoginLogService {
                 }
             }
         });
+
+        if (log) await setCacheWithPrefix("loginLogs", `getById:${id}`, log, 180);
+        return log;
     }
 
     async createLoginLog(payload: LoginLogCreateInput) {
-        return await Prisma.loginLogs.create({
+        const created = await Prisma.loginLogs.create({
             data: payload,
             include: {
                 user: {
@@ -102,12 +118,20 @@ export class LoginLogService {
                 }
             }
         });
+
+        await clearPattern("loginLogs:list:*");
+        await clearPattern(`loginLogs:getById:*`);
+
+        return created;
     }
 
     async deleteLoginLog(id: string) {
-        return await Prisma.loginLogs.delete({
-            where: { id }
-        });
+        const deleted = await Prisma.loginLogs.delete({ where: { id } });
+
+        await clearPattern("loginLogs:list:*");
+        await clearPattern(`loginLogs:getById:${id}`);
+
+        return deleted;
     }
 }
 

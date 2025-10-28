@@ -1,5 +1,5 @@
-import React from "react";
-import { Upload } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Upload, X } from "lucide-react";
 
 const BankForm = ({
   accountForm = {},
@@ -9,17 +9,40 @@ const BankForm = ({
   onCancel,
   editingAccountId,
   accountTypes = [],
-  errors = {}, // ✅ safe default
+  errors = {},
 }) => {
+  const [preview, setPreview] = useState(null);
+
+  useEffect(() => {
+    if (editingAccountId && accountForm.bankProofFile) {
+      setPreview(accountForm.bankProofFile);
+    }
+  }, [editingAccountId, accountForm.bankProofFile]);
+
+  useEffect(() => {
+    if (accountForm.bankProofFile instanceof File) {
+      const objectUrl = URL.createObjectURL(accountForm.bankProofFile);
+      setPreview(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+  }, [accountForm.bankProofFile]);
+
+  const handleRemovePreview = () => {
+    setPreview(null);
+    onChange({ target: { name: "bankProofFile", value: null } });
+  };
+  console.log(accountForm);
+  
+
   return (
     <div className="fixed inset-0 bg-black/10 backdrop-blur-xs bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-gray-50 p-6 border border-gray-200 rounded-lg shadow-lg w-full max-w-3xl">
+      <div className="bg-gray-50 p-6 border border-gray-200 rounded-lg shadow-lg w-full max-w-3xl relative">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           {editingAccountId ? "Edit Account" : "Add New Account"}
         </h3>
+        <p>{accountForm?.bankRejectionReason}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Account Holder */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Account Holder Name *
@@ -140,13 +163,13 @@ const BankForm = ({
             )}
           </div>
 
-          {/* Bank Proof */}
-          <div>
+          {/* 🔹 Bank Proof Document */}
+          <div className="col-span-1 md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Bank Proof Document
+              Bank Proof Document {editingAccountId ? "" : "*"}
             </label>
-            <div className="flex items-center gap-2">
-              <label className="flex-1 flex items-center px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+            <div className="flex items-center gap-3">
+              <label className="flex items-center px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
                 <Upload className="h-4 w-4 mr-2 text-gray-500" />
                 <span className="text-sm text-gray-600 truncate">
                   {accountForm?.bankProofFile
@@ -160,6 +183,23 @@ const BankForm = ({
                   className="hidden"
                 />
               </label>
+
+              {preview && (
+                <div className="relative">
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="w-20 h-20 object-cover rounded-md border border-gray-200"
+                  />
+                  <button
+                    onClick={handleRemovePreview}
+                    className="absolute -top-2 -right-2 bg-white border border-gray-300 rounded-full p-0.5 hover:bg-gray-100"
+                    title="Remove"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+              )}
             </div>
             {errors.bankProofFile && (
               <p className="text-red-500 text-xs mt-1">

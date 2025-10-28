@@ -18,6 +18,7 @@ export const protectedRoute = [
   "/login-logs",
   "/audit-logs",
   "/card-payout",
+  "/bank-details"
 ];
 
 import {
@@ -35,6 +36,7 @@ import {
   Logs,
   LogIn,
   Activity,
+  Landmark,
 } from "lucide-react";
 
 export const navbarTitleConfig = {
@@ -107,6 +109,11 @@ export const navbarTitleConfig = {
     title: "Audit logs",
     tagLine: "View and manage your audit logs",
     icon: Activity,
+  },
+  "/bank-details": {
+    title: "Bank Details",
+    tagLine: "View and manage your Users bank details",
+    icon: Landmark,
   },
 };
 

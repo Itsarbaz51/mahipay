@@ -1,4 +1,4 @@
-import { AccountType } from "@prisma/client";
+import { AccountType, KycStatus } from "@prisma/client";
 
 export interface BankDetailInput {
   accountHolder: string;
@@ -25,8 +25,17 @@ export interface BankDetail {
   bankId?: string;
   userId: string;
   isPrimary?: boolean;
-  isVerified?: boolean;
+  status?: KycStatus;
   createdAt?: Date;
   updatedAt?: Date;
   deletedAt?: Date | null;
+  bankRejectionReason?: string | null
+}
+
+
+export  interface BankDetailInputVerify {
+  id: string,
+  userId: string,
+  status: KycStatus;
+  bankRejectionReason?: string | null;
 }

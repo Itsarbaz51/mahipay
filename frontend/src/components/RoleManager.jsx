@@ -45,19 +45,6 @@ export default function RoleManager() {
   }, [showPermissionModal, dispatch]);
 
   useEffect(() => {
-    if (error) {
-      console.error("Error:", error);
-    }
-  }, [error]);
-
-  useEffect(() => {
-    if (success) {
-      console.log("Success:", success);
-    }
-  }, [success]);
-
-  // ✅ Only set existing permissions when currentPermission matches the selected role
-  useEffect(() => {
     if (
       currentPermission &&
       permissionRole &&
@@ -137,10 +124,10 @@ export default function RoleManager() {
     setPermissionMode("role");
   };
 
-  const handleCancel = () => {
-    setEditRole(null);
-    setIsModalOpen(false);
-  };
+  // const handleCancel = () => {
+  //   setEditRole(null);
+  //   setIsModalOpen(false);
+  // };
 
   const handleAddNew = () => {
     setEditRole(null);
@@ -156,14 +143,14 @@ export default function RoleManager() {
             Manage and monitor your roles
           </p>
         </div>
-        <button
+        {/* <button
           onClick={handleAddNew}
           disabled={isLoading}
           className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white font-semibold rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={20} />
           {isLoading ? "Loading..." : "Add Role"}
-        </button>
+        </button> */}
       </div>
 
       {isLoading && !roles.length && (
@@ -215,13 +202,13 @@ export default function RoleManager() {
         </div>
       )}
 
-      <RoleFormModal
+      {/* <RoleFormModal
         isOpen={isModalOpen}
         onClose={handleCancel}
         onSubmit={handleAddOrUpdate}
         editData={editRole}
         isLoading={isLoading}
-      />
+      /> */}
 
       {showPermissionModal && permissionRole && (
         <PermissionForm

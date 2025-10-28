@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { getAdminBank } from "../../redux/slices/bankSlice";
+// import { getAdminBank } from "../../redux/slices/bankSlice";
 import { addFunds } from "../../redux/slices/walletSlice";
 import { toast } from "react-toastify";
 import axios from "axios";
@@ -31,9 +31,9 @@ const AddFundRequest = () => {
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    dispatch(getAdminBank());
-  }, [dispatch]);
+  // useEffect(() => {
+  //   dispatch(getAdminBank());
+  // }, [dispatch]);
 
   useEffect(() => {
     if (bankData) {

@@ -17,6 +17,7 @@ const ROLE_PERMISSIONS = {
     "/profile/:id",
     "/audit-logs",
     "/login-logs",
+    "/bank-details",
   ],
   "STATE HEAD": [
     "/dashboard",
@@ -28,6 +29,9 @@ const ROLE_PERMISSIONS = {
     "/card-payout",
     "/profile/:id",
     "/transactions",
+    "/bank-details",
+    "/settings",
+
   ],
   "MASTER DISTRIBUTOR": [
     "/dashboard",
@@ -38,6 +42,9 @@ const ROLE_PERMISSIONS = {
     "/card-payout",
     "/profile/:id",
     "/transactions",
+    "/bank-details",
+    "/settings",
+
   ],
   DISTRIBUTOR: [
     "/dashboard",
@@ -48,6 +55,9 @@ const ROLE_PERMISSIONS = {
     "/add-fund",
     "/profile/:id",
     "/transactions",
+    "/bank-details",
+    "/settings",
+
   ],
   RETAILER: [
     "/dashboard",
@@ -57,6 +67,8 @@ const ROLE_PERMISSIONS = {
     "/card-payout",
     "/profile/:id",
     "/transactions",
+    "/settings",
+
   ],
 };
 
