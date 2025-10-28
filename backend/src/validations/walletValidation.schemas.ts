@@ -20,7 +20,6 @@ const ReferenceTypeEnum = z.enum([
   "PAYOUT",
   "COLLECTION",
 ]);
-const ModuleTypeEnum = z.enum(["CC_PAYOUT", "BBPS", "RECHARGE", "DMT", "AEPS"]);
 
 class WallletValidationSchemas {
   static get walletCreditSchema() {
@@ -33,7 +32,7 @@ class WallletValidationSchemas {
         .optional(),
       walletType: WalletTypeEnum.default("PRIMARY"),
       referenceType: ReferenceTypeEnum.default("ADJUSTMENT"),
-      moduleType: ModuleTypeEnum.default("CC_PAYOUT"),
+      serviceId: z.string().uuid().optional(), // ServiceId add kiya
     });
   }
 
@@ -47,7 +46,7 @@ class WallletValidationSchemas {
         .optional(),
       walletType: WalletTypeEnum.default("PRIMARY"),
       referenceType: ReferenceTypeEnum.default("ADJUSTMENT"),
-      moduleType: ModuleTypeEnum.default("CC_PAYOUT"),
+      serviceId: z.string().uuid().optional(), // ServiceId add kiya
     });
   }
 

@@ -22,12 +22,10 @@ export class TransactionService {
     const {
       userId,
       walletId,
-      serviceId,
+      serviceId, // Yahan serviceId use karenge moduleType ki jagah
       apiEntityId,
       amount,
       currency = "INR",
-      moduleType,
-      subModule,
       paymentType,
       commissionAmount = 0,
       taxAmount = 0,
@@ -52,6 +50,15 @@ export class TransactionService {
         });
         return existingTx;
       }
+    }
+
+    // Service verify karenge agar serviceId diya hai to
+    let service = null;
+    if (serviceId) {
+      service = await Prisma.serviceProvider.findUnique({
+        where: { id: serviceId },
+      });
+      if (!service) throw ApiError.notFound("Service not found");
     }
 
     const wallet = await Prisma.wallet.findUnique({
@@ -90,7 +97,6 @@ export class TransactionService {
         currency: currency as Currency,
         netAmount,
         status: TxStatus.PENDING,
-        moduleType: moduleType as ModuleType,
         paymentType: paymentType as PaymentType,
         commissionAmount: commissionAmountBigInt,
         taxAmount: taxAmountBigInt,
@@ -102,7 +108,6 @@ export class TransactionService {
       // Add optional fields
       if (serviceId) txData.serviceId = serviceId;
       if (apiEntityId) txData.apiEntityId = apiEntityId;
-      if (subModule) txData.subModule = subModule;
       if (referenceId) txData.referenceId = referenceId;
       if (externalRefId) txData.externalRefId = externalRefId;
       if (idempotencyKey) txData.idempotencyKey = idempotencyKey;
@@ -114,7 +119,7 @@ export class TransactionService {
       const newTx = await tx.transaction.create({
         data: txData,
         include: {
-          service: { select: { name: true, code: true } },
+          service: { select: { name: true, code: true, type: true } },
           apiEntity: { select: { entityType: true, entityId: true } },
           user: {
             select: { firstName: true, lastName: true, phoneNumber: true },
@@ -126,6 +131,10 @@ export class TransactionService {
       // Calculate new balance
       const newBalance = wallet.balance - amountBigInt;
 
+      // Narration mein service type use karenge
+      const serviceType = service?.type || "GENERAL";
+      const serviceName = service?.name || serviceType;
+
       // Create ledger entry
       await tx.ledgerEntry.create({
         data: {
@@ -133,10 +142,10 @@ export class TransactionService {
           transactionId: newTx.id,
           entryType: LedgerEntryType.DEBIT,
           referenceType: ReferenceType.TRANSACTION,
-          moduleType: moduleType as ModuleType,
+          serviceId: serviceId || null,
           amount: amountBigInt,
           runningBalance: newBalance,
-          narration: `Transaction initiated for ${moduleType}${subModule ? ` - ${subModule}` : ""}`,
+          narration: `Transaction initiated for ${serviceName} - ${paymentType}`,
           createdBy: userId,
           idempotencyKey: idempotencyKey || null,
         },
@@ -151,7 +160,8 @@ export class TransactionService {
       logger.info("Transaction created successfully", {
         transactionId: newTx.id,
         userId,
-        moduleType,
+        serviceType,
+        serviceName,
         amount: Number(amountBigInt),
         idempotencyKey,
       });
@@ -170,7 +180,7 @@ export class TransactionService {
       where: { id: transactionId },
       include: {
         wallet: true,
-        service: { select: { name: true } },
+        service: { select: { name: true, type: true } },
       },
     });
 
@@ -180,6 +190,10 @@ export class TransactionService {
     }
 
     const amountBigInt = BigInt(amount);
+    const serviceName =
+      transaction.service?.name ||
+      transaction.service?.type ||
+      "Unknown Service";
 
     const refund = await Prisma.$transaction(async (tx) => {
       // Create refund record
@@ -214,10 +228,10 @@ export class TransactionService {
           transactionId,
           entryType: LedgerEntryType.CREDIT,
           referenceType: ReferenceType.REFUND,
-          moduleType: transaction.moduleType,
+          serviceId: transaction.serviceId,
           amount: amountBigInt,
           runningBalance,
-          narration: `Refund for transaction ${transactionId} - ${reason || "No reason provided"}`,
+          narration: `Refund for ${serviceName} transaction - ${reason || "No reason provided"}`,
           createdBy: initiatedBy,
         },
       });
@@ -237,13 +251,14 @@ export class TransactionService {
       logger.info("Transaction refund processed", {
         transactionId,
         refundId: refundRecord.id,
+        serviceName,
         amount: Number(amountBigInt),
       });
 
       return {
         ...refundRecord,
         transactionReference: transaction.referenceId,
-        serviceName: transaction.service?.name,
+        serviceName,
       };
     });
 
@@ -252,23 +267,14 @@ export class TransactionService {
 
   // ---------------- GET TRANSACTIONS ----------------
   static async getTransactions(filters: GetTransactionsFilters) {
-    const {
-      userId,
-      status,
-      serviceId,
-      apiEntityId,
-      moduleType,
-      paymentType,
-      page,
-      limit,
-    } = filters;
+    const { userId, status, serviceId, apiEntityId, paymentType, page, limit } =
+      filters;
 
     const where: any = {};
     if (userId) where.userId = userId;
     if (status) where.status = status as TxStatus;
     if (serviceId) where.serviceId = serviceId;
     if (apiEntityId) where.apiEntityId = apiEntityId;
-    if (moduleType) where.moduleType = moduleType as ModuleType;
     if (paymentType) where.paymentType = paymentType as PaymentType;
 
     const skip = (page - 1) * limit;
@@ -280,7 +286,7 @@ export class TransactionService {
         skip,
         take: limit,
         include: {
-          service: { select: { name: true, code: true } },
+          service: { select: { name: true, code: true, type: true } },
           apiEntity: { select: { entityType: true, entityId: true } },
           user: {
             select: { firstName: true, lastName: true, phoneNumber: true },
@@ -307,7 +313,7 @@ export class TransactionService {
     const transaction = await Prisma.transaction.findUnique({
       where: { id },
       include: {
-        service: { select: { name: true, code: true } },
+        service: { select: { name: true, code: true, type: true } },
         apiEntity: { select: { entityType: true, entityId: true } },
         user: {
           select: { firstName: true, lastName: true, phoneNumber: true },
@@ -347,7 +353,10 @@ export class TransactionService {
 
     const transaction = await Prisma.transaction.findUnique({
       where: { id: transactionId },
-      include: { wallet: true },
+      include: {
+        wallet: true,
+        service: { select: { name: true, type: true } },
+      },
     });
 
     if (!transaction) throw ApiError.notFound("Transaction not found");
@@ -371,13 +380,18 @@ export class TransactionService {
     if (responsePayload)
       updateData.responsePayload = responsePayload as prisma.InputJsonValue;
 
+    const serviceName =
+      transaction.service?.name ||
+      transaction.service?.type ||
+      "Unknown Service";
+
     const updatedTx = await Prisma.$transaction(async (tx) => {
       // Update transaction
       const txUpdate = await tx.transaction.update({
         where: { id: transactionId },
         data: updateData,
         include: {
-          service: { select: { name: true } },
+          service: { select: { name: true, type: true } },
           user: { select: { firstName: true, lastName: true } },
         },
       });
@@ -399,10 +413,10 @@ export class TransactionService {
             transactionId,
             entryType: LedgerEntryType.CREDIT,
             referenceType: ReferenceType.REFUND,
-            moduleType: transaction.moduleType,
+            serviceId: transaction.serviceId,
             amount: transaction.amount,
             runningBalance,
-            narration: `Transaction failed - amount refunded`,
+            narration: `${serviceName} transaction failed - amount refunded`,
             createdBy: transaction.userId,
           },
         });
@@ -415,6 +429,7 @@ export class TransactionService {
 
       logger.info("Transaction status updated", {
         transactionId,
+        serviceName,
         oldStatus: transaction.status,
         newStatus: status,
       });

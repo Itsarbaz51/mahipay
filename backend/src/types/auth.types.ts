@@ -1,3 +1,4 @@
+import type { Request } from "express";
 import type {
   UserStatus,
   Currency,
@@ -5,13 +6,14 @@ import type {
   AccountType,
   Gender,
   KycStatus,
+  KycTypes,
 } from "@prisma/client";
 
 export interface TokenPayload {
   id: string;
   email: string;
   role: string;
-  roleLevel: number;
+  roleLevel?: number;
   iat?: number;
   exp?: number;
 }
@@ -21,7 +23,7 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     role: string;
-    roleLevel: number;
+    roleLevel?: number;
   };
 }
 
@@ -42,12 +44,10 @@ export interface User {
   isKycVerified: boolean;
   roleId: string;
 
-  // Timestamps
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
 
-  // Auth fields
   refreshToken: string | null;
   passwordResetToken: string | null;
   passwordResetExpires: Date | null;
@@ -55,7 +55,6 @@ export interface User {
   emailVerifiedAt: Date | null;
   emailVerificationTokenExpires: Date | null;
 
-  // Relations
   role?: {
     id: string;
     name: string;
@@ -81,15 +80,14 @@ export interface User {
     deletedAt: Date | null;
   }[];
 
-  // Make these fields optional in relations since we don't always need them
   parent?: {
     id: string;
     username: string;
     firstName: string;
     lastName: string;
     email: string;
-    phoneNumber?: string; // Make optional
-    profileImage?: string; // Make optional
+    phoneNumber: string;
+    profileImage: string;
   } | null;
 
   children?: {
@@ -98,52 +96,62 @@ export interface User {
     firstName: string;
     lastName: string;
     email: string;
-    phoneNumber?: string; // Make optional
-    profileImage?: string; // Make optional
-    status?: UserStatus; // Make optional
-    createdAt?: Date; // Make optional
+    phoneNumber: string;
+    profileImage: string;
+    status: UserStatus;
+    createdAt: Date;
   }[];
 
-  // KYC Information
   kycInfo?: {
     currentStatus: KycStatus | "NOT_SUBMITTED";
     isKycSubmitted: boolean;
     latestKyc?: {
       id: string;
+      userId: string;
       firstName: string;
       lastName: string;
       fatherName: string;
       dob: Date;
       gender: Gender;
       status: KycStatus;
+      type: KycTypes;
       kycRejectionReason?: string | null;
-      address: {
-        id: string;
-        address: string;
-        pinCode: string;
-        state: {
-          id: string;
-          stateName: string;
-          stateCode: string;
-        };
-        city: {
-          id: string;
-          cityName: string;
-          cityCode: string;
-        };
-      };
+      addressId: string;
       panFile: string;
       aadhaarFile: string;
       addressProofFile: string;
       photo: string;
       createdAt: Date;
       updatedAt: Date;
+      deletedAt: Date | null;
+      address: {
+        id: string;
+        address: string;
+        pinCode: string;
+        stateId: string;
+        cityId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        state: {
+          id: string;
+          stateName: string;
+          stateCode: string;
+          createdAt: Date;
+          updatedAt: Date;
+        };
+        city: {
+          id: string;
+          cityName: string;
+          cityCode: string;
+          createdAt: Date;
+          updatedAt: Date;
+        };
+      };
     } | null;
     kycHistory: any[];
     totalKycAttempts: number;
   };
 
-  // Bank Information
   bankInfo?: {
     totalAccounts: number;
     primaryAccount?: {
@@ -152,44 +160,53 @@ export interface User {
       accountNumber: string;
       phoneNumber: string;
       accountType: AccountType;
+      ifscCode: string;
+      bankName: string;
       bankProofFile: string;
       isVerified: boolean;
       isPrimary: boolean;
-      bank: {
-        id: string;
-        bankName: string;
-        ifscCode: string;
-        bankIcon: string;
-      };
+      userId: string;
+      createdAt: Date;
+      updatedAt: Date;
+      deletedAt: Date | null;
     } | null;
     verifiedAccounts: any[];
   };
 
-  // Permissions
   userPermissions?: {
     id: string;
+    userId: string;
     serviceId: string;
-    moduleTypes: string;
     canView: boolean;
     canEdit: boolean;
     canSetCommission: boolean;
     canProcess: boolean;
     limits: any;
+    createdAt: Date;
+    updatedAt: Date;
     service: {
       id: string;
-      name?: string;
       type: string;
       code: string;
+      name?: string | null;
+      isActive: boolean;
+      config: any;
+      createdAt: Date;
+      updatedAt: Date;
+      createdBy: string;
     };
   }[];
 
-  // PII Consents
   piiConsents?: {
     id: string;
+    userId: string;
+    userKycId: string | null;
     piiType: string;
-    scope: string;
+    piiHash: string;
     providedAt: Date;
     expiresAt: Date;
+    scope: string;
+    createdAt: Date;
   }[];
 }
 

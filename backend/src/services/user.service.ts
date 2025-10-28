@@ -153,6 +153,14 @@ class UserServices {
               createdAt: true,
             },
           },
+          bankAccounts: {
+            where: {
+              isVerified: true,
+            },
+            orderBy: {
+              isPrimary: "desc",
+            },
+          },
         },
       });
 
@@ -464,6 +472,8 @@ class UserServices {
                     id: true,
                     stateName: true,
                     stateCode: true,
+                    createdAt: true,
+                    updatedAt: true,
                   },
                 },
                 city: {
@@ -471,6 +481,8 @@ class UserServices {
                     id: true,
                     cityName: true,
                     cityCode: true,
+                    createdAt: true,
+                    updatedAt: true,
                   },
                 },
               },
@@ -479,19 +491,10 @@ class UserServices {
           orderBy: {
             createdAt: "desc",
           },
-          take: 1, // Get only the latest KYC
+          take: 1,
         },
+
         bankAccounts: {
-          include: {
-            bank: {
-              select: {
-                id: true,
-                bankName: true,
-                ifscCode: true,
-                bankIcon: true,
-              },
-            },
-          },
           where: {
             isVerified: true,
           },
@@ -507,6 +510,7 @@ class UserServices {
                 name: true,
                 type: true,
                 code: true,
+                isActive: true,
               },
             },
           },
@@ -518,6 +522,7 @@ class UserServices {
             scope: true,
             providedAt: true,
             expiresAt: true,
+            userKycId: true,
           },
           where: {
             expiresAt: {
@@ -533,10 +538,8 @@ class UserServices {
       throw ApiError.notFound("User not found");
     }
 
-    // Transform the user data to include computed KYC status
     const transformedUser = {
       ...user,
-      // Add computed KYC information
       kycInfo:
         user.kycs.length > 0
           ? {
@@ -553,13 +556,11 @@ class UserServices {
               kycHistory: [],
               totalKycAttempts: 0,
             },
-      // Add computed bank account information
       bankInfo: {
         totalAccounts: user.bankAccounts.length,
         primaryAccount: user.bankAccounts.find((acc) => acc.isPrimary) || null,
         verifiedAccounts: user.bankAccounts.filter((acc) => acc.isVerified),
       },
-      // Remove the original arrays to avoid duplication
       kycs: undefined,
       bankAccounts: undefined,
     };
@@ -625,6 +626,13 @@ class UserServices {
             status: true,
             createdAt: true,
           },
+        },
+        // Include bankAccounts
+        bankAccounts: {
+          where: {
+            isVerified: true,
+          },
+          take: 1, // Get only primary/verified accounts
         },
       },
       orderBy: { createdAt: "desc" },

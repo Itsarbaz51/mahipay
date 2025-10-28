@@ -4,7 +4,6 @@ import {
   ReferenceType,
   CommissionType,
   CommissionScope,
-  ModuleType,
   WalletType,
   type CommissionEarning,
   type CommissionSetting,
@@ -167,7 +166,7 @@ export class CommissionDistributionService {
         targetUserId: { in: userIds },
         serviceId,
         isActive: true,
-        ...(channel !== null ? { channel } : { channel: null }),
+        // channel field removed as per schema
         effectiveFrom: { lte: now },
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
       },
@@ -204,7 +203,7 @@ export class CommissionDistributionService {
               roleId: user.roleId,
               serviceId,
               isActive: true,
-              ...(channel !== null ? { channel } : { channel: null }),
+              // channel field removed as per schema
               effectiveFrom: { lte: now },
               OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
             },
@@ -700,7 +699,7 @@ export class CommissionDistributionService {
         walletId: wallet.id,
         entryType: LedgerEntryType.CREDIT,
         referenceType: ReferenceType.COMMISSION,
-        moduleType: ModuleType.CC_PAYOUT,
+        // moduleType removed - use serviceId from transaction
         amount: amount,
         runningBalance: newBalance,
         narration: narration,
@@ -762,7 +761,7 @@ export class CommissionDistributionService {
         walletId: wallet.id,
         entryType: LedgerEntryType.DEBIT,
         referenceType: ReferenceType.COMMISSION,
-        moduleType: ModuleType.CC_PAYOUT,
+        // moduleType removed - use serviceId from transaction
         amount: amount,
         runningBalance: newBalance,
         narration: narration,

@@ -366,28 +366,11 @@ model BankDetail {
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id])
 
-  // bankId String @map("bank_id")
-  // bank   Banks  @relation(fields: [bankId], references: [id])
-
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
   @@map("bank_details")
-}
-
-model Banks {
-  id       String @id @default(uuid())
-  bankName String @map("bank_name") @db.Text
-  ifscCode String @map("ifsc_code") @db.Text
-  bankIcon String @map("bank_icon") @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // bankDetails BankDetail[]
-
-  @@map("banks")
 }
 
 model State {

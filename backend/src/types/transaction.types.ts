@@ -1,12 +1,10 @@
 export interface CreateTransactionDTO {
   userId: string;
   walletId: string;
-  serviceId?: string;
+  serviceId?: string; // ServiceId use karenge moduleType ki jagah
   apiEntityId?: string;
   amount: number | bigint;
   currency?: string;
-  moduleType: string;
-  subModule?: string;
   paymentType: string;
   commissionAmount?: number | bigint;
   taxAmount?: number | bigint;
@@ -46,7 +44,6 @@ export interface GetTransactionsFilters {
   status?: string;
   serviceId?: string;
   apiEntityId?: string;
-  moduleType?: string;
   paymentType?: string;
   page: number;
   limit: number;

@@ -144,18 +144,6 @@ CREATE TABLE `bank_details` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `banks` (
-    `id` VARCHAR(191) NOT NULL,
-    `bank_name` TEXT NOT NULL,
-    `ifsc_code` TEXT NOT NULL,
-    `bank_icon` TEXT NOT NULL,
-    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
 CREATE TABLE `states` (
     `id` VARCHAR(191) NOT NULL,
     `state_name` VARCHAR(191) NOT NULL,

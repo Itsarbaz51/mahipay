@@ -15,8 +15,6 @@ export class TransactionValidationSchemas {
         .optional(),
       amount: z.number().positive({ message: "Amount must be positive" }),
       currency: z.string().default("INR"),
-      moduleType: z.string().min(1, { message: "Module type is required" }),
-      subModule: z.string().optional(),
       paymentType: z.string().min(1, { message: "Payment type is required" }),
       commissionAmount: z
         .number()
@@ -61,9 +59,8 @@ export class TransactionValidationSchemas {
     return z.object({
       userId: z.string().uuid().optional(),
       status: z.string().optional(),
-      serviceId: z.string().uuid().optional(),
+      serviceId: z.string().uuid().optional(), // ServiceId se filter
       apiEntityId: z.string().uuid().optional(),
-      moduleType: z.string().optional(),
       paymentType: z.string().optional(),
       page: z.coerce.number().min(1).default(1),
       limit: z.coerce.number().min(1).max(100).default(10),

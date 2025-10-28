@@ -41,8 +41,14 @@ export class WalletController {
   });
 
   static creditWallet = asyncHandler(async (req: Request, res: Response) => {
-    const { userId, amount, narration, walletType, referenceType, moduleType } =
-      req.body;
+    const {
+      userId,
+      amount,
+      narration,
+      walletType,
+      referenceType,
+      serviceId, // ServiceId add kiya
+    } = req.body;
     const idempotencyKey = req.idempotencyKey;
 
     const result = await WalletService.creditWallet(
@@ -53,7 +59,7 @@ export class WalletController {
       idempotencyKey,
       walletType as WalletType,
       referenceType as ReferenceType,
-      moduleType as ModuleType
+      serviceId // ServiceId pass kiya
     );
 
     return res
@@ -62,8 +68,14 @@ export class WalletController {
   });
 
   static debitWallet = asyncHandler(async (req: Request, res: Response) => {
-    const { userId, amount, narration, walletType, referenceType, moduleType } =
-      req.body;
+    const {
+      userId,
+      amount,
+      narration,
+      walletType,
+      referenceType,
+      serviceId, // ServiceId add kiya
+    } = req.body;
     const idempotencyKey = req.idempotencyKey;
 
     const result = await WalletService.debitWallet(
@@ -74,7 +86,7 @@ export class WalletController {
       idempotencyKey,
       walletType as WalletType,
       referenceType as ReferenceType,
-      moduleType as ModuleType
+      serviceId // ServiceId pass kiya
     );
 
     return res

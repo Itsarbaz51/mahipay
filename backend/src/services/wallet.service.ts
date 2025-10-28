@@ -1,10 +1,6 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
-import {
-  LedgerEntryType,
-  ReferenceType,
-  WalletType,
-} from "@prisma/client";
+import { LedgerEntryType, ReferenceType, WalletType } from "@prisma/client";
 import logger from "../utils/WinstonLogger.js";
 
 export class WalletService {
@@ -83,7 +79,7 @@ export class WalletService {
     idempotencyKey?: string,
     walletType?: WalletType,
     referenceType?: ReferenceType,
-    moduleType?: ModuleType
+    serviceId?: string // ServiceId add kiya
   ) {
     if (amount <= 0) throw ApiError.badRequest("Amount must be greater than 0");
 
@@ -115,16 +111,29 @@ export class WalletService {
       const newBalance = currentBalance + creditAmount;
       const newAvailableBalance = currentAvailableBalance + creditAmount;
 
+      // Service details nikalenge agar serviceId diya hai to
+      let serviceDetails = null;
+      if (serviceId) {
+        serviceDetails = await tx.serviceProvider.findUnique({
+          where: { id: serviceId },
+          select: { name: true, type: true },
+        });
+      }
+
+      const serviceNarration = serviceDetails
+        ? `${serviceDetails.type} - ${serviceDetails.name}`
+        : "Wallet credit";
+
       // Create ledger entry
       const ledgerEntry = await tx.ledgerEntry.create({
         data: {
           walletId: wallet.id,
           entryType: LedgerEntryType.CREDIT,
           referenceType: referenceType || ReferenceType.ADJUSTMENT,
-          moduleType: moduleType || ModuleType.CC_PAYOUT,
+          serviceId: serviceId || null, // ServiceId add kiya
           amount: creditAmount,
           runningBalance: newBalance,
-          narration: narration || "Wallet credit",
+          narration: narration || serviceNarration,
           createdBy: createdBy || userId,
           idempotencyKey: idempotencyKey ?? null,
         },
@@ -144,6 +153,7 @@ export class WalletService {
         walletId: wallet.id,
         userId,
         walletType: wallet.walletType,
+        serviceId,
         amount,
         idempotencyKey,
       });
@@ -171,7 +181,7 @@ export class WalletService {
     idempotencyKey?: string,
     walletType?: WalletType,
     referenceType?: ReferenceType,
-    moduleType?: ModuleType
+    serviceId?: string // ServiceId add kiya
   ) {
     if (amount <= 0) throw ApiError.badRequest("Amount must be greater than 0");
 
@@ -208,16 +218,29 @@ export class WalletService {
       const newBalance = currentBalance - debitAmount;
       const newAvailableBalance = currentAvailableBalance - debitAmount;
 
+      // Service details nikalenge agar serviceId diya hai to
+      let serviceDetails = null;
+      if (serviceId) {
+        serviceDetails = await tx.serviceProvider.findUnique({
+          where: { id: serviceId },
+          select: { name: true, type: true },
+        });
+      }
+
+      const serviceNarration = serviceDetails
+        ? `${serviceDetails.type} - ${serviceDetails.name}`
+        : "Wallet debit";
+
       // Create ledger entry
       const ledgerEntry = await tx.ledgerEntry.create({
         data: {
           walletId: wallet.id,
           entryType: LedgerEntryType.DEBIT,
           referenceType: referenceType || ReferenceType.ADJUSTMENT,
-          moduleType: moduleType || ModuleType.CC_PAYOUT,
+          serviceId: serviceId || null, // ServiceId add kiya
           amount: debitAmount,
           runningBalance: newBalance,
-          narration: narration || "Wallet debit",
+          narration: narration || serviceNarration,
           createdBy: createdBy || userId,
           idempotencyKey: idempotencyKey || null,
         },
@@ -237,6 +260,7 @@ export class WalletService {
         walletId: wallet.id,
         userId,
         walletType: wallet.walletType,
+        serviceId,
         amount,
         idempotencyKey,
       });
@@ -436,11 +460,13 @@ export class WalletService {
           transaction: {
             select: {
               id: true,
-              service: { select: { name: true, code: true } },
+              service: { select: { name: true, code: true, type: true } },
               status: true,
-              moduleType: true,
               paymentType: true,
             },
+          },
+          service: {
+            select: { name: true, type: true },
           },
         },
       }),
@@ -466,6 +492,11 @@ export class WalletService {
         ledgerEntries: {
           orderBy: { createdAt: "desc" },
           take: 5,
+          include: {
+            service: {
+              select: { name: true, type: true },
+            },
+          },
         },
       },
     });

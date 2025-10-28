@@ -3,13 +3,13 @@ import { BulkpeAPIClient } from "./BulkpeAPIClient.js";
 import Prisma from "../../db/db.js";
 
 import {
-  ModuleType,
   EntityStatus,
   PaymentType,
   TxStatus,
   ReferenceType,
   LedgerEntryType,
   WalletType,
+  ApiProvider,
 } from "@prisma/client";
 import { ApiError } from "../../utils/ApiError.js";
 import CommissionDistributionService from "../commission.distribution.service.js";
@@ -19,6 +19,7 @@ import { CryptoService } from "../../utils/cryptoService.js";
 
 export class CCPayoutService {
   private bulkpeClient: BulkpeAPIClient;
+  private serviceType = "CC_PAYOUT"; // Service type constant
 
   constructor() {
     this.bulkpeClient = new BulkpeAPIClient();
@@ -32,7 +33,6 @@ export class CCPayoutService {
         reference: {
           startsWith: prefix,
         },
-        moduleType: ModuleType.CC_PAYOUT,
       },
       orderBy: {
         reference: "desc",
@@ -81,9 +81,8 @@ export class CCPayoutService {
           entityId: bulkpeResponse.senderId,
           reference: referenceId,
           userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
           status: EntityStatus.PENDING,
-          provider: "BULKPE",
+          provider: ApiProvider.BULKPE,
           metadata: this.safeJsonParse({
             encryptedData: encryptedData,
             name: payload.name,
@@ -148,7 +147,6 @@ export class CCPayoutService {
           entityType: "cc_sender",
           entityId: senderId,
           userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
         },
       });
 
@@ -219,7 +217,6 @@ export class CCPayoutService {
     const where: any = {
       entityType: "cc_sender",
       userId: userId,
-      moduleType: ModuleType.CC_PAYOUT,
     };
 
     if (referenceId) where.reference = referenceId;
@@ -306,9 +303,8 @@ export class CCPayoutService {
           entityId: bulkpeResponse.beneficiaryId,
           reference: reference,
           userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
           status: EntityStatus.PENDING,
-          provider: "BULKPE",
+          provider: ApiProvider.BULKPE,
           metadata: this.safeJsonParse({
             encryptedData: encryptedData,
             name: payload.name,
@@ -365,7 +361,6 @@ export class CCPayoutService {
     const where: any = {
       entityType: "cc_beneficiary",
       userId: userId,
-      moduleType: ModuleType.CC_PAYOUT,
     };
 
     if (status) where.status = status;
@@ -437,7 +432,6 @@ export class CCPayoutService {
             entityType: "cc_sender",
             entityId: payload.senderId,
             userId: userId,
-            moduleType: ModuleType.CC_PAYOUT,
             status: EntityStatus.ACTIVE,
           },
         }),
@@ -446,7 +440,6 @@ export class CCPayoutService {
             entityType: "cc_beneficiary",
             entityId: payload.beneficiaryId,
             userId: userId,
-            moduleType: ModuleType.CC_PAYOUT,
             status: EntityStatus.ACTIVE,
           },
         }),
@@ -455,6 +448,18 @@ export class CCPayoutService {
       if (!sender) throw ApiError.notFound("Sender not found or inactive");
       if (!beneficiary)
         throw ApiError.notFound("Beneficiary not found or inactive");
+
+      // Get CC Payout service
+      const service = await tx.serviceProvider.findFirst({
+        where: {
+          type: this.serviceType,
+          isActive: true,
+        },
+      });
+
+      if (!service) {
+        throw ApiError.notFound("CC Payout service not found");
+      }
 
       const wallet = await tx.wallet.findFirst({
         where: {
@@ -480,8 +485,7 @@ export class CCPayoutService {
         data: {
           userId: userId,
           walletId: wallet.id,
-          moduleType: ModuleType.CC_PAYOUT,
-          subModule: "COLLECTION",
+          serviceId: service.id,
           paymentType: PaymentType.COLLECTION,
           amount: amountInPaise,
           currency: "INR",
@@ -513,9 +517,8 @@ export class CCPayoutService {
           entityId: bulkpeResponse.collectionId,
           reference: reference,
           userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
           status: EntityStatus.PENDING,
-          provider: "BULKPE",
+          provider: ApiProvider.BULKPE,
           metadata: this.safeJsonParse({
             amount: payload.amount,
             senderId: payload.senderId,
@@ -541,7 +544,7 @@ export class CCPayoutService {
           walletId: wallet.id,
           entryType: LedgerEntryType.DEBIT,
           referenceType: ReferenceType.COLLECTION,
-          moduleType: ModuleType.CC_PAYOUT,
+          serviceId: service.id,
           amount: amountInPaise,
           runningBalance: newWalletBalance,
           narration: `CC Collection initiated - ${reference}`,
@@ -614,11 +617,24 @@ export class CCPayoutService {
       collectionId,
     } = query;
 
+    // Get CC Payout service
+    const service = await Prisma.serviceProvider.findFirst({
+      where: {
+        type: this.serviceType,
+        isActive: true,
+      },
+    });
+
+    // Fix: Create proper where condition with serviceId
     const transactionWhere: any = {
       userId: userId,
-      moduleType: ModuleType.CC_PAYOUT,
-      subModule: "COLLECTION",
+      paymentType: PaymentType.COLLECTION,
     };
+
+    // Add serviceId only if service exists
+    if (service?.id) {
+      transactionWhere.serviceId = service.id;
+    }
 
     if (reference) transactionWhere.referenceId = reference;
     if (collectionId) transactionWhere.externalRefId = collectionId;
@@ -630,6 +646,9 @@ export class CCPayoutService {
           apiWebhooks: {
             orderBy: { createdAt: "desc" },
             take: 1,
+          },
+          service: {
+            select: { name: true, type: true },
           },
         },
         skip: (page - 1) * parseInt(limit),
@@ -663,6 +682,7 @@ export class CCPayoutService {
           gst: metadata?.gst,
           additionalCharge: metadata?.additionalCharge,
           payouts: metadata?.payouts || [],
+          serviceName: tx.service?.name,
         };
       })
     );
@@ -687,10 +707,11 @@ export class CCPayoutService {
       const transaction = await tx.transaction.findFirst({
         where: {
           externalRefId: collectionId,
-          moduleType: ModuleType.CC_PAYOUT,
+          paymentType: PaymentType.COLLECTION,
         },
         include: {
           wallet: true,
+          service: true,
         },
       });
 
@@ -723,7 +744,6 @@ export class CCPayoutService {
         where: {
           entityType: "cc_collection",
           entityId: collectionId,
-          moduleType: ModuleType.CC_PAYOUT,
         },
         data: {
           status:
@@ -739,13 +759,13 @@ export class CCPayoutService {
         },
       });
 
-      if (status === "SUCCESS") {
+      if (status === "SUCCESS" && transaction.serviceId) {
         try {
           await CommissionDistributionService.distribute(
             {
               id: transaction.id,
               userId: transaction.userId,
-              serviceId: transaction.serviceId || "cc_payout_service",
+              serviceId: transaction.serviceId,
               amount: transaction.amount,
               channel: "CC_PAYOUT",
             },
@@ -772,7 +792,7 @@ export class CCPayoutService {
             walletId: transaction.walletId,
             entryType: LedgerEntryType.CREDIT,
             referenceType: ReferenceType.COLLECTION,
-            moduleType: ModuleType.CC_PAYOUT,
+            serviceId: transaction.serviceId,
             amount: transaction.amount,
             runningBalance: transaction.wallet.balance + transaction.amount,
             narration: `CC Collection completed - UTR: ${utr}`,
@@ -804,7 +824,7 @@ export class CCPayoutService {
             walletId: transaction.walletId,
             entryType: LedgerEntryType.CREDIT,
             referenceType: ReferenceType.REFUND,
-            moduleType: ModuleType.CC_PAYOUT,
+            serviceId: transaction.serviceId,
             amount: transaction.amount,
             runningBalance: transaction.wallet.balance + transaction.amount,
             narration: `CC Collection failed - Amount refunded`,
@@ -834,7 +854,7 @@ export class CCPayoutService {
       await tx.apiWebhook.create({
         data: {
           transactionId: transaction.id,
-          provider: "BULKPE",
+          provider: ApiProvider.BULKPE,
           eventType: "COLLECTION_STATUS_UPDATE",
           payload: this.safeJsonParse(payload),
           status: "PROCESSED",
@@ -869,6 +889,37 @@ export class CCPayoutService {
   }
 
   async getDashboardStats(userId: string) {
+    // Get CC Payout service
+    const service = await Prisma.serviceProvider.findFirst({
+      where: {
+        type: this.serviceType,
+        isActive: true,
+      },
+    });
+
+    // Fix: Create proper where conditions with serviceId checks
+    const baseWhere: any = {
+      userId: userId,
+      paymentType: PaymentType.COLLECTION,
+    };
+
+    const successWhere: any = {
+      ...baseWhere,
+      status: TxStatus.SUCCESS,
+    };
+
+    const pendingWhere: any = {
+      ...baseWhere,
+      status: TxStatus.PENDING,
+    };
+
+    // Add serviceId only if service exists
+    if (service?.id) {
+      baseWhere.serviceId = service.id;
+      successWhere.serviceId = service.id;
+      pendingWhere.serviceId = service.id;
+    }
+
     const [
       totalCollections,
       successfulCollections,
@@ -877,62 +928,38 @@ export class CCPayoutService {
       recentCollections,
     ] = await Promise.all([
       Prisma.transaction.count({
-        where: {
-          userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
-          subModule: "COLLECTION",
-        },
+        where: baseWhere,
       }),
 
       Prisma.transaction.count({
-        where: {
-          userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
-          subModule: "COLLECTION",
-          status: TxStatus.SUCCESS,
-        },
+        where: successWhere,
       }),
 
       Prisma.transaction.count({
-        where: {
-          userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
-          subModule: "COLLECTION",
-          status: TxStatus.PENDING,
-        },
+        where: pendingWhere,
       }),
 
       Prisma.transaction.aggregate({
-        where: {
-          userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
-          subModule: "COLLECTION",
-          status: TxStatus.SUCCESS,
-        },
+        where: successWhere,
         _sum: {
           amount: true,
         },
       }),
 
       Prisma.transaction.findMany({
-        where: {
-          userId: userId,
-          moduleType: ModuleType.CC_PAYOUT,
-          subModule: "COLLECTION",
+        where: baseWhere,
+        include: {
+          service: {
+            select: { name: true },
+          },
         },
         orderBy: { createdAt: "desc" },
         take: 5,
-        select: {
-          id: true,
-          amount: true,
-          status: true,
-          createdAt: true,
-          referenceId: true,
-          externalRefId: true,
-          metadata: true,
-        },
       }),
     ]);
+
+    // Fix: Handle possibly undefined _sum.amount
+    const totalAmountValue = totalAmount._sum?.amount || BigInt(0);
 
     return {
       totalCollections,
@@ -940,7 +967,7 @@ export class CCPayoutService {
       pendingCollections,
       failedCollections:
         totalCollections - successfulCollections - pendingCollections,
-      totalAmount: this.convertToRupees(totalAmount._sum.amount || BigInt(0)),
+      totalAmount: this.convertToRupees(totalAmountValue),
       successRate:
         totalCollections > 0
           ? (successfulCollections / totalCollections) * 100
@@ -951,6 +978,7 @@ export class CCPayoutService {
         amount: this.convertToRupees(tx.amount),
         status: tx.status,
         createdAt: tx.createdAt,
+        serviceName: tx.service?.name,
       })),
     };
   }
@@ -961,7 +989,6 @@ export class CCPayoutService {
         entityType: "cc_sender",
         entityId: senderId,
         userId: userId,
-        moduleType: ModuleType.CC_PAYOUT,
       },
     });
 
@@ -1008,7 +1035,6 @@ export class CCPayoutService {
         entityType: "cc_beneficiary",
         entityId: beneficiaryId,
         userId: userId,
-        moduleType: ModuleType.CC_PAYOUT,
       },
     });
 
