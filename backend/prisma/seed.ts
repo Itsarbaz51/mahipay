@@ -107,8 +107,8 @@ async function main() {
 
   const roles = [
     { name: "ADMIN", level: 0, description: "System Administrator" },
-    { name: "STATE_HEAD", level: 1, description: "State Head" },
-    { name: "MASTER_DISTRIBUTOR", level: 2, description: "Master Distributor" },
+    { name: "STATE HEAD", level: 1, description: "State Head" },
+    { name: "MASTER DISTRIBUTOR", level: 2, description: "Master Distributor" },
     { name: "DISTRIBUTOR", level: 3, description: "Distributor" },
     { name: "RETAILER", level: 4, description: "Retailer" },
   ];
