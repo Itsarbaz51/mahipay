@@ -102,8 +102,37 @@ async function main() {
     }
   }
 
-  // ===== 2. Create Admin User First =====
-  console.log("\n👑 Creating admin user first...");
+  // ===== 2. Create Roles First =====
+  console.log("\n👥 Creating roles first...");
+
+  const roles = [
+    { name: "ADMIN", level: 0, description: "System Administrator" },
+    { name: "STATE_HEAD", level: 1, description: "State Head" },
+    { name: "MASTER_DISTRIBUTOR", level: 2, description: "Master Distributor" },
+    { name: "DISTRIBUTOR", level: 3, description: "Distributor" },
+    { name: "RETAILER", level: 4, description: "Retailer" },
+  ];
+
+  const createdRoles: Record<number, any> = {};
+
+  for (const role of roles) {
+    const created = await prisma.role.upsert({
+      where: { level: role.level },
+      update: {},
+      create: {
+        name: role.name,
+        level: role.level,
+        description: role.description,
+        // createdBy will be set after admin creation
+        createdBy: null,
+      },
+    });
+    createdRoles[role.level] = created;
+    console.log(`✅ Role created: ${created.name}`);
+  }
+
+  // ===== 3. Create Admin User =====
+  console.log("\n👑 Creating admin user...");
 
   const adminPassword = hashSync("Admin@123", 10);
   const adminPin = hashSync("1234", 10);
@@ -120,8 +149,7 @@ async function main() {
       phoneNumber: "9999999991",
       password: adminPassword,
       transactionPin: adminPin,
-      // Role will be set after creation
-      roleId: "", // Temporary empty string
+      roleId: createdRoles[0].id, // Use the actual ADMIN role ID
       hierarchyLevel: 0,
       hierarchyPath: "0",
       status: "ACTIVE",
@@ -131,40 +159,14 @@ async function main() {
 
   console.log(`✅ Created Admin: ${admin.username}`);
 
-  // ===== 3. Create Roles with Admin as createdBy =====
-  console.log("\n👥 Creating roles...");
-
-  const roles = [
-    { name: "ADMIN", level: 0, description: "System Administrator" },
-    { name: "STATE_HEAD", level: 1, description: "State Head" },
-    { name: "MASTER_DISTRIBUTOR", level: 2, description: "Master Distributor" },
-    { name: "DISTRIBUTOR", level: 3, description: "Distributor" },
-    { name: "RETAILER", level: 4, description: "Retailer" },
-  ];
-
-  const createdRoles: Record<number, any> = {};
-
-  for (const role of roles) {
-    const created = await prisma.role.upsert({
-      where: { level: role.level },
-      update: { createdBy: admin.id },
-      create: {
-        name: role.name,
-        level: role.level,
-        description: role.description,
-        createdBy: admin.id,
-      },
+  // ===== 4. Update Roles with createdBy =====
+  console.log("\n🔄 Updating roles with createdBy...");
+  for (const role of Object.values(createdRoles)) {
+    await prisma.role.update({
+      where: { id: role.id },
+      data: { createdBy: admin.id },
     });
-    createdRoles[role.level] = created;
-    console.log(`✅ Role created: ${created.name}`);
   }
-
-  // ===== 4. Update Admin with correct Role ID =====
-  console.log("\n🔄 Updating admin with correct role...");
-  await prisma.user.update({
-    where: { id: admin.id },
-    data: { roleId: createdRoles[0].id },
-  });
 
   const admins = [admin];
 
