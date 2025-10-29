@@ -31,21 +31,17 @@ const AllKycTable = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedAction, setSelectedAction] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
-  const [rejectionReason, setRejectionReason] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
   const [showViewKyc, setShowViewKyc] = useState(false);
 
   const [debouncedSearch] = useDebounce(search, 400);
   const limit = 10;
 
-  // Redux State
-  const kycProfiles = useSelector((state) => state.kyc?.kycList?.data) || [];
+  const kycProfiles = useSelector((state) => state.kyc?.kycList?.data || []);
   const kycMeta = useSelector((state) => state.kyc?.kycList?.meta);
   const kycDetail = useSelector((state) => state.kyc?.kycDetail);
   const totalPages = kycMeta?.totalPages || 1;
 
-  // Fetch KYC data
   useEffect(() => {
     dispatch(
       getKycAll({
@@ -57,7 +53,6 @@ const AllKycTable = () => {
     );
   }, [dispatch, currentPage, statusFilter, debouncedSearch]);
 
-  // Status card counts
   const statusCounts = useMemo(() => {
     return {
       total: kycProfiles.length,
@@ -100,7 +95,6 @@ const AllKycTable = () => {
 
   const [loading, setLoading] = useState(false);
 
-  // Function to fetch KYC data
   const fetchKycData = async () => {
     setLoading(true);
     await dispatch(
@@ -114,7 +108,6 @@ const AllKycTable = () => {
     setLoading(false);
   };
 
-  // useEffect for initial load & filter/search change
   useEffect(() => {
     fetchKycData();
   }, [currentPage, statusFilter, debouncedSearch]);
@@ -153,51 +146,38 @@ const AllKycTable = () => {
     setShowViewKyc(true);
   };
 
-  const confirmAction = () => {
-    if (selectedAction === "REJECT") {
+  const handleConfirmAction = async (reason) => {
+    if (!selectedAction || !selectedId) return;
+
+    try {
+      if (selectedAction === "VERIFIED") {
+        await dispatch(
+          verifyKyc({
+            id: selectedId,
+            status: "VERIFIED",
+            kycRejectionReason: "",
+          })
+        );
+      } else if (selectedAction === "REJECT") {
+        await dispatch(
+          verifyKyc({
+            id: selectedId,
+            status: "REJECT",
+            kycRejectionReason: reason.trim(),
+          })
+        );
+      }
+
+      fetchKycData();
+    } catch (error) {
+      console.error("KYC verification error:", error);
+      alert(" Failed to update KYC. Please try again.");
+    } finally {
+      // Reset modal and selection
       setShowModal(false);
-      setShowRejectModal(true);
-      return;
+      setSelectedAction(null);
+      setSelectedId(null);
     }
-
-    if (selectedAction === "VERIFIED") {
-      dispatch(
-        verifyKyc({
-          id: selectedId,
-          status: "VERIFIED",
-          kycRejectionReason: "",
-        })
-      );
-    }
-
-    setShowModal(false);
-  };
-
-  const handleRejectSubmit = () => {
-    if (!rejectionReason.trim()) {
-      alert("Please enter a rejection reason");
-      return;
-    }
-
-    dispatch(
-      verifyKyc({
-        id: selectedId,
-        status: "REJECT",
-        kycRejectionReason: rejectionReason.trim(),
-      })
-    );
-
-    setShowRejectModal(false);
-    setRejectionReason("");
-    setSelectedAction(null);
-    setSelectedId(null);
-  };
-
-  const handleCloseRejectModal = () => {
-    setShowRejectModal(false);
-    setRejectionReason("");
-    setSelectedAction(null);
-    setSelectedId(null);
   };
 
   return (
@@ -206,63 +186,28 @@ const AllKycTable = () => {
       {showModal && (
         <ConfirmCard
           actionType={selectedAction}
-          isClose={() => setShowModal(false)}
-          isSubmit={confirmAction}
+          user={kycProfiles.find((p) => p.id === selectedId)}
+          isClose={() => {
+            setShowModal(false);
+            setSelectedAction(null);
+            setSelectedId(null);
+          }}
+          isSubmit={handleConfirmAction}
+          {...(selectedAction === "REJECT" && {
+            predefinedReasons: [
+              "Invalid or unreadable ID document",
+              "Mismatched name or personal details",
+              "Expired identification document",
+              "Blurry or unclear document image",
+              "Incomplete proof of address",
+              "Document appears to be fraudulent",
+              "Selfie does not match ID photo",
+              "Incorrect document type uploaded",
+              "Incomplete KYC submission",
+              "Other",
+            ],
+          })}
         />
-      )}
-
-      {/* Reject Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Reject KYC
-              </h3>
-              <button
-                onClick={handleCloseRejectModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Rejection Reason *
-              </label>
-              <textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Please provide a detailed reason for rejection..."
-                className="w-full border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows={4}
-                required
-              />
-              {!rejectionReason.trim() && (
-                <p className="text-red-500 text-xs mt-1">
-                  Rejection reason is required
-                </p>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleCloseRejectModal}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRejectSubmit}
-                disabled={!rejectionReason.trim()}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Confirm Reject
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Header */}
@@ -432,6 +377,18 @@ const AllKycTable = () => {
                                 <X className="w-5 h-5 text-red-600" />
                               </button>
                             </>
+                          )}
+
+                          {kyc.status === "REJECT" && (
+                            <button
+                              onClick={() =>
+                                handleActionClick("VERIFIED", kyc.id)
+                              }
+                              className="p-1 hover:bg-green-50 rounded transition-colors"
+                              title="Approve KYC"
+                            >
+                              <CheckCircle2 className="w-5 h-5 text-green-600" />
+                            </button>
                           )}
 
                           {kyc.status === "VERIFIED" && (

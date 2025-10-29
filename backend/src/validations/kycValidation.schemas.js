@@ -56,7 +56,7 @@ class KycValidationSchemas {
       .object({
         id: z.string().uuid(),
         status: z.enum(["VERIFIED", "REJECT"]),
-        kycRejectionReason: z.string().optional(),
+        kycRejectionReason: z.string(),
       })
       .refine(
         (data) => {

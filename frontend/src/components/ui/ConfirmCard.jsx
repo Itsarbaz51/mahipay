@@ -17,7 +17,10 @@ function ConfirmCard({
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
-    const finalReason = reason.trim() || `${actionType}d by admin`;
+    const trimmedReason = reason.trim() || "";
+    const finalReason = isReject
+      ? ""
+      : trimmedReason || `${actionType}d by admin`;
 
     setIsSubmitting(true);
     setError("");
@@ -52,28 +55,29 @@ function ConfirmCard({
           </div>
         )}
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Reason for {actionType.toLowerCase()}
-            </label>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Reason for {actionType.toLowerCase()}
+          </label>
 
-            <div className="grid grid-cols-1 gap-2 mb-3">
-              {predefinedReasons?.map((predefinedReason) => (
-                <button
-                  key={predefinedReason}
-                  type="button"
-                  onClick={() => setReason(predefinedReason)}
-                  className={`text-left p-2 text-sm rounded border transition-colors ${
-                    reason === predefinedReason
-                      ? "bg-blue-50 border-blue-300 text-blue-700"
-                      : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {predefinedReason}
-                </button>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 gap-2 mb-3">
+            {predefinedReasons?.map((predefinedReason) => (
+              <button
+                key={predefinedReason}
+                type="button"
+                onClick={() => setReason(predefinedReason)}
+                className={`text-left p-2 text-sm rounded border transition-colors ${
+                  reason === predefinedReason
+                    ? "bg-blue-50 border-blue-300 text-blue-700"
+                    : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {predefinedReason}
+              </button>
+            ))}
+          </div>
 
+          {actionType !== "VERIFIED" && (
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -81,11 +85,12 @@ function ConfirmCard({
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               rows="3"
             />
+          )}
 
-            <p className="text-xs text-gray-500 mt-1">
-              Providing a reason helps maintain audit records
-            </p>
-          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Providing a reason helps maintain audit records
+          </p>
+        </div>
 
         <p className="mb-4 text-gray-700 text-sm">
           You are about to{" "}

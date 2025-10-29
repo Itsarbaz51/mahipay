@@ -151,12 +151,13 @@ export const verifyKyc = (payload) => async (dispatch) => {
     const { data } = await axios.put("kycs/user-verify", payload);
 
     dispatch(kycActionSuccess(data));
+
     toast.success(data.message);
     dispatch(getKycAll());
     return data;
   } catch (error) {
-    console.error("KYC verification error:", error);
     const errMsg =
+      error?.response?.data?.errors?.[0]?.message ||
       error?.response?.data?.message ||
       error?.message ||
       "KYC verification failed";

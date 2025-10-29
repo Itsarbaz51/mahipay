@@ -274,6 +274,8 @@ const KYCStatusCard = ({ kycDetail }) => {
     }
   };
 
+  console.log(kycDetail);
+
   const config = getStatusConfig(kycDetail.status);
   const StatusIcon = config.icon;
 
@@ -356,7 +358,10 @@ export default function KYCWithAddressForm() {
 
   // Fetch KYC details and states & cities
   useEffect(() => {
-    if (currentUser?.kycInfo?.currentStatus === "REJECT") {
+    if (
+      currentUser?.kycInfo?.currentStatus === "REJECT" ||
+      currentUser?.kycInfo?.currentStatus === "PENDING"
+    ) {
       dispatch(getbyId());
     }
     dispatch(getAllEntities("state-list"));
@@ -797,7 +802,7 @@ export default function KYCWithAddressForm() {
           <KYCStatusCard kycDetail={kycDetail} />
 
           {/* Additional info for VERIFIED KYC */}
-          {kycDetail.status === "APPROVE" && (
+          {kycDetail.status === "VERIFIED" && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 KYC Details
@@ -1056,7 +1061,7 @@ export default function KYCWithAddressForm() {
           {currentStep === 4 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FileUpload
-                label="Photo"
+                label="User Photo"
                 name="photo"
                 icon={Camera}
                 onChange={handleFileChange}
