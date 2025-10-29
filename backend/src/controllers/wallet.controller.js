@@ -1,12 +1,10 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { WalletService } from "../services/wallet.service.js";
 import { ApiError } from "../utils/ApiError.js";
-import { WalletType, ReferenceType } from "@prisma/client";
 
 export class WalletController {
-  static getWallet = asyncHandler(async (req: Request, res: Response) => {
+  static getWallet = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const { walletType } = req.query;
 
@@ -16,7 +14,7 @@ export class WalletController {
 
     const wallet = await WalletService.getWalletByUserId(
       userId,
-      walletType as WalletType
+      walletType
     );
 
     return res
@@ -24,7 +22,7 @@ export class WalletController {
       .json(ApiResponse.success(wallet, "Wallet fetched successfully", 200));
   });
 
-  static getUserWallets = asyncHandler(async (req: Request, res: Response) => {
+  static getUserWallets = asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
     if (!userId) {
@@ -40,7 +38,7 @@ export class WalletController {
       );
   });
 
-  static creditWallet = asyncHandler(async (req: Request, res: Response) => {
+  static creditWallet = asyncHandler(async (req, res) => {
     const {
       userId,
       amount,
@@ -57,8 +55,8 @@ export class WalletController {
       narration,
       req.user?.id,
       idempotencyKey,
-      walletType as WalletType,
-      referenceType as ReferenceType,
+      walletType ,
+      referenceType ,
       serviceId // ServiceId pass kiya
     );
 
@@ -67,7 +65,7 @@ export class WalletController {
       .json(ApiResponse.success(result, "Wallet credited successfully", 200));
   });
 
-  static debitWallet = asyncHandler(async (req: Request, res: Response) => {
+  static debitWallet = asyncHandler(async (req, res) => {
     const {
       userId,
       amount,
@@ -84,8 +82,8 @@ export class WalletController {
       narration,
       req.user?.id,
       idempotencyKey,
-      walletType as WalletType,
-      referenceType as ReferenceType,
+      walletType ,
+      referenceType ,
       serviceId // ServiceId pass kiya
     );
 
@@ -94,7 +92,7 @@ export class WalletController {
       .json(ApiResponse.success(result, "Wallet debited successfully", 200));
   });
 
-  static holdAmount = asyncHandler(async (req: Request, res: Response) => {
+  static holdAmount = asyncHandler(async (req, res) => {
     const { userId, amount, narration, walletType } = req.body;
     const idempotencyKey = req.idempotencyKey;
 
@@ -104,7 +102,7 @@ export class WalletController {
       narration,
       req.user?.id,
       idempotencyKey,
-      walletType as WalletType
+      walletType 
     );
 
     return res
@@ -113,7 +111,7 @@ export class WalletController {
   });
 
   static releaseHoldAmount = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const { userId, amount, narration, walletType } = req.body;
       const idempotencyKey = req.idempotencyKey;
 
@@ -123,7 +121,7 @@ export class WalletController {
         narration,
         req.user?.id,
         idempotencyKey,
-        walletType as WalletType
+        walletType 
       );
 
       return res
@@ -135,7 +133,7 @@ export class WalletController {
   );
 
   static getWalletBalance = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const { userId } = req.params;
       const { walletType } = req.query;
 
@@ -145,7 +143,7 @@ export class WalletController {
 
       const balance = await WalletService.getWalletBalance(
         userId,
-        walletType as WalletType
+        walletType 
       );
 
       return res
@@ -161,7 +159,7 @@ export class WalletController {
   );
 
   static getWalletTransactions = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const { userId } = req.params;
       const { page = 1, limit = 10, walletType } = req.query;
 
@@ -171,9 +169,9 @@ export class WalletController {
 
       const transactions = await WalletService.getWalletTransactions(
         userId,
-        parseInt(page as string),
-        parseInt(limit as string),
-        walletType as WalletType
+        parseInt(page ),
+        parseInt(limit),
+        walletType 
       );
 
       return res

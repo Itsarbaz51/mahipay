@@ -1,4 +1,3 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import LoginLogService from "../services/loginLog.service.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -7,7 +6,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 class LoginLogController {
   private static loginLogService = new LoginLogService();
 
-  static index = asyncHandler(async (req: Request, res: Response) => {
+  static index = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) {
       throw ApiError.unauthorized("User not authenticated");
@@ -33,7 +32,7 @@ class LoginLogController {
       .json(ApiResponse.success(result, "Login logs fetched successfully", 200));
   });
 
-  static show = asyncHandler(async (req: Request, res: Response) => {
+  static show = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
@@ -49,7 +48,7 @@ class LoginLogController {
     res.status(200).json(ApiResponse.success(loginLog, "Login log fetched successfully", 200));
   });
 
-  static store = asyncHandler(async (req: Request, res: Response) => {
+  static store = asyncHandler(async (req, res) => {
     const loginLog = await LoginLogController.loginLogService.createLoginLog(req.body);
 
     if (!loginLog) {
@@ -60,7 +59,7 @@ class LoginLogController {
     res.status(201).json(ApiResponse.success(loginLog, "Login log created successfully", 201));
   });
 
-  static destroy = asyncHandler(async (req: Request, res: Response) => {
+  static destroy = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     if (!id) {

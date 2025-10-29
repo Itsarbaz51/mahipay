@@ -1,11 +1,10 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import KycServices from "../services/kyc.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
 class UserKycController {
-  static index = asyncHandler(async (req: Request, res: Response) => {
+  static index = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) {
       throw ApiError.internal("User ID not found in request");
@@ -29,9 +28,9 @@ class UserKycController {
       );
   });
 
-  static show = asyncHandler(async (req: Request, res: Response) => {
+  static show = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const userId = req.query.userId as string;
+    const userId = req.query.userId;
 
     // Get the authenticated user's info including role
     const requestingUser = req.user; // Assuming req.user has { id: string, role: string }
@@ -51,16 +50,11 @@ class UserKycController {
       .json(ApiResponse.success(kyc, "KYC fetched successfully", 200));
   });
 
-  static store = asyncHandler(async (req: Request, res: Response) => {
+  static store = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
-    const files = req.files as {
-      panFile?: Express.Multer.File[];
-      aadhaarFile?: Express.Multer.File[];
-      addressProofFile?: Express.Multer.File[];
-      photo?: Express.Multer.File[];
-    };
+    const files = req.files
 
     const panFile = files.panFile?.[0];
     const aadhaarFile = files.aadhaarFile?.[0];
@@ -93,26 +87,21 @@ class UserKycController {
       );
   });
 
-  static update = asyncHandler(async (req: Request, res: Response) => {
+  static update = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("KYC ID is required in params");
 
-    const files = req.files as {
-      panFile?: Express.Multer.File[];
-      aadhaarFile?: Express.Multer.File[];
-      addressProofFile?: Express.Multer.File[];
-      photo?: Express.Multer.File[];
-    };
+    const files = req.files
 
     const panFile = files.panFile?.[0];
     const aadhaarFile = files.aadhaarFile?.[0];
     const addressProofFile = files.addressProofFile?.[0];
     const photo = files.photo?.[0];
 
-    const updateData: any = {
+    const updateData = {
       ...req.body,
       userId, // Pass userId to service for validation
     };
@@ -131,7 +120,7 @@ class UserKycController {
       );
   });
 
-  static verification = asyncHandler(async (req: Request, res: Response) => {
+  static verification = asyncHandler(async (req, res) => {
     const dbStoreData = await KycServices.verifyUserKyc(req.body);
 
     return res

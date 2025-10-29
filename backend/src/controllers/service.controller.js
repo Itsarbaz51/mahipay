@@ -1,4 +1,3 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -6,7 +5,7 @@ import { ServiceProviderService } from "../services/service.service.js";
 import { ServiceValidationSchemas } from "../validations/serviceValidation.schemas.js";
 
 export class ServiceProviderController {
-  static create = asyncHandler(async (req: Request, res: Response) => {
+  static create = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) {
       throw ApiError.unauthorized("User not authenticated");
@@ -29,7 +28,7 @@ export class ServiceProviderController {
   });
 
   static getAllByCreatedUser = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const userId = req.user?.id;
 
       if (!userId) {
@@ -51,7 +50,7 @@ export class ServiceProviderController {
   );
 
   static getAllByCreatedUserAndStatus = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const userId = req.user?.id;
 
       if (!userId) {
@@ -72,7 +71,7 @@ export class ServiceProviderController {
     }
   );
 
-  static getById = asyncHandler(async (req: Request, res: Response) => {
+  static getById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("Service Provider ID is required");
 
@@ -89,7 +88,7 @@ export class ServiceProviderController {
   });
 
   static toggleActiveStatus = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const { id } = req.params;
       const { isActive } = req.body;
 
@@ -115,7 +114,7 @@ export class ServiceProviderController {
     }
   );
 
-  static update = asyncHandler(async (req: Request, res: Response) => {
+  static update = asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("Service Provider ID is required");
 
@@ -131,7 +130,7 @@ export class ServiceProviderController {
       );
   });
 
-  static delete = asyncHandler(async (req: Request, res: Response) => {
+  static delete = asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("Service Provider ID is required");
 

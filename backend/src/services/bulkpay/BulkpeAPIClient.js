@@ -1,22 +1,10 @@
-// src/services/BulkpeAPIClient.ts
-import type { AxiosInstance } from "axios";
 import axios from "axios";
 import FormData from "form-data";
 import { ApiError } from "../../utils/ApiError.js";
-import type {
-  BulkpeBeneficiaryResponse,
-  BulkpeCollectionResponse,
-  BulkpeSenderResponse,
-  CreateBeneficiaryInput,
-  CreateCollectionInput,
-  CreateSenderInput,
-} from "../../types/bulkpay/ccPayout.types.js";
 
 export class BulkpeAPIClient {
-  private client: AxiosInstance;
-  private baseURL = "https://api.bulkpe.in/client/cc";
-
-  constructor() {
+   constructor() {
+    this.baseURL = "https://api.bulkpe.in/client/cc";
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000,
@@ -24,7 +12,6 @@ export class BulkpeAPIClient {
         "Content-Type": "application/json",
       },
     });
-
     // Add auth interceptor
     this.client.interceptors.request.use((config) => {
       const token = process.env.BULKPE_API_TOKEN;
@@ -54,8 +41,8 @@ export class BulkpeAPIClient {
   }
 
   async createSender(
-    payload: CreateSenderInput
-  ): Promise<BulkpeSenderResponse> {
+    payload
+  ) {
     const response = await this.client.post("/createSender", payload);
 
     if (!response.data.status) {
@@ -68,14 +55,10 @@ export class BulkpeAPIClient {
   }
 
   async uploadCardImage(
-    senderId: string,
-    cardImageType: "front" | "back",
-    file: Express.Multer.File
-  ): Promise<{
-    cardFrontImage: string;
-    cardBackImage: string;
-    cardNo: string;
-  }> {
+    senderId,
+    cardImageType,
+    file
+  ) {
     const formData = new FormData();
     formData.append("senderId", senderId);
     formData.append("cardImageType", cardImageType);
@@ -99,7 +82,7 @@ export class BulkpeAPIClient {
     return response.data.data;
   }
 
-  async listSenders(query: any): Promise<any> {
+  async listSenders(query) {
     const response = await this.client.post("/listSenders", query);
 
     if (!response.data.status) {
@@ -112,8 +95,8 @@ export class BulkpeAPIClient {
   }
 
   async createBeneficiary(
-    payload: CreateBeneficiaryInput
-  ): Promise<BulkpeBeneficiaryResponse> {
+    payload
+  ) {
     const response = await this.client.post("/createBeneficiary", payload);
 
     if (!response.data.status) {
@@ -125,7 +108,7 @@ export class BulkpeAPIClient {
     return response.data.data;
   }
 
-  async listBeneficiaries(query: any): Promise<any> {
+  async listBeneficiaries(query) {
     const response = await this.client.post("/listBeneficiary", query);
 
     if (!response.data.status) {
@@ -138,8 +121,8 @@ export class BulkpeAPIClient {
   }
 
   async createCollection(
-    payload: CreateCollectionInput
-  ): Promise<BulkpeCollectionResponse> {
+    payload
+  ) {
     const response = await this.client.post(
       "/createCardCollectionUrl",
       payload
@@ -154,7 +137,7 @@ export class BulkpeAPIClient {
     return response.data.data;
   }
 
-  async listCollections(query: any): Promise<any> {
+  async listCollections(query) {
     const response = await this.client.post("/listCardCollection", query);
 
     if (!response.data.status) {

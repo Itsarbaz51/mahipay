@@ -1,11 +1,10 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import RoleServices from "../services/role.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 class RoleController {
-  static index = asyncHandler(async (req: Request, res: Response) => {
+  static index = asyncHandler(async (req, res) => {
     const userRoleLevel = req.user?.roleLevel;
 
     const options = {
@@ -21,7 +20,7 @@ class RoleController {
       .json(ApiResponse.success(roles, "Roles fetched successfully", 200));
   });
 
-  static show = asyncHandler(async (req: Request, res: Response) => {
+  static show = asyncHandler(async (req, res) => {
     const userRoleLevel = req.user?.roleLevel;
     const roleId = req.params.id;
 
@@ -45,7 +44,7 @@ class RoleController {
       .json(ApiResponse.success(role, "Role fetched successfully", 200));
   });
 
-  static store = asyncHandler(async (req: Request, res: Response) => {
+  static store = asyncHandler(async (req, res) => {
     const createdBy = req.user?.id;
     const userRoleLevel = req.user?.roleLevel;
 
@@ -73,7 +72,7 @@ class RoleController {
       .json(ApiResponse.success(role, "Role created successfully", 201));
   });
 
-  static update = asyncHandler(async (req: Request, res: Response) => {
+  static update = asyncHandler(async (req, res) => {
     const updatedBy = req.user?.id;
     const userRoleLevel = req.user?.roleLevel;
     const roleId = req.params.id;
@@ -119,7 +118,7 @@ class RoleController {
       .json(ApiResponse.success(role, "Role updated successfully", 200));
   });
 
-  static destroy = asyncHandler(async (req: Request, res: Response) => {
+  static destroy = asyncHandler(async (req, res) => {
     const userRoleLevel = req.user?.roleLevel;
     const roleId = req.params.id;
 

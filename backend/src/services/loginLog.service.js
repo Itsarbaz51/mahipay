@@ -1,23 +1,13 @@
 import Prisma from "../db/db.js";
-import type {
-    LoginLogCreateInput,
-    LoginLogUpdateInput,
-    LoginLogFilterParams,
-    LoginLogListResponse,
-    UserLoginLogsParams,
-} from "../types/loginLog.types.js";
-import { clearPattern, getCacheWithPrefix, setCacheWithPrefix } from "../utils/redisCasheHelper.js";
+import { ApiError } from "../utils/ApiError.js";
 
 export class LoginLogService {
-    async getAllLoginLogs(payload: LoginLogFilterParams): Promise<LoginLogListResponse> {
+    async getAllLoginLogs(payload) {
         const { page = 1, limit = 10, userId, startDate, endDate, search } = payload;
         const skip = (page - 1) * limit;
 
-        const cacheKey = `loginLogs:list:${userId || "all"}:${page}:${limit}:${startDate || ""}:${endDate || ""}:${search || ""}`;
-        const cached = await getCacheWithPrefix<LoginLogListResponse>("loginLogs", cacheKey);
-        if (cached) return cached;
 
-        const where: any = {};
+        const where = {};
 
         if (userId) where.userId = userId;
         if (startDate || endDate) {
@@ -64,7 +54,7 @@ export class LoginLogService {
         ]);
 
         const totalPages = Math.ceil(total / limit);
-        const result: LoginLogListResponse = {
+        const result = {
             data: loginLogs,
             pagination: {
                 currentPage: page,
@@ -76,15 +66,11 @@ export class LoginLogService {
             }
         };
 
-        await setCacheWithPrefix("loginLogs", cacheKey, result, 120);
 
         return result;
     }
 
-    async getLoginLogById(id: string) {
-        const cacheKey = `loginLogs:getById:${id}`;
-        const cached = await getCacheWithPrefix<any>("loginLogs", `getById:${id}`);
-        if (cached) return cached;
+    async getLoginLogById(id) {
 
         const log = await Prisma.loginLogs.findUnique({
             where: { id },
@@ -100,11 +86,10 @@ export class LoginLogService {
             }
         });
 
-        if (log) await setCacheWithPrefix("loginLogs", `getById:${id}`, log, 180);
         return log;
     }
 
-    async createLoginLog(payload: LoginLogCreateInput) {
+    async createLoginLog(payload) {
         const created = await Prisma.loginLogs.create({
             data: payload,
             include: {
@@ -119,17 +104,14 @@ export class LoginLogService {
             }
         });
 
-        await clearPattern("loginLogs:list:*");
-        await clearPattern(`loginLogs:getById:*`);
-
         return created;
     }
 
-    async deleteLoginLog(id: string) {
+    async deleteLoginLog(id) {
         const deleted = await Prisma.loginLogs.delete({ where: { id } });
-
-        await clearPattern("loginLogs:list:*");
-        await clearPattern(`loginLogs:getById:${id}`);
+        if (!deleted) {
+            throw ApiError.internal("Login log not found");
+        }
 
         return deleted;
     }

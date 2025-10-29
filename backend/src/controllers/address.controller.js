@@ -1,4 +1,3 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import AddressValidationSchemas from "../validations/addressValidation.schemas.js";
 import AddressServices from "../services/address.service.js";
@@ -6,7 +5,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
 class AddressController {
-  static show = asyncHandler(async (req: Request, res: Response) => {
+  static show = asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!id) {
       throw ApiError.badRequest("Address ID is required");
@@ -18,7 +17,7 @@ class AddressController {
         ApiResponse.success(dbShowData, "Address fetched successfully", 201)
       );
   });
-  static store = asyncHandler(async (req: Request, res: Response) => {
+  static store = asyncHandler(async (req, res) => {
     const dbStoreData = await AddressServices.storeUserAddress(req.body);
     if (!dbStoreData) {
       throw ApiError.internal("Failed to create address");
@@ -29,7 +28,7 @@ class AddressController {
         ApiResponse.success(dbStoreData, "Address created successfully", 201)
       );
   });
-  static update = asyncHandler(async (req: Request, res: Response) => {
+  static update = asyncHandler(async (req, res) => {
     const validatedData = await AddressValidationSchemas.Address.parseAsync(
       req.body
     );
@@ -47,7 +46,7 @@ class AddressController {
         ApiResponse.success(dbUpdateData, "Address updated successfully", 201)
       );
   });
-  static destroy = asyncHandler(async (req: Request, res: Response) => {
+  static destroy = asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!id) {
       throw ApiError.badRequest("Address ID is requir");
@@ -62,7 +61,7 @@ class AddressController {
 }
 
 class StateController {
-  static index = asyncHandler(async (req: Request, res: Response) => {
+  static index = asyncHandler(async (req, res) => {
     const dbStoreData = await AddressServices.indexState();
     res
       .status(201)
@@ -70,7 +69,7 @@ class StateController {
         ApiResponse.success(dbStoreData, "States fetched successfully", 201)
       );
   });
-  static store = asyncHandler(async (req: Request, res: Response) => {
+  static store = asyncHandler(async (req, res) => {
     console.log(req.body);
 
     const validatedData = await AddressValidationSchemas.State.parseAsync(
@@ -85,7 +84,7 @@ class StateController {
         ApiResponse.success(dbStoreData, "State created successfully", 201)
       );
   });
-  static update = asyncHandler(async (req: Request, res: Response) => {
+  static update = asyncHandler(async (req, res) => {
     const validatedData = await AddressValidationSchemas.State.parseAsync(
       req.body
     );
@@ -104,7 +103,7 @@ class StateController {
         ApiResponse.success(dbUpdateData, "State updated successfully", 201)
       );
   });
-  static destroy = asyncHandler(async (req: Request, res: Response) => {
+  static destroy = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
@@ -121,7 +120,7 @@ class StateController {
 }
 
 class CityController {
-  static index = asyncHandler(async (req: Request, res: Response) => {
+  static index = asyncHandler(async (req, res) => {
     const dbStoreData = await AddressServices.indexCity();
     res
       .status(201)
@@ -129,7 +128,7 @@ class CityController {
         ApiResponse.success(dbStoreData, "Cities fetched successfully", 201)
       );
   });
-  static store = asyncHandler(async (req: Request, res: Response) => {
+  static store = asyncHandler(async (req, res) => {
     const validatedData = await AddressValidationSchemas.City.parseAsync(
       req.body
     );
@@ -140,7 +139,7 @@ class CityController {
       .status(201)
       .json(ApiResponse.success(dbStoreData, "City created successfully", 201));
   });
-  static update = asyncHandler(async (req: Request, res: Response) => {
+  static update = asyncHandler(async (req, res) => {
     const validatedData = await AddressValidationSchemas.City.parseAsync(
       req.body
     );
@@ -155,7 +154,7 @@ class CityController {
         ApiResponse.success(dbUpdateData, "City updated successfully", 201)
       );
   });
-  static destroy = asyncHandler(async (req: Request, res: Response) => {
+  static destroy = asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!id) {
       throw ApiError.badRequest("City ID is required");

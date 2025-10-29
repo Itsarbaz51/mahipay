@@ -1,9 +1,7 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
-import logger from "../utils/WinstonLogger.js";
-
 export class IdempotencyService {
-  static async processIdempotencyKey(key: string, userId?: string) {
+  static async processIdempotencyKey(key, userId) {
     try {
       return await Prisma.$transaction(async (tx) => {
         const existingKey = await tx.idempotencyKey.findUnique({
@@ -36,18 +34,18 @@ export class IdempotencyService {
           },
         });
 
-        logger.info("Idempotency key processed", { key, userId });
+        
         return idempotencyKey;
       });
     } catch (error) {
       if (error instanceof ApiError) throw error;
 
-      logger.error("Idempotency processing failed", { key, error });
+      console.error("Idempotency processing failed", { key, error });
       throw ApiError.internal("Idempotency processing failed");
     }
   }
 
-  static async findExistingResponse(key: string) {
+  static async findExistingResponse(key) {
     try {
       const existingKey = await Prisma.idempotencyKey.findUnique({
         where: { key },
@@ -55,7 +53,7 @@ export class IdempotencyService {
 
       return existingKey?.used ? existingKey : null;
     } catch (error) {
-      logger.error("Error finding existing response", { key, error });
+      console.error("Error finding existing response", { key, error });
       return null;
     }
   }
@@ -70,12 +68,10 @@ export class IdempotencyService {
         },
       });
 
-      logger.info("Expired idempotency keys cleaned up", {
-        count: result.count,
-      });
+      
       return result.count;
     } catch (error) {
-      logger.error("Failed to cleanup expired keys", { error });
+      console.error("Failed to cleanup expired keys", { error });
       return 0;
     }
   }

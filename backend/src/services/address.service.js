@@ -1,17 +1,10 @@
 import Prisma from "../db/db.js";
-import type {
-  Address,
-  AddressInput,
-  City,
-  CityInput,
-  State,
-  StateInput,
-} from "../types/address.types.js";
+
 import { ApiError } from "../utils/ApiError.js";
 
 class AddressServices {
   // 🔹 Show a specific address with relations
-  static async showAddress(id: string): Promise<Address> {
+  static async showAddress(id) {
     if (!id) {
       throw ApiError.badRequest("Address ID is required");
     }
@@ -32,7 +25,7 @@ class AddressServices {
   }
 
   // 🔹 Create a new address
-  static async storeUserAddress(payload: AddressInput): Promise<Address> {
+  static async storeUserAddress(payload) {
     const stateExists = await Prisma.state.findUnique({
       where: { id: payload.stateId },
     });
@@ -65,9 +58,9 @@ class AddressServices {
 
   // 🔹 Update an existing address
   static async updateUserAddress(
-    payload: AddressInput,
-    addressId: string
-  ): Promise<Address> {
+    payload,
+    addressId
+  ) {
     if (!addressId) {
       throw ApiError.badRequest("Address ID is required");
     }
@@ -114,7 +107,7 @@ class AddressServices {
   }
 
   // 🔹 Delete an address
-  static async deleteUserAddress(id: string): Promise<Address> {
+  static async deleteUserAddress(id) {
     if (!id) {
       throw ApiError.badRequest("Address ID is required");
     }
@@ -135,7 +128,7 @@ class AddressServices {
   }
 
   // 🔹 List all states
-  static async indexState(): Promise<State[]> {
+  static async indexState() {
     const allStates = await Prisma.state.findMany({
       orderBy: {
         stateName: "asc",
@@ -150,7 +143,7 @@ class AddressServices {
   }
 
   // 🔹 Create new state
-  static async storeState(payload: StateInput): Promise<State> {
+  static async storeState(payload) {
     const formattedName =
       payload.stateName.charAt(0).toUpperCase() +
       payload.stateName.slice(1).toLowerCase();
@@ -174,7 +167,7 @@ class AddressServices {
   }
 
   // 🔹 Update existing state
-  static async updateState(payload: StateInput, id: string): Promise<State> {
+  static async updateState(payload, id) {
     if (!id) {
       throw ApiError.badRequest("State ID is required");
     }
@@ -222,7 +215,7 @@ class AddressServices {
   }
 
   // 🔹 Delete a state
-  static async deleteState(id: string): Promise<State> {
+  static async deleteState(id) {
     if (!id) {
       throw ApiError.badRequest("State ID is required");
     }
@@ -251,7 +244,7 @@ class AddressServices {
   }
 
   // 🔹 List all cities
-  static async indexCity(): Promise<City[]> {
+  static async indexCity() {
     const allCities = await Prisma.city.findMany({
       orderBy: {
         cityName: "asc",
@@ -266,7 +259,7 @@ class AddressServices {
   }
 
   // 🔹 Create new city
-  static async storeCity(payload: CityInput): Promise<City> {
+  static async storeCity(payload) {
     const formattedName =
       payload.cityName.charAt(0).toUpperCase() +
       payload.cityName.slice(1).toLowerCase();
@@ -290,7 +283,7 @@ class AddressServices {
   }
 
   // 🔹 Update existing city
-  static async updateCity(payload: CityInput, id: string): Promise<City> {
+  static async updateCity(payload, id) {
     if (!id) {
       throw ApiError.badRequest("City ID is required");
     }
@@ -338,7 +331,7 @@ class AddressServices {
   }
 
   // 🔹 Delete a city
-  static async deleteCity(id: string): Promise<City> {
+  static async deleteCity(id) {
     if (!id) {
       throw ApiError.badRequest("City ID is required");
     }

@@ -1,12 +1,10 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import AuthServices from "../services/auth.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
-import logger from "../utils/WinstonLogger.js";
 
-const cookieOptions: import("express").CookieOptions = {
+const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax",
@@ -15,7 +13,7 @@ const cookieOptions: import("express").CookieOptions = {
 };
 
 class AuthController {
-  static login = asyncHandler(async (req: Request, res: Response) => {
+  static login = asyncHandler(async (req, res) => {
     const { user, accessToken, refreshToken } = await AuthServices.login(
       req.body,
       req
@@ -23,7 +21,6 @@ class AuthController {
 
     const safeUser = Helper.serializeUser(user);
 
-    logger.info("User login completed", { userId: user.id });
 
     return res
       .status(200)
@@ -38,7 +35,7 @@ class AuthController {
       );
   });
 
-  static logout = asyncHandler(async (req: Request, res: Response) => {
+  static logout = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     const refreshToken = req.cookies?.refreshToken;
 
@@ -54,11 +51,10 @@ class AuthController {
       .json(ApiResponse.success(null, "Logout successful", 200));
   });
 
-  static refreshToken = asyncHandler(async (req: Request, res: Response) => {
+  static refreshToken = asyncHandler(async (req, res) => {
     const incomingRefresh = req.cookies?.refreshToken;
 
     if (!incomingRefresh) {
-      logger.warn("Refresh token missing in request");
       throw ApiError.unauthorized("Refresh token missing");
     }
 
@@ -73,7 +69,6 @@ class AuthController {
 
     const safeUser = Helper.serializeUser(user);
 
-    logger.info("Token refresh completed", { userId: user.id });
 
     return res
       .status(200)
@@ -86,53 +81,47 @@ class AuthController {
       );
   });
 
-  static forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+  static forgotPassword = asyncHandler(async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      logger.warn("Forgot password attempted without email");
       throw ApiError.badRequest("Email is required");
     }
 
     const result = await AuthServices.forgotPassword(email);
 
-    logger.info("Forgot password request processed", { email });
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
 
-  static resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  static resetPassword = asyncHandler(async (req, res) => {
     const { token, newPassword } = req.body;
 
     if (!token || !newPassword) {
-      logger.warn("Reset password attempted with missing fields");
       throw ApiError.badRequest("token and newPassword required");
     }
 
     const result = await AuthServices.resetPassword(token, newPassword);
 
-    logger.info("Password reset completed successfully");
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
 
-  static verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+  static verifyEmail = asyncHandler(async (req, res) => {
     const { token } = req.query;
 
     if (!token) {
-      logger.warn("Email verification attempted without token");
       throw ApiError.badRequest("token required");
     }
 
     const result = await AuthServices.verifyEmail(String(token));
 
-    logger.info("Email verification completed");
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
 
   static updateCredentials = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const { userId } = req.params;
       const currentUserId = req.user?.id;
 
@@ -142,15 +131,9 @@ class AuthController {
 
       const credentialsData = req.body;
 
-      logger.info("Updating credentials", {
-        userId,
-        currentUserId: currentUserId,
-        hasBody: !!req.body,
-        bodyKeys: Object.keys(req.body),
-      });
 
       const result = await AuthServices.updateCredentials(
-        userId!,
+        userId,
         credentialsData,
         currentUserId
       );
@@ -162,21 +145,7 @@ class AuthController {
       if (shouldLogout) {
         res.clearCookie("accessToken", cookieOptions);
         res.clearCookie("refreshToken", cookieOptions);
-
-        logger.info("User updated their own password - cookies cleared", {
-          userId,
-        });
-      } else if (credentialsData.newPassword) {
-        logger.info("Admin updated user password - cookies preserved", {
-          adminId: currentUserId,
-          targetUserId: userId,
-        });
       }
-
-      logger.info("User credentials updated successfully", {
-        userId,
-        updatedBy: currentUserId,
-      });
 
       return res.status(200).json(
         ApiResponse.success(

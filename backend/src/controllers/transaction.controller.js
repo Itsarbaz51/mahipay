@@ -1,4 +1,3 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { TransactionService } from "../services/transaction.service.js";
@@ -7,7 +6,7 @@ import Helper from "../utils/helper.js";
 
 export class TransactionController {
   static createTransaction = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const idempotencyKey = req.idempotencyKey;
 
       const transactionData = {
@@ -32,7 +31,7 @@ export class TransactionController {
   );
 
   static refundTransaction = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const refund = await TransactionService.refundTransaction(req.body);
       const safeRefund = Helper.serializeUser(refund);
 
@@ -44,18 +43,18 @@ export class TransactionController {
     }
   );
 
-  static getTransactions = asyncHandler(async (req: Request, res: Response) => {
+  static getTransactions = asyncHandler(async (req, res) => {
     const { userId, status, serviceId, apiEntityId, paymentType, page, limit } =
       req.query;
 
     const filters = {
-      userId: userId as string,
-      status: status as string,
-      serviceId: serviceId as string,
-      apiEntityId: apiEntityId as string,
-      paymentType: paymentType as string,
-      page: parseInt(page as string) || 1,
-      limit: parseInt(limit as string) || 10,
+      userId: userId ,
+      status: status ,
+      serviceId: serviceId ,
+      apiEntityId: apiEntityId ,
+      paymentType: paymentType ,
+      page: parseInt(page ) || 1,
+      limit: parseInt(limit ) || 10,
     };
 
     const transactions = await TransactionService.getTransactions(filters);
@@ -72,7 +71,7 @@ export class TransactionController {
   });
 
   static updateTransactionStatus = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const updated = await TransactionService.updateTransactionStatus(
         req.body
       );
@@ -92,7 +91,7 @@ export class TransactionController {
   );
 
   static getTransactionById = asyncHandler(
-    async (req: Request, res: Response) => {
+    async (req, res) => {
       const { id } = req.params;
 
       if (!id) {

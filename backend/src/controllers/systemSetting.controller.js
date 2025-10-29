@@ -1,24 +1,20 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import SystemSettingService from "../services/systemSetting.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
-import type { SystemSettingInput } from "../types/systemSetting.types.js";
 import Helper from "../utils/helper.js";
 
 class SystemSettingController {
 
-  static upsert = asyncHandler(async (req: Request, res: Response) => {
+  static upsert = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.unauthorized("User not authenticated");
 
-    const data: SystemSettingInput = { ...req.body };
+    const data = { ...req.body };
 
-    const uploadedFilePaths: string[] = [];
+    const uploadedFilePaths = [];
     if (req.files) {
-      const files = req.files as {
-        [fieldname: string]: Express.Multer.File[];
-      };
+      const files = req.files 
       if (files.companyLogo?.[0]) {
         data.companyLogo = files.companyLogo[0].path;
         uploadedFilePaths.push(files.companyLogo[0].path);
@@ -45,7 +41,7 @@ class SystemSettingController {
     }
   });
 
-  static show = asyncHandler(async (req: Request, res: Response) => {
+  static show = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) throw ApiError.internal("Failed to access user id setting");
@@ -59,8 +55,8 @@ class SystemSettingController {
       );
   });
 
-  static index = asyncHandler(async (req: Request, res: Response) => {
-    const { page = 1, limit = 10, sort = "desc" } = req.query as any;
+  static index = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 10, sort = "desc" } = req.query;
     const data = await SystemSettingService.getAll(
       Number(page),
       Number(limit),
@@ -71,7 +67,7 @@ class SystemSettingController {
       .json(ApiResponse.success(data, "System settings fetched", 200));
   });
 
-  static delete = asyncHandler(async (req: Request, res: Response) => {
+  static delete = asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("System setting ID is required");
 

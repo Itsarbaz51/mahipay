@@ -1,15 +1,13 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import { BankDetailService } from "../services/bank.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import type { BankDetailInputVerify } from "../types/bank.types.js";
 
 
 // ===================== USER BANK CONTROLLER =====================
 
 export class AddBankController {
-  static index = asyncHandler(async (req: Request, res: Response) => {
+  static index = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     const role = req.user?.role;
 
@@ -22,10 +20,10 @@ export class AddBankController {
 
     const params = {
       userId,
-      role: role as "ADMIN" | "STATE HEAD" | "MASTER DISTRIBUTOR" | "DISTRIBUTOR",
+      role: role,
       page: Number(page),
       limit: Number(limit),
-      sort: sortOrder as "asc" | "desc",
+      sort: sortOrder,
       status,
       search
     };
@@ -37,7 +35,7 @@ export class AddBankController {
       .json(ApiResponse.success(data, "Bank details fetched successfully", 200));
   });
 
-  static getAllMyBanks = asyncHandler(async (req: Request, res: Response) => {
+  static getAllMyBanks = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
@@ -48,7 +46,7 @@ export class AddBankController {
       .json(ApiResponse.success(data, "All bank details fetched successfully", 200));
   });
 
-  static show = asyncHandler(async (req: Request, res: Response) => {
+  static show = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
@@ -62,11 +60,11 @@ export class AddBankController {
       .json(ApiResponse.success(data, "Bank detail fetched successfully", 200));
   });
 
-  static store = asyncHandler(async (req: Request, res: Response) => {
+  static store = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
-    const file = req.file as Express.Multer.File | undefined;
+    const file = req.file
 
     const data = await BankDetailService.store({
       ...req.body,
@@ -79,7 +77,7 @@ export class AddBankController {
       .json(ApiResponse.success(data, "Bank detail added successfully", 201));
   });
 
-  static update = asyncHandler(async (req: Request, res: Response) => {
+  static update = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
@@ -88,7 +86,7 @@ export class AddBankController {
 
     if (!id) throw ApiError.internal("Bank detail ID is required");
 
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files
     const data = await BankDetailService.update(id, userId, {
       ...req.body,
       bankProofFile: files?.bankProofFile?.[0],
@@ -99,7 +97,7 @@ export class AddBankController {
       .json(ApiResponse.success(data, "Bank detail updated successfully", 200));
   });
 
-  static destroy = asyncHandler(async (req: Request, res: Response) => {
+  static destroy = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
@@ -116,9 +114,9 @@ export class AddBankController {
       );
   });
 
-  static verify = asyncHandler(async (req: Request, res: Response) => {
+  static verify = asyncHandler(async (req, res) => {
 
-    const { id, status, bankRejectionReason } = req.body as BankDetailInputVerify & { id?: string };
+    const { id, status, bankRejectionReason } = req.body
     const userId = req.user?.id;
 
     if (!id) throw ApiError.badRequest("Bank ID is required");

@@ -1,33 +1,20 @@
-// src/services/CCPayoutService.ts
 import { BulkpeAPIClient } from "./BulkpeAPIClient.js";
 import Prisma from "../../db/db.js";
 
-import {
-  EntityStatus,
-  PaymentType,
-  TxStatus,
-  ReferenceType,
-  LedgerEntryType,
-  WalletType,
-  ApiProvider,
-} from "@prisma/client";
 import { ApiError } from "../../utils/ApiError.js";
 import CommissionDistributionService from "../commission.distribution.service.js";
-import logger from "../../utils/WinstonLogger.js";
-import type { PayoutDetail } from "../../types/bulkpay/ccPayout.types.js";
 import { CryptoService } from "../../utils/cryptoService.js";
 
 export class CCPayoutService {
-  private bulkpeClient: BulkpeAPIClient;
-  private serviceType = "CC_PAYOUT"; // Service type constant
-
   constructor() {
     this.bulkpeClient = new BulkpeAPIClient();
+    this.serviceType = "CC_PAYOUT"; 
   }
 
-  private async generateSequentialReferenceId(
-    prefix: string = "ref"
-  ): Promise<string> {
+
+   async generateSequentialReferenceId(
+    prefix = "ref"
+  ){
     const latestEntity = await Prisma.apiEntity.findFirst({
       where: {
         reference: {
@@ -55,7 +42,7 @@ export class CCPayoutService {
     return `${prefix}${sequence}`;
   }
 
-  async createSender(userId: string, reqIp: string, payload: any) {
+  async createSender(userId, reqIp, payload) {
     return await Prisma.$transaction(async (tx) => {
       const referenceId =
         payload.referenceId ||
@@ -136,10 +123,10 @@ export class CCPayoutService {
   }
 
   async uploadCardImage(
-    userId: string,
-    senderId: string,
-    cardImageType: "front" | "back",
-    file: Express.Multer.File
+    userId,
+    senderId,
+    cardImageType,
+    file
   ) {
     return await Prisma.$transaction(async (tx) => {
       const senderEntity = await tx.apiEntity.findFirst({
@@ -160,7 +147,7 @@ export class CCPayoutService {
         file
       );
 
-      const currentMetadata = (senderEntity.metadata as any) || {};
+      const currentMetadata = (senderEntity.metadata);
 
       const updatedMetadata = {
         ...currentMetadata,
@@ -211,10 +198,10 @@ export class CCPayoutService {
     });
   }
 
-  async listSenders(userId: string, query: any) {
+  async listSenders(userId, query) {
     const { page = 1, limit = 10, referenceId, senderId } = query;
 
-    const where: any = {
+    const where = {
       entityType: "cc_sender",
       userId: userId,
     };
@@ -233,7 +220,7 @@ export class CCPayoutService {
     ]);
 
     const formattedSenders = senders.map((entity) => {
-      const metadata = entity.metadata as any;
+      const metadata = entity.metadata;
       const encryptedData = metadata?.encryptedData || {};
 
       let maskedPan = "*****";
@@ -250,7 +237,7 @@ export class CCPayoutService {
           maskedCardNumber = CryptoService.maskCardNumber(decryptedCardNo);
         }
       } catch (error) {
-        logger.error("Error decrypting data for display", {
+        console.error("Error decrypting data for display", {
           error,
           entityId: entity.id,
         });
@@ -282,7 +269,7 @@ export class CCPayoutService {
     };
   }
 
-  async createBeneficiary(userId: string, payload: any) {
+  async createBeneficiary(userId, payload) {
     return await Prisma.$transaction(async (tx) => {
       const reference =
         payload.reference || (await this.generateSequentialReferenceId("bene"));
@@ -355,10 +342,10 @@ export class CCPayoutService {
     });
   }
 
-  async listBeneficiaries(userId: string, query: any) {
+  async listBeneficiaries(userId, query) {
     const { page = 1, limit = 10, status, reference, beneficiaryId } = query;
 
-    const where: any = {
+    const where = {
       entityType: "cc_beneficiary",
       userId: userId,
     };
@@ -378,7 +365,7 @@ export class CCPayoutService {
     ]);
 
     const formattedBeneficiaries = beneficiaries.map((entity) => {
-      const metadata = entity.metadata as any;
+      const metadata = entity.metadata;
       const encryptedData = metadata?.encryptedData || {};
 
       let maskedAccountNumber = "****";
@@ -392,7 +379,7 @@ export class CCPayoutService {
             CryptoService.maskAccountNumber(decryptedAccount);
         }
       } catch (error) {
-        logger.error("Error decrypting account number for display", {
+        console.error("Error decrypting account number for display", {
           error,
           entityId: entity.id,
         });
@@ -421,7 +408,7 @@ export class CCPayoutService {
     };
   }
 
-  async createCardCollection(userId: string, payload: any) {
+  async createCardCollection(userId, payload) {
     return await Prisma.$transaction(async (tx) => {
       const reference =
         payload.reference || (await this.generateSequentialReferenceId("coll"));
@@ -608,7 +595,7 @@ export class CCPayoutService {
     });
   }
 
-  async listCollections(userId: string, query: any) {
+  async listCollections(userId, query) {
     const {
       page = 1,
       limit = 10,
@@ -626,7 +613,7 @@ export class CCPayoutService {
     });
 
     // Fix: Create proper where condition with serviceId
-    const transactionWhere: any = {
+    const transactionWhere = {
       userId: userId,
       paymentType: PaymentType.COLLECTION,
     };
@@ -660,10 +647,10 @@ export class CCPayoutService {
 
     const formattedCollections = await Promise.all(
       transactions.map(async (tx) => {
-        const metadata = tx.metadata as any;
+        const metadata = tx.metadata;
 
         const latestWebhook = tx.apiWebhooks[0];
-        const webhookStatus = latestWebhook?.payload as any;
+        const webhookStatus = latestWebhook?.payload ;
 
         return {
           collectionId: tx.externalRefId,
@@ -700,7 +687,7 @@ export class CCPayoutService {
     };
   }
 
-  async handleWebhook(payload: any) {
+  async handleWebhook(payload) {
     return await Prisma.$transaction(async (tx) => {
       const { collectionId, status, message, utr, payouts } = payload;
 
@@ -730,7 +717,7 @@ export class CCPayoutService {
           completedAt: new Date(),
           updatedAt: new Date(),
           metadata: this.safeJsonParse({
-            ...(transaction.metadata as any),
+            ...(transaction.metadata),
             utr: utr,
             webhookStatus: status,
             webhookMessage: message,
@@ -750,7 +737,7 @@ export class CCPayoutService {
             status === "SUCCESS" ? EntityStatus.ACTIVE : EntityStatus.INACTIVE,
           updatedAt: new Date(),
           metadata: this.safeJsonParse({
-            ...(transaction.metadata as any),
+            ...(transaction.metadata),
             status: status,
             message: message,
             utr: utr,
@@ -771,13 +758,8 @@ export class CCPayoutService {
             },
             "SYSTEM"
           );
-
-          logger.info("Commission distributed successfully", {
-            transactionId: transaction.id,
-            collectionId: collectionId,
-          });
         } catch (commissionError) {
-          logger.error("Commission distribution failed", {
+          console.error("Commission distribution failed", {
             transactionId: transaction.id,
             error: commissionError,
             collectionId: collectionId,
@@ -888,7 +870,7 @@ export class CCPayoutService {
     });
   }
 
-  async getDashboardStats(userId: string) {
+  async getDashboardStats(userId) {
     // Get CC Payout service
     const service = await Prisma.serviceProvider.findFirst({
       where: {
@@ -898,17 +880,17 @@ export class CCPayoutService {
     });
 
     // Fix: Create proper where conditions with serviceId checks
-    const baseWhere: any = {
+    const baseWhere = {
       userId: userId,
       paymentType: PaymentType.COLLECTION,
     };
 
-    const successWhere: any = {
+    const successWhere = {
       ...baseWhere,
       status: TxStatus.SUCCESS,
     };
 
-    const pendingWhere: any = {
+    const pendingWhere = {
       ...baseWhere,
       status: TxStatus.PENDING,
     };
@@ -983,7 +965,7 @@ export class CCPayoutService {
     };
   }
 
-  async getDecryptedSenderData(userId: string, senderId: string) {
+  async getDecryptedSenderData(userId, senderId) {
     const senderEntity = await Prisma.apiEntity.findFirst({
       where: {
         entityType: "cc_sender",
@@ -996,7 +978,7 @@ export class CCPayoutService {
       throw ApiError.notFound("Sender not found");
     }
 
-    const metadata = senderEntity.metadata as any;
+    const metadata = senderEntity.metadata;
     const encryptedData = metadata?.encryptedData || {};
 
     const decryptedData = {
@@ -1029,7 +1011,7 @@ export class CCPayoutService {
     };
   }
 
-  async getDecryptedBeneficiaryData(userId: string, beneficiaryId: string) {
+  async getDecryptedBeneficiaryData(userId, beneficiaryId) {
     const beneficiaryEntity = await Prisma.apiEntity.findFirst({
       where: {
         entityType: "cc_beneficiary",
@@ -1042,7 +1024,7 @@ export class CCPayoutService {
       throw ApiError.notFound("Beneficiary not found");
     }
 
-    const metadata = beneficiaryEntity.metadata as any;
+    const metadata = beneficiaryEntity.metadata;
     const encryptedData = metadata?.encryptedData || {};
 
     const decryptedData = {
@@ -1067,33 +1049,33 @@ export class CCPayoutService {
     };
   }
 
-  private convertToJsonCompatible(obj: any): any {
+  static convertToJsonCompatible(obj) {
     return JSON.parse(JSON.stringify(obj));
   }
 
-  private safeJsonParse(data: any): any {
+  static safeJsonParse(data) {
     try {
       return JSON.parse(JSON.stringify(data));
     } catch (error) {
-      logger.error("JSON conversion error", { error, data });
+      console.error("JSON conversion error", { error, data });
       return {};
     }
   }
 
-  private convertPayoutsToJson(payouts: PayoutDetail[]): any[] {
+  static convertPayoutsToJson(payouts) {
     return payouts.map((payout) => this.convertToJsonCompatible(payout));
   }
 
-  private convertToPaise(amount: number): bigint {
+  static convertToPaise(amount) {
     return BigInt(Math.round(amount * 100));
   }
 
-  private convertToRupees(amount: bigint): number {
+  static convertToRupees(amount) {
     return Number(amount) / 100;
   }
 
-  private mapWebhookStatus(webhookStatus: string): TxStatus {
-    const statusMap: { [key: string]: TxStatus } = {
+  static mapWebhookStatus(webhookStatus) {
+    const statusMap= {
       SUCCESS: TxStatus.SUCCESS,
       FAILED: TxStatus.FAILED,
       PENDING: TxStatus.PENDING,

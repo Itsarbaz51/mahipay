@@ -1,21 +1,13 @@
 import Prisma from "../db/db.js";
 import { KycStatus as PrismaKycStatus } from "@prisma/client";
-import type {
-  UserKyc,
-  Gender,
-  UserKycUploadInput,
-  KycVerificationInput,
-  FilterParams,
-} from "../types/kyc.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import S3Service from "../utils/S3Service.js";
 import Helper from "../utils/helper.js";
 import { CryptoService } from "../utils/cryptoService.js";
-import { cacheUser, cacheUserKyc, getCache, getCachedUserKyc, invalidateUserCache, invalidateUserKycCache, setCache } from "../utils/redisCasheHelper.js";
 
 class KycServices {
   // users kyc
-  static async indexUserKyc(params: FilterParams) {
+  static async indexUserKyc(params) {
     const {
       userId,
       status = "ALL",
@@ -28,13 +20,6 @@ class KycServices {
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 10;
     const sortOrder = sort === "asc" ? "asc" : "desc";
-
-    // --- Build cache key
-    const cacheKey = `page:${pageNum}:limit:${limitNum}:status:${status}:sort:${sortOrder}:search:${search || ""}`;
-
-    // --- Check cache
-    const cached = await getCachedUserKyc(`${userId}:${cacheKey}`);
-    if (cached) return cached;
 
     // --- Fetch from DB
     const user = await Prisma.user.findUnique({
@@ -61,7 +46,7 @@ class KycServices {
 
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {
+    const where = {
       userId: { in: childUserIds },
       ...(status && status.toUpperCase() !== "ALL" && { status: status.toUpperCase() }),
       ...(search && {
@@ -135,28 +120,18 @@ class KycServices {
       },
     };
 
-    // --- Cache the result
-    await cacheUserKyc(`${userId}:${cacheKey}`, result, 300);
-
     return result;
   }
 
   static async showUserKyc(
-    id?: string,
-    userId?: string,
-    requestingUser?: { id: string; role: string }
+    id,
+    userId,
+    requestingUser
   ) {
     if (!id && !userId) {
       throw ApiError.badRequest("Either KYC ID or User ID is required");
     }
-
-    const cacheKey = id ? `userKyc:id:${id}` : `userKyc:user:${userId}`;
-
-    // Try fetching from cache first
-    const cachedKyc = await getCachedUserKyc<any>(cacheKey);
-    if (cachedKyc) return cachedKyc;
-
-    const whereClause: any = {};
+    const whereClause = {};
     if (id && id !== "undefined") whereClause.id = id;
     else if (userId) whereClause.userId = userId;
 
@@ -179,13 +154,13 @@ class KycServices {
 
     if (!kyc) throw ApiError.notFound("KYC not found");
 
-    const kycWithRelations = kyc as any;
+    const kycWithRelations = kyc;
 
     const isOwner = requestingUser && kyc.userId === requestingUser.id;
     const isAdmin = requestingUser && requestingUser.role === "ADMIN";
 
     const pii = await Promise.all(
-      kycWithRelations.piiConsents.map(async (p: any) => {
+      kycWithRelations.piiConsents.map(async (p) => {
         try {
           const decryptedValue = await CryptoService.decrypt(p.piiHash);
           if (isAdmin || isOwner) {
@@ -242,16 +217,10 @@ class KycServices {
       updatedAt: kyc.updatedAt,
     };
 
-    try {
-      await cacheUserKyc(cacheKey, result, 300);
-    } catch (cacheError) {
-      console.error("⚠️ Failed to cache user KYC:", cacheError);
-    }
-
     return result;
   }
 
-  static async storeUserKyc(payload: UserKycUploadInput): Promise<UserKyc> {
+  static async storeUserKyc(payload) {
     try {
       const userExists = await Prisma.user.findUnique({
         where: { id: payload.userId },
@@ -348,16 +317,9 @@ class KycServices {
         throw ApiError.internal("Failed to create user kyc Pii");
       }
 
-      // Cache the created KYC Cache for 2 seconds
-      try {
-        await cacheUserKyc(payload.userId, createdKyc, 2000);
-      } catch (cacheError) {
-        console.error("⚠️ Failed to cache new user KYC:", cacheError);
-      }
-
       return {
         ...createdKyc,
-        gender: createdKyc.gender as Gender,
+        gender: createdKyc.gender,
         kycRejectionReason: createdKyc.kycRejectionReason ?? "",
       };
     } catch (error) {
@@ -372,19 +334,15 @@ class KycServices {
       ].filter(Boolean);
 
       for (const filePath of allFiles) {
-        await Helper.deleteOldImage(filePath as string);
+        await Helper.deleteOldImage(filePath );
       }
     }
   }
 
   static async updateUserKyc(
-    id: string,
-    payload: Partial<UserKycUploadInput> & {
-      status?: string;
-      kycRejectionReason?: string | null;
-      userId?: string;
-    }
-  ): Promise<UserKyc> {
+    id,
+    payload
+  ) {
     try {
       const existingKyc = await Prisma.userKyc.findUnique({
         where: { id: id },
@@ -400,7 +358,7 @@ class KycServices {
         );
       }
 
-      const updates: any = {};
+      const updates = {};
       if (payload.firstName) updates.firstName = payload.firstName.trim();
       if (payload.lastName) updates.lastName = payload.lastName.trim();
       if (payload.fatherName) updates.fatherName = payload.fatherName.trim();
@@ -417,8 +375,8 @@ class KycServices {
         }
       }
 
-      const uploadTasks: Promise<string | null>[] = [];
-      const fileFields: [keyof typeof payload, keyof typeof existingKyc][] = [
+      const uploadTasks= [];
+      const fileFields = [
         ["panFile", "panFile"],
         ["photo", "photo"],
         ["aadhaarFile", "aadhaarFile"],
@@ -426,16 +384,16 @@ class KycServices {
       ];
 
       for (const [fileField, dbField] of fileFields) {
-        const file = payload[fileField] as any;
+        const file = payload[fileField];
         if (file && typeof file === "object" && "path" in file) {
           uploadTasks.push(
             (async () => {
               const newUrl = await S3Service.upload(
-                (file as any).path,
+                (file).path,
                 "user-kyc"
               );
               if (newUrl) {
-                const oldUrl = existingKyc[dbField] as string | null;
+                const oldUrl = existingKyc[dbField];
                 if (oldUrl) {
                   await S3Service.delete({ fileUrl: oldUrl });
                 }
@@ -460,26 +418,9 @@ class KycServices {
         throw ApiError.internal("Failed to update user kyc");
       }
 
-      // Update Redis Cache
-      try {
-        await invalidateUserCache(existingKyc.userId);
-        await invalidateUserKycCache(existingKyc.userId);
-
-        if (updatedKyc.status === "VERIFIED") {
-          await cacheUser(existingKyc.userId, updatedKyc, 2000);
-          await cacheUserKyc(existingKyc.userId, updatedKyc, 2000);
-        }
-      } catch (cacheError) {
-        console.error(
-          "⚠️ Failed to update cache for user and KYC:",
-          existingKyc.userId,
-          cacheError
-        );
-      }
-
       return {
         ...updatedKyc,
-        gender: updatedKyc.gender as Gender,
+        gender: updatedKyc.gender,
         kycRejectionReason: updatedKyc.kycRejectionReason ?? "",
       };
     } catch (error) {
@@ -494,12 +435,12 @@ class KycServices {
       ].filter(Boolean);
 
       for (const filePath of allFiles) {
-        await Helper.deleteOldImage(filePath as string);
+        await Helper.deleteOldImage(filePath);
       }
     }
   }
 
-  static async verifyUserKyc(payload: KycVerificationInput): Promise<UserKyc> {
+  static async verifyUserKyc(payload) {
     const existingKyc = await Prisma.userKyc.findFirst({
       where: { id: payload.id },
     });
@@ -509,7 +450,7 @@ class KycServices {
     }
 
     const enumStatus =
-      PrismaKycStatus[payload.status as keyof typeof PrismaKycStatus];
+      PrismaKycStatus[payload.status];
 
     if (!enumStatus) {
       throw ApiError.badRequest("Invalid status value");
@@ -544,23 +485,14 @@ class KycServices {
       },
     });
 
-    // Invalidate and update cache
-    try {
-      await invalidateUserCache(existingKyc.userId);
-      await invalidateUserKycCache(existingKyc.userId);
-
-      // Re-cache only if verified
-      if (enumStatus === "VERIFIED") {
-        await cacheUser(existingKyc.userId, updatedUser, 5000);
-        await cacheUserKyc(existingKyc.userId, updateVerify, 5000);
-      }
-    } catch (cacheError) {
-      console.error("⚠️ Failed to update cache:", cacheError);
+    if (!updatedUser) {
+      throw ApiError.internal("Failed to update user KYC status");
     }
+
 
     return {
       ...updateVerify,
-      gender: updateVerify.gender as Gender,
+      gender: updateVerify.gender,
       kycRejectionReason: updateVerify.kycRejectionReason ?? "",
     };
   }

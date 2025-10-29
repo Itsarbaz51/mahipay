@@ -1,18 +1,12 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
-import type {
-  RoleCreatePayload,
-  RoleDTO,
-  RoleUpdatePayload,
-} from "../types/role.types.js";
+
 
 class RoleServices {
-  static async index(options: { currentUserRoleLevel?: number }): Promise<{
-    roles: RoleDTO[];
-  }> {
+  static async index(options) {
     const { currentUserRoleLevel } = options;
 
-    const where: any = {};
+    const where= {};
 
     if (typeof currentUserRoleLevel === "number") {
       where.level = { gt: currentUserRoleLevel };
@@ -39,7 +33,7 @@ class RoleServices {
       },
     });
 
-    const roleDTOs: RoleDTO[] = roles.map((role) => ({
+    const roleDTOs = roles.map((role) => ({
       id: role.id,
       name: role.name,
       level: role.level,
@@ -56,7 +50,7 @@ class RoleServices {
     };
   }
 
-  static async show(id: string): Promise<RoleDTO | null> {
+  static async show(id) {
     const role = await Prisma.role.findUnique({
       where: { id },
       include: {
@@ -112,8 +106,8 @@ class RoleServices {
   }
 
   static async store(
-    payload: RoleCreatePayload & { createdBy: string }
-  ): Promise<RoleDTO> {
+    payload
+  ) {
     let { name, description, level, createdBy } = payload;
 
     // Check if role with same name exists
@@ -181,7 +175,7 @@ class RoleServices {
     }
 
     // Return DTO
-    const dto: RoleDTO = {
+    const dto = {
       id: role.id,
       name: role.name,
       level: role.level,
@@ -195,9 +189,9 @@ class RoleServices {
   }
 
   static async update(
-    id: string,
-    payload: RoleUpdatePayload & { updatedBy: string }
-  ): Promise<RoleDTO | null> {
+    id,
+    payload
+   ) {
     const { name, description, level } = payload;
 
     // Check if role exists
@@ -226,7 +220,7 @@ class RoleServices {
       }
     }
 
-    const updateData: any = {};
+    const updateData = {};
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (level !== undefined) updateData.level = level;
@@ -246,7 +240,7 @@ class RoleServices {
       },
     });
 
-    const dto: RoleDTO = {
+    const dto = {
       id: role.id,
       name: role.name,
       level: role.level,
@@ -259,7 +253,7 @@ class RoleServices {
     return dto;
   }
 
-  static async destroy(id: string): Promise<boolean> {
+  static async destroy(id) {
     // Check if role exists
     const existingRole = await Prisma.role.findUnique({
       where: { id },
@@ -300,9 +294,9 @@ class RoleServices {
 
   // Additional method to check if user can manage this role
   static async canUserManageRole(
-    userRoleLevel: number,
-    targetRoleLevel: number
-  ): Promise<boolean> {
+    userRoleLevel,
+    targetRoleLevel
+  ) {
     return userRoleLevel < targetRoleLevel;
   }
 }

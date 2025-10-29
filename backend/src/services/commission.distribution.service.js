@@ -1,15 +1,4 @@
-// src/services/commission.distribution.service.ts
-import {
-  LedgerEntryType,
-  ReferenceType,
-  CommissionType,
-  CommissionScope,
-  WalletType,
-  type CommissionEarning,
-  type CommissionSetting,
-} from "@prisma/client";
 import { ApiError } from "../utils/ApiError.js";
-import logger from "../utils/WinstonLogger.js";
 import Prisma from "../db/db.js";
 
 const ROLE_HIERARCHY = {
@@ -18,63 +7,14 @@ const ROLE_HIERARCHY = {
   "MASTER DISTRIBUTOR": 2,
   DISTRIBUTOR: 3,
   RETAILER: 4,
-} as const;
-
-interface CommissionChainMember {
-  userId: string;
-  roleId: string;
-  roleName: string;
-  commissionType: CommissionType;
-  commissionValue: any;
-  level: number;
-}
-
-interface CommissionPayout {
-  fromUserId: string;
-  toUserId: string;
-  amount: bigint;
-  level: number;
-  roleName: string;
-  commissionType: CommissionType;
-  commissionValue: any;
-  narration: string;
-}
-
-interface TransactionForCommission {
-  id: string;
-  userId: string;
-  serviceId: string;
-  amount: bigint;
-  channel?: string | null;
-  providerCharge?: bigint;
-}
-
-interface UserChain {
-  id: string;
-  parentId: string | null;
-  roleId: string;
-  role: {
-    name: string;
-  } | null;
-  hierarchyLevel: number;
-  hierarchyPath: string;
-}
-
-interface CommissionCalculation {
-  userId: string;
-  roleName: string;
-  amount: bigint;
-  level: number;
-  commissionType: CommissionType;
-  commissionValue: any;
-}
+};
 
 export class CommissionDistributionService {
   static async getCommissionChain(
-    userId: string,
-    serviceId: string,
-    channel: string | null = null
-  ): Promise<CommissionChainMember[]> {
+    userId,
+    serviceId,
+    channel = null
+  ) {
     const userWithPath = await Prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -118,11 +58,7 @@ export class CommissionDistributionService {
     });
 
     if (chainUsers.length !== hierarchyIds.length) {
-      logger.warn("Incomplete hierarchy chain found", {
-        userId,
-        expected: hierarchyIds.length,
-        found: chainUsers.length,
-      });
+      throw ApiError.internal("Incomplete hierarchy chain");
     }
 
     this.validateHierarchyOrder(chainUsers);
@@ -130,33 +66,27 @@ export class CommissionDistributionService {
     return await this.resolveCommissionSettings(chainUsers, serviceId, channel);
   }
 
-  private static validateHierarchyOrder(chainUsers: UserChain[]): void {
+   static validateHierarchyOrder(chainUsers) {
     const roleLevels = chainUsers.map((user) => {
       const roleName =
         user.role?.name?.toUpperCase().replace(/\s+/g, "_") || "";
-      return ROLE_HIERARCHY[roleName as keyof typeof ROLE_HIERARCHY] ?? 999;
+      return ROLE_HIERARCHY[roleName ] ?? 999;
     });
 
     for (let i = 1; i < roleLevels.length; i++) {
-      if (roleLevels[i]! <= roleLevels[i - 1]!) {
-        logger.warn("Invalid hierarchy order detected", {
-          chain: chainUsers.map((u) => ({
-            userId: u.id,
-            role: u.role?.name,
-          })),
-        });
-        break;
+      if (roleLevels[i] <= roleLevels[i - 1]) {
+        throw ApiError.internal("Invalid hierarchy order detected");
       }
     }
   }
 
-  private static async resolveCommissionSettings(
-    chainUsers: UserChain[],
-    serviceId: string,
-    channel: string | null
-  ): Promise<CommissionChainMember[]> {
-    const results: CommissionChainMember[] = [];
-    const roleCommissionCache = new Map<string, CommissionSetting | null>();
+   static async resolveCommissionSettings(
+    chainUsers,
+    serviceId,
+    channel
+  ) {
+    const results  = [];
+    const roleCommissionCache = new Map();
     const now = new Date();
 
     const userIds = chainUsers.map((u) => u.id);
@@ -174,7 +104,7 @@ export class CommissionDistributionService {
     });
 
     const userSettingsMap = new Map(
-      userSettings.map((setting) => [setting.targetUserId!, setting])
+      userSettings.map((setting) => [setting.targetUserId, setting])
     );
 
     for (const user of chainUsers) {
@@ -230,7 +160,7 @@ export class CommissionDistributionService {
         userId: user.id,
         roleId: user.roleId,
         roleName: roleName,
-        commissionType: CommissionType.FLAT,
+        commissionType: "FLAT",
         commissionValue: 0,
         level: user.hierarchyLevel,
       });
@@ -242,10 +172,10 @@ export class CommissionDistributionService {
   }
 
   static calculateCommissionAmount(
-    baseAmount: bigint,
-    commissionType: CommissionType,
-    commissionValue: any
-  ): bigint {
+    baseAmount,
+    commissionType,
+    commissionValue
+  ) {
     if (commissionType === CommissionType.FLAT) {
       const decimalValue = Number(commissionValue);
       const amountInPaise = Math.round(decimalValue * 100);
@@ -258,7 +188,7 @@ export class CommissionDistributionService {
     }
   }
 
-  private static validateCommissionChain(chain: CommissionChainMember[]): void {
+   static validateCommissionChain(chain) {
     if (chain.length === 0) return;
 
     const userIds = new Set();
@@ -289,17 +219,13 @@ export class CommissionDistributionService {
       }
     }
 
-    logger.debug("Commission chain validation passed", {
-      chainLength: chain.length,
-      userIds: Array.from(userIds),
-    });
   }
 
   static calculateHierarchicalCommissions(
-    chain: CommissionChainMember[],
-    baseAmount: bigint
-  ): CommissionCalculation[] {
-    const commissions: CommissionCalculation[] = [];
+    chain,
+    baseAmount
+  ) {
+    const commissions = [];
 
     if (chain.length === 0) return commissions;
 
@@ -308,7 +234,7 @@ export class CommissionDistributionService {
     const adminMember = sortedChain.find((member) => member.level === 0);
 
     if (!adminMember) {
-      logger.warn("No ADMIN found in commission chain, using first member");
+      console.log("No ADMIN found in commission chain");
       const firstMember = sortedChain[0];
       if (firstMember) {
         const totalCommissionPool = this.calculateCommissionAmount(
@@ -328,7 +254,7 @@ export class CommissionDistributionService {
       adminMember.commissionValue
     );
 
-    logger.debug("Total commission pool calculated by ADMIN", {
+    console.log("Total commission pool calculated by ADMIN", {
       adminUserId: adminMember.userId,
       totalCommissionPool: Number(totalCommissionPool) / 100,
       baseAmount: Number(baseAmount) / 100,
@@ -339,18 +265,18 @@ export class CommissionDistributionService {
     return this.distributeCommissionPool(sortedChain, totalCommissionPool);
   }
 
-  private static distributeCommissionPool(
-    chain: CommissionChainMember[],
-    totalCommissionPool: bigint
-  ): CommissionCalculation[] {
-    const commissions: CommissionCalculation[] = [];
+   static distributeCommissionPool(
+    chain,
+    totalCommissionPool
+  ) {
+    const commissions = [];
     let remainingPool = totalCommissionPool;
 
     for (let i = 0; i < chain.length; i++) {
       const member = chain[i];
       if (!member) continue;
 
-      let memberCommission: bigint;
+      let memberCommission;
 
       if (i === chain.length - 1) {
         memberCommission = remainingPool;
@@ -377,7 +303,7 @@ export class CommissionDistributionService {
 
       remainingPool -= memberCommission;
 
-      logger.debug("Member commission allocated", {
+      console.log("Member commission allocated", {
         userId: member.userId,
         role: member.roleName,
         level: member.level,
@@ -394,14 +320,10 @@ export class CommissionDistributionService {
     );
 
     if (totalDistributed !== totalCommissionPool) {
-      logger.warn("Commission distribution mismatch", {
-        totalPool: Number(totalCommissionPool) / 100,
-        totalDistributed: Number(totalDistributed) / 100,
-        difference: Number(totalCommissionPool - totalDistributed) / 100,
-      });
+
 
       if (Math.abs(Number(totalCommissionPool - totalDistributed)) <= 1) {
-        logger.info("Minor rounding difference auto-corrected");
+        console.log("Minor rounding difference auto-corrected");
         if (commissions.length > 0) {
           const lastCommission = commissions[commissions.length - 1];
           if (lastCommission) {
@@ -419,10 +341,10 @@ export class CommissionDistributionService {
   }
 
   static calculateCommissionPayouts(
-    commissions: CommissionCalculation[],
-    transactionId: string
-  ): CommissionPayout[] {
-    const payouts: CommissionPayout[] = [];
+    commissions,
+    transactionId
+  ){
+    const payouts= [];
 
     if (commissions.length === 0) return payouts;
 
@@ -448,7 +370,7 @@ export class CommissionDistributionService {
         narration: `Total commission pool for transaction ${transactionId}`,
       });
 
-      logger.debug("SYSTEM payout to ADMIN", {
+      console.log("SYSTEM payout to ADMIN", {
         toUserId: adminCommission.userId,
         amount: Number(totalCommissionPool) / 100,
       });
@@ -470,7 +392,7 @@ export class CommissionDistributionService {
           narration: `Commission share for transaction ${transactionId} (${payer.roleName} → ${receiver.roleName})`,
         });
 
-        logger.debug("Inter-level payout", {
+        console.log("Inter-level payout", {
           fromUserId: payer.userId,
           fromRole: payer.roleName,
           toUserId: receiver.userId,
@@ -484,13 +406,13 @@ export class CommissionDistributionService {
   }
 
   static async distribute(
-    transaction: TransactionForCommission,
-    createdBy: string
-  ): Promise<CommissionEarning[]> {
+    transaction,
+    createdBy
+  ){
     const { id: transactionId, serviceId, amount: txAmount } = transaction;
     const baseAmount = BigInt(txAmount);
 
-    logger.info("Starting commission distribution", {
+    console.log("Starting commission distribution", {
       transactionId,
       userId: transaction.userId,
       serviceId,
@@ -504,11 +426,11 @@ export class CommissionDistributionService {
     );
 
     if (chain.length === 0) {
-      logger.info("No commission chain found", { transactionId });
+      console.log("No commission chain found", { transactionId });
       return [];
     }
 
-    logger.info("Commission chain found", {
+    console.log("Commission chain found", {
       transactionId,
       chainLength: chain.length,
       userIds: chain.map((m) => m.userId),
@@ -526,11 +448,11 @@ export class CommissionDistributionService {
       BigInt(0)
     );
     if (totalCommission === BigInt(0)) {
-      logger.info("No commission to distribute", { transactionId });
+      console.log("No commission to distribute", { transactionId });
       return [];
     }
 
-    logger.info("Hierarchical commissions calculated", {
+    console.log("Hierarchical commissions calculated", {
       transactionId,
       totalCommissionPool: Number(totalCommission) / 100,
       commissions: hierarchicalCommissions.map((c) => ({
@@ -549,11 +471,11 @@ export class CommissionDistributionService {
     );
 
     if (payouts.length === 0) {
-      logger.info("No commission payouts calculated", { transactionId });
+      console.log("No commission payouts calculated", { transactionId });
       return [];
     }
 
-    logger.info("Commission payouts calculated", {
+    console.log("Commission payouts calculated", {
       transactionId,
       totalPayouts: payouts.length,
       payouts: payouts.map((p) => ({
@@ -566,7 +488,7 @@ export class CommissionDistributionService {
     });
 
     const createdEarnings = await Prisma.$transaction(async (tx) => {
-      const earnings: CommissionEarning[] = [];
+      const earnings = [];
 
       for (const payout of payouts) {
         if (payout.fromUserId === "SYSTEM") {
@@ -598,7 +520,7 @@ export class CommissionDistributionService {
           );
         }
 
-        const earningData: any = {
+        const earningData = {
           userId: payout.toUserId,
           serviceId: serviceId,
           transactionId: transactionId,
@@ -631,7 +553,7 @@ export class CommissionDistributionService {
 
         earnings.push(earning);
 
-        logger.debug("Commission earning recorded", {
+        console.log("Commission earning recorded", {
           transactionId,
           earningId: earning.id,
           from: payout.fromUserId,
@@ -648,7 +570,7 @@ export class CommissionDistributionService {
       .filter((p) => p.fromUserId === "SYSTEM")
       .reduce((sum, payout) => sum + payout.amount, BigInt(0));
 
-    logger.info("Commission distribution completed successfully", {
+    console.log("Commission distribution completed successfully", {
       transactionId,
       distributedCount: createdEarnings.length,
       totalSystemCommission: Number(totalSystemCommission) / 100,
@@ -661,14 +583,14 @@ export class CommissionDistributionService {
     return createdEarnings;
   }
 
-  private static async creditUserWallet(
-    tx: any,
-    userId: string,
-    amount: bigint,
-    transactionId: string,
-    narration: string,
-    createdBy: string
-  ): Promise<void> {
+   static async creditUserWallet(
+    tx,
+    userId,
+    amount,
+    transactionId,
+    narration,
+    createdBy
+  ) {
     const wallet = await tx.wallet.findFirst({
       where: {
         userId: userId,
@@ -708,7 +630,7 @@ export class CommissionDistributionService {
       },
     });
 
-    logger.debug("Wallet credited", {
+    console.log("Wallet credited", {
       userId,
       amount: Number(amount) / 100,
       newBalance: Number(newBalance) / 100,
@@ -716,14 +638,14 @@ export class CommissionDistributionService {
     });
   }
 
-  private static async debitUserWallet(
-    tx: any,
-    userId: string,
-    amount: bigint,
-    transactionId: string,
-    narration: string,
-    createdBy: string
-  ): Promise<void> {
+   static async debitUserWallet(
+    tx,
+    userId,
+    amount,
+    transactionId,
+    narration,
+    createdBy
+  ) {
     const wallet = await tx.wallet.findFirst({
       where: {
         userId: userId,
@@ -770,7 +692,7 @@ export class CommissionDistributionService {
       },
     });
 
-    logger.debug("Wallet debited", {
+    console.log("Wallet debited", {
       userId,
       amount: Number(amount) / 100,
       newBalance: Number(newBalance) / 100,

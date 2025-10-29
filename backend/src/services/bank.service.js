@@ -1,25 +1,12 @@
 import Prisma from "../db/db.js";
-import type {
-  BankDetail,
-  BankDetailInput,
-  BankDetailInputVerify
-} from "../types/bank.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
-import { clearPattern, getCacheWithPrefix, setCacheWithPrefix } from "../utils/redisCasheHelper.js";
 import S3Service from "../utils/S3Service.js";
-import { KycStatus } from "@prisma/client";
 
 
 export class BankDetailService {
   // ================= BANK DETAILS =================
-  static async getAllChildrenIds(userId: string): Promise<string[]> {
-
-    // redis cache helper functions
-    const cacheKey = `bank:children:${userId}`;
-    const cached = await getCacheWithPrefix<string[]>("bank", `children:${userId}`);
-    if (cached) return cached;
-
+  static async getAllChildrenIds(userId) {
 
     const user = await Prisma.user.findUnique({
       where: { id: userId },
@@ -32,10 +19,10 @@ export class BankDetailService {
 
     if (!user || !user.children?.length) return [];
 
-    let allChildIds: string[] = [];
+    let allChildIds = [];
 
     // Recursively get all descendants
-    const getDescendants = async (parentId: string): Promise<string[]> => {
+    const getDescendants = async (parentId)=> {
       const children = await Prisma.user.findMany({
         where: { parentId },
         select: { id: true }
@@ -52,9 +39,6 @@ export class BankDetailService {
         descendantIds.push(...grandchildren);
       }
 
-      // redis cache setting
-      await setCacheWithPrefix("bank", `children:${userId}`, allChildIds, 300);
-
       return descendantIds;
     };
 
@@ -62,27 +46,15 @@ export class BankDetailService {
     return allChildIds;
   }
 
-  static async index(params: {
-    userId: string;
-    role: "ADMIN" | "STATE HEAD" | "MASTER DISTRIBUTOR" | "DISTRIBUTOR";
-    status?: "ALL" | "PENDING" | "VERIFIED" | "REJECT";
-    page?: number;
-    limit?: number;
-    sort?: "asc" | "desc";
-    search?: string;
-  }): Promise<any> {
+  static async index(params) {
     const { userId, role, status, page = 1, limit = 10, sort = "desc", search } = params;
-
-    const cacheKey = `bank:index:${userId}:${role}:${status}:${page}:${limit}:${sort}:${search ?? ""}`;
-    const cached = await getCacheWithPrefix<any>("bank", cacheKey);
-    if (cached) return cached;
 
     const pageNum = Number(page);
     const limitNum = Number(limit);
     const skip = (pageNum - 1) * limitNum;
     const sortOrder = sort === "asc" ? "asc" : "desc";
 
-    let where: any = {};
+    let where = {};
 
     if (role === "ADMIN") {
       where.userId = { not: userId };
@@ -131,16 +103,10 @@ export class BankDetailService {
       },
     };
 
-    await setCacheWithPrefix("bank", cacheKey, result, 120);
     return result;
   }
 
-  static async getAllMy(userId: string): Promise<BankDetail[]> {
-    // redis cache helper functions
-    const cacheKey = `bank:my:${userId}`;
-    const cached = await getCacheWithPrefix<BankDetail[]>("bank", `my:${userId}`);
-    if (cached) return cached;
-
+  static async getAllMy(userId ) {
     const records = await Prisma.bankDetail.findMany({
       where: { userId }
     });
@@ -148,15 +114,10 @@ export class BankDetailService {
     if (!records) throw ApiError.notFound("No bank details found");
 
     const safely = await Helper.serializeUser(records);
-    await setCacheWithPrefix("bank", `my:${userId}`, safely, 180);
     return safely;
   }
 
-  static async show(id: string, userId: string): Promise<BankDetail> {
-
-    const cacheKey = `bank:show:${id}`;
-    const cached = await getCacheWithPrefix<BankDetail>("bank", `show:${id}`);
-    if (cached) return cached;
+  static async show(id, userId){
 
     const record = await Prisma.bankDetail.findUnique({
       where: { id },
@@ -166,11 +127,10 @@ export class BankDetailService {
     if (!record) throw ApiError.notFound("Bank detail not found");
 
     const safely = await Helper.serializeUser(record);
-    await setCacheWithPrefix("bank", `show:${id}`, safely, 180);
     return safely;
   }
 
-  static async store(payload: BankDetailInput): Promise<BankDetail> {
+  static async store(payload) {
     const { bankProofFile, ...rest } = payload;
     let proofUrl;
     try {
@@ -206,7 +166,7 @@ export class BankDetailService {
         });
       }
 
-      let status: KycStatus = KycStatus.PENDING;
+      let status = "PENDING";
 
       if (userExsits.role.name === "ADMIN") {
         status = "VERIFIED";
@@ -230,7 +190,6 @@ export class BankDetailService {
 
       if (!createBank) throw ApiError.internal("Failed to create bank details");
 
-      await clearPattern(`bank:*:${payload.userId}*`);
 
       return createBank;
     } catch (error) {
@@ -244,10 +203,10 @@ export class BankDetailService {
   }
 
   static async update(
-    id: string,
-    userId: string,
-    payload: Partial<BankDetailInput>
-  ): Promise<BankDetail> {
+    id ,
+    userId ,
+    payload
+  ) {
     try {
       // Fetch existing record
       const record = await Prisma.bankDetail.findUnique({ where: { id } });
@@ -305,8 +264,6 @@ export class BankDetailService {
 
       if (!updateBank) throw ApiError.internal("Failed to update bank details");
 
-      await clearPattern(`bank:*:${userId}*`);
-      await clearPattern(`bank:show:${id}`);
 
       return updateBank;
     } catch (error) {
@@ -316,12 +273,12 @@ export class BankDetailService {
       // Clean up temporary files
       const allFiles = [payload.bankProofFile?.path].filter(Boolean);
       for (const filePath of allFiles) {
-        await Helper.deleteOldImage(filePath as string);
+        await Helper.deleteOldImage(filePath );
       }
     }
   }
 
-  static async destroy(id: string, userId: string): Promise<BankDetail> {
+  static async destroy(id, userId ) {
     const record = await Prisma.bankDetail.findUnique({ where: { id } });
 
     if (!record || record.userId !== userId)
@@ -331,17 +288,15 @@ export class BankDetailService {
 
     if (!deleteBank) throw ApiError.internal("Failed to delete bank");
 
-    await clearPattern(`bank:*:${userId}*`);
-    await clearPattern(`bank:show:${id}`);
     return deleteBank;
   }
 
   // ================= BANK Admin manage =================
   static async verification(
-    id: string,
-    userId: string,
-    payload: Partial<BankDetailInputVerify>
-  ): Promise<BankDetail> {
+    id,
+    userId ,
+    payload
+  ) {
     if (!id) throw ApiError.badRequest("Bank ID is required");
 
     const record = await Prisma.bankDetail.findUnique({ where: { id } });
@@ -365,10 +320,6 @@ export class BankDetailService {
         bankRejectionReason: payload.bankRejectionReason ?? record.bankRejectionReason ?? "",
       },
     });
-
-    await clearPattern(`bank:*:${record.userId}*`);
-    await clearPattern(`bank:show:${id}`);
-
     return updatedBank;
   }
 }

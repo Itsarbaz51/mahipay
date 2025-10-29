@@ -1,4 +1,3 @@
-import type { Request, Response } from "express";
 import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import {
@@ -6,10 +5,9 @@ import {
   CommissionSettingService,
 } from "../services/commission.service.js";
 import { ApiError } from "../utils/ApiError.js";
-import { CommissionScope } from "@prisma/client";
 
 export class CommissionSettingController {
-  static createOrUpdate = asyncHandler(async (req: Request, res: Response) => {
+  static createOrUpdate = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.unauthorized("Unauthorized");
 
@@ -30,7 +28,7 @@ export class CommissionSettingController {
       );
   });
 
-  static getByRoleOrUser = asyncHandler(async (req: Request, res: Response) => {
+  static getByRoleOrUser = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.unauthorized("Unauthorized");
 
@@ -48,7 +46,7 @@ export class CommissionSettingController {
       );
   });
 
-  static getByCreatedBy = asyncHandler(async (req: Request, res: Response) => {
+  static getByCreatedBy = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.unauthorized("Unauthorized");
 
@@ -66,18 +64,12 @@ export class CommissionSettingController {
       );
   });
 
-  static getAll = asyncHandler(async (req: Request, res: Response) => {
+  static getAll = asyncHandler(async (req, res) => {
     const { scope, roleId, targetUserId, serviceId, isActive } = req.query;
 
-    const filters: {
-      scope?: CommissionScope;
-      roleId?: string;
-      targetUserId?: string;
-      serviceId?: string;
-      isActive?: boolean;
-    } = {};
+    const filters = {};
 
-    if (scope) filters.scope = scope as CommissionScope;
+    if (scope) filters.scope = scope;
     if (typeof roleId === "string") filters.roleId = roleId;
     if (typeof targetUserId === "string") filters.targetUserId = targetUserId;
     if (typeof serviceId === "string") filters.serviceId = serviceId;
@@ -97,7 +89,7 @@ export class CommissionSettingController {
       );
   });
 
-  static deactivate = asyncHandler(async (req: Request, res: Response) => {
+  static deactivate = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     if(!id) throw ApiError.badRequest("Id is required")
@@ -118,7 +110,7 @@ export class CommissionSettingController {
 }
 
 export class CommissionEarningController {
-  static create = asyncHandler(async (req: Request, res: Response) => {
+  static create = asyncHandler(async (req, res) => {
     const createdBy = req.user?.id;
     if (!createdBy) throw ApiError.unauthorized("Unauthorized");
 
@@ -141,18 +133,11 @@ export class CommissionEarningController {
       );
   });
 
-  static getAll = asyncHandler(async (req: Request, res: Response) => {
+  static getAll = asyncHandler(async (req, res) => {
     const { userId, fromUserId, serviceId, transactionId, startDate, endDate } =
       req.query;
 
-    const filters: {
-      userId?: string;
-      fromUserId?: string;
-      serviceId?: string;
-      transactionId?: string;
-      startDate?: string;
-      endDate?: string;
-    } = {};
+    const filters = {};
 
     if (typeof userId === "string") filters.userId = userId;
     if (typeof fromUserId === "string") filters.fromUserId = fromUserId;
@@ -176,7 +161,7 @@ export class CommissionEarningController {
       );
   });
 
-  static getSummary = asyncHandler(async (req: Request, res: Response) => {
+  static getSummary = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.unauthorized("Unauthorized");
 
@@ -185,8 +170,8 @@ export class CommissionEarningController {
     const period =
       startDate && endDate
         ? {
-            startDate: startDate as string,
-            endDate: endDate as string,
+            startDate: startDate,
+            endDate: endDate,
           }
         : undefined;
 

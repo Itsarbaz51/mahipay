@@ -1,82 +1,45 @@
 import crypto from "crypto";
 import Prisma from "../db/db.js";
-import type { JwtPayload, LoginPayload, User } from "../types/auth.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
-import {
-  getCache,
-  setCache,
-  delCache,
-  invalidateUserCache,
-  clearPattern,
-} from "../utils/redisCasheHelper.js";
-import logger from "../utils/WinstonLogger.js";
-import {
-  recordLoginAttempt,
-  resetLoginAttempts,
-  addRevokedToken,
-} from "../utils/securityCache.js";
-import type { Request } from "express";
 
 class AuthServices {
-  private static readonly USER_CACHE_TTL = 600; // 10 minutes
-
-  static async login(
-    payload: LoginPayload,
-    req: Request
-  ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
+  static async login(payload, req) {
     const { emailOrUsername, password } = payload;
 
-    const attempts = await recordLoginAttempt(emailOrUsername);
-    if (attempts > 5)
-      throw ApiError.badRequest("Too many attempts. Try again later.");
-
-    const cacheKey = `user:login:${emailOrUsername}`;
-    let user = await getCache<User>(cacheKey);
-
-    if (!user) {
-      user = await Prisma.user.findFirst({
-        where: {
-          OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
-        },
-        include: {
-          role: true,
-          wallets: true,
-          parent: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              profileImage: true,
-            },
-          },
-          children: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              profileImage: true,
-              status: true,
-              createdAt: true,
-            },
+    const user = await Prisma.user.findFirst({
+      where: {
+        OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
+      },
+      include: {
+        role: true,
+        wallets: true,
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
           },
         },
-      });
-
-      if (user) {
-        await setCache(
-          cacheKey,
-          Helper.serializeUser(user),
-          this.USER_CACHE_TTL
-        );
-      }
-    }
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
 
     if (!user) {
       throw ApiError.unauthorized("Invalid credentials");
@@ -90,15 +53,15 @@ class AuthServices {
     const accessToken = Helper.generateAccessToken({
       id: user.id,
       email: user.email,
-      role: user.role!.name,
-      roleLevel: user.role!.level,
+      role: user.role.name,
+      roleLevel: user.role.level,
     });
 
     const refreshToken = Helper.generateRefreshToken({
       id: user.id,
       email: user.email,
-      role: user.role!.name,
-      roleLevel: user.role!.level,
+      role: user.role.name,
+      roleLevel: user.role.level,
     });
 
     await Prisma.user.update({
@@ -106,20 +69,10 @@ class AuthServices {
       data: { refreshToken },
     });
 
-    // Clean up login cache and clear related cache patterns
-    await delCache(cacheKey);
-    await invalidateUserCache(user.id);
-    await this.clearUserRelatedCache(
-      user.id,
-      user?.parent?.id ?? null,
-      user.roleId
-    );
-    await resetLoginAttempts(emailOrUsername);
-
     const ip = Helper.getClientIP(req);
     const geoData = await Helper.getGeoLocation(ip);
 
-    const loginData: any = {
+    const loginData = {
       userId: user.id,
       domainName: req.hostname,
       ipAddress: String(ip),
@@ -136,51 +89,32 @@ class AuthServices {
       data: { userId: user.id, action: "LOGIN", metadata: {} },
     });
 
-    logger.info("User logged in successfully", { userId: user.id });
-
     return { user, accessToken, refreshToken };
   }
 
-  static async logout(userId: string, refreshToken?: string): Promise<void> {
+  static async logout(userId, refreshToken) {
     if (!userId) return;
-
-    // Get user data before update for cache clearing
-    const user = await Prisma.user.findUnique({
-      where: { id: userId },
-      select: { parentId: true, roleId: true },
-    });
 
     await Prisma.user.update({
       where: { id: userId },
       data: { refreshToken: null },
     });
 
-    await invalidateUserCache(userId);
-
-    // Clear related cache patterns
-    if (user) {
-      await this.clearUserRelatedCache(userId, user.parentId, user.roleId);
-    }
-
     if (refreshToken) {
       const payload = Helper.verifyRefreshToken(refreshToken);
       if (payload.jti && payload.exp) {
-        await addRevokedToken(
-          payload.jti,
-          payload.exp - Math.floor(Date.now() / 1000)
-        );
+        // Token revocation logic if needed (could store in database)
+        // await addRevokedToken(payload.jti, payload.exp - Math.floor(Date.now() / 1000));
       }
     }
 
     await Prisma.auditLog.create({
       data: { userId, action: "LOGOUT", metadata: {} },
     });
-
-    logger.info("User logged out successfully", { userId });
   }
 
-  static async refreshToken(refreshToken: string) {
-    let payload: JwtPayload;
+  static async refreshToken(refreshToken) {
+    let payload;
     try {
       payload = Helper.verifyRefreshToken(refreshToken);
     } catch {
@@ -204,6 +138,7 @@ class AuthServices {
         },
       },
     });
+    
     if (!user || !user.refreshToken)
       throw ApiError.unauthorized("Invalid refresh token");
 
@@ -212,15 +147,8 @@ class AuthServices {
         where: { id: user.id },
         data: { refreshToken: null },
       });
-      await invalidateUserCache(user.id);
-      await this.clearUserRelatedCache(user.id, user.parentId, user.roleId);
       throw ApiError.unauthorized("Refresh token mismatch");
     }
-
-    await addRevokedToken(
-      payload.jti!,
-      payload.exp! - Math.floor(Date.now() / 1000)
-    );
 
     const newAccessToken = Helper.generateAccessToken({
       id: user.id,
@@ -228,6 +156,7 @@ class AuthServices {
       role: user.role.name,
       roleLevel: user.role.level,
     });
+    
     const newRefreshToken = Helper.generateRefreshToken({
       id: user.id,
       email: user.email,
@@ -244,8 +173,6 @@ class AuthServices {
       data: { userId: user.id, action: "REFRESH_TOKEN", metadata: {} },
     });
 
-    logger.info("Token refreshed successfully", { userId: user.id });
-
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
@@ -253,7 +180,7 @@ class AuthServices {
     };
   }
 
-  static async forgotPassword(email: string): Promise<{ message: string }> {
+  static async forgotPassword(email) {
     const user = await Prisma.user.findUnique({
       where: { email },
       include: {
@@ -272,7 +199,6 @@ class AuthServices {
     });
 
     if (!user) {
-      logger.warn("Password reset requested for non-existent email", { email });
       return { message: "If the email exists, a reset link has been sent." };
     }
 
@@ -290,8 +216,7 @@ class AuthServices {
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
-    // Apply proper casing for email content
-    const formattedFirstName = this.formatName(user.firstName);
+    const formattedFirstName = AuthServices.formatName(user.firstName);
 
     const subject = "Password Reset Instructions";
     const text = `Hello ${formattedFirstName},\n\nYou requested a password reset.\n\nClick the link to reset your password:\n${resetUrl}\n\nThis link expires in 5 minutes.`;
@@ -305,15 +230,10 @@ class AuthServices {
 
     await Helper.sendEmail({ to: user.email, subject, text, html });
 
-    logger.info("Password reset link sent", { userId: user.id, email });
-
     return { message: "If the email exists, a reset link has been sent." };
   }
 
-  static async resetPassword(
-    token: string,
-    newPassword: string
-  ): Promise<{ message: string }> {
+  static async resetPassword(token, newPassword) {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     const user = await Prisma.user.findFirst({
@@ -337,7 +257,6 @@ class AuthServices {
     });
 
     if (!user) {
-      logger.warn("Invalid or expired password reset token attempted");
       throw ApiError.badRequest("Invalid or expired token");
     }
 
@@ -353,12 +272,7 @@ class AuthServices {
       },
     });
 
-    // Clear user cache and related patterns
-    await invalidateUserCache(user.id);
-    await this.clearUserRelatedCache(user.id, user.parentId, user.roleId);
-
-    // Apply proper casing for email content
-    const formattedFirstName = this.formatName(user.firstName);
+    const formattedFirstName = AuthServices.formatName(user.firstName);
 
     await Helper.sendEmail({
       to: user.email,
@@ -367,14 +281,11 @@ class AuthServices {
       html: `<p>Hello ${formattedFirstName},</p><p>Your password was successfully changed. If this wasn't you, please <a href="mailto:support@example.com">contact support</a> immediately.</p>`,
     });
 
-    logger.info("Password reset successful", { userId: user.id });
-
     return { message: "Password reset successful" };
   }
 
-  static async verifyEmail(token: string): Promise<{ message: string }> {
+  static async verifyEmail(token) {
     if (!token) {
-      logger.warn("Email verification attempted without token");
       throw ApiError.badRequest("Verification token missing");
     }
 
@@ -400,7 +311,6 @@ class AuthServices {
     });
 
     if (!user) {
-      logger.warn("Invalid email verification token attempted");
       throw ApiError.badRequest("Invalid verification token");
     }
 
@@ -412,16 +322,10 @@ class AuthServices {
       },
     });
 
-    // Clear user cache and related patterns
-    await invalidateUserCache(user.id);
-    await this.clearUserRelatedCache(user.id, user.parentId, user.roleId);
-
-    logger.info("Email verified successfully", { userId: user.id });
-
     return { message: "Email verified successfully" };
   }
 
-  static async createAndSendEmailVerification(user: User) {
+  static async createAndSendEmailVerification(user) {
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
@@ -440,8 +344,7 @@ class AuthServices {
 
     const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`;
 
-    // Apply proper casing for email content
-    const formattedFirstName = this.formatName(user.firstName);
+    const formattedFirstName = AuthServices.formatName(user.firstName);
 
     await Helper.sendEmail({
       to: user.email,
@@ -454,23 +357,9 @@ class AuthServices {
       <p>This link is valid for 24 hours.</p>
     `,
     });
-
-    logger.info("Email verification sent", {
-      userId: user.id,
-      email: user.email,
-    });
   }
 
-  static async updateCredentials(
-    userId: string,
-    credentialsData: {
-      currentPassword: string;
-      newPassword?: string;
-      currentTransactionPin?: string;
-      newTransactionPin?: string;
-    },
-    requestedBy?: string
-  ): Promise<{ message: string }> {
+  static async updateCredentials(userId, credentialsData, requestedBy) {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -503,7 +392,7 @@ class AuthServices {
       throw ApiError.unauthorized("User's current password is incorrect");
     }
 
-    const updateData: any = {};
+    const updateData = {};
 
     if (credentialsData.newPassword) {
       updateData.password = await Helper.hashPassword(
@@ -536,9 +425,6 @@ class AuthServices {
       data: updateData,
     });
 
-    await invalidateUserCache(userId);
-    await this.clearUserRelatedCache(userId, user.parentId, user.roleId);
-
     await Prisma.auditLog.create({
       data: {
         userId: requestedBy || userId,
@@ -555,19 +441,11 @@ class AuthServices {
       },
     });
 
-    logger.info("Credentials updated successfully", {
-      userId,
-      updatedBy: requestedBy,
-      isOwnUpdate,
-    });
-
     return { message: "Credentials updated successfully" };
   }
 
   // ===================== HELPER METHODS =====================
-
-  // Format name with proper casing (First Letter Capital)
-  private static formatName(name: string): string {
+  static formatName(name) {
     if (!name) return name;
 
     return name
@@ -576,50 +454,6 @@ class AuthServices {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
       .trim();
-  }
-
-  // Clear all cache related to user operations
-  private static async clearUserRelatedCache(
-    userId: string,
-    parentId: string | null,
-    roleId: string
-  ): Promise<void> {
-    try {
-      const patternsToClear = [
-        "user_check:*",
-        "user:login:*",
-        `users:role:${roleId}`,
-        `users:children:${userId}`,
-        `users:children:count:${userId}`,
-      ];
-
-      // Add parent-related cache patterns if parent exists
-      if (parentId) {
-        patternsToClear.push(
-          `users:parent:${parentId}:*`,
-          `users:parent:count:${parentId}`
-        );
-      }
-
-      // Clear all patterns
-      await Promise.all(
-        patternsToClear.map((pattern) => clearPattern(pattern))
-      );
-
-      logger.debug("User-related cache cleared successfully", {
-        userId,
-        parentId,
-        roleId,
-        patternsCleared: patternsToClear,
-      });
-    } catch (error) {
-      logger.error("Failed to clear user-related cache", {
-        userId,
-        parentId,
-        roleId,
-        error,
-      });
-    }
   }
 }
 
