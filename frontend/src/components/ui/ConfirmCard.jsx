@@ -1,9 +1,16 @@
 import { useState } from "react";
 
-function ConfirmCard({ actionType, isClose, isSubmit, user }) {
+function ConfirmCard({
+  actionType,
+  isClose,
+  isSubmit,
+  user,
+  predefinedReasons,
+}) {
   const isDeactivate = actionType === "Deactivate";
   const isActivate = actionType === "Activate";
   const isDelete = actionType === "Delete";
+  const isReject = actionType === "REJECT";
 
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,16 +30,6 @@ function ConfirmCard({ actionType, isClose, isSubmit, user }) {
       setIsSubmitting(false);
     }
   };
-
-  const predefinedReasons = [
-    "Violation of terms of service",
-    "Inappropriate behavior",
-    "Security concerns",
-    "User request",
-    "Suspicious activity",
-    "Account verification required",
-    "Other",
-  ];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -59,11 +56,10 @@ function ConfirmCard({ actionType, isClose, isSubmit, user }) {
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Reason for {actionType.toLowerCase()}
-              <span className="text-gray-400 text-xs ml-1">(Optional)</span>
             </label>
 
             <div className="grid grid-cols-1 gap-2 mb-3">
-              {predefinedReasons.map((predefinedReason) => (
+              {predefinedReasons?.map((predefinedReason) => (
                 <button
                   key={predefinedReason}
                   type="button"
@@ -82,7 +78,7 @@ function ConfirmCard({ actionType, isClose, isSubmit, user }) {
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Enter reason (optional)..."
+              placeholder="Enter reason..."
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               rows="3"
             />
@@ -124,7 +120,7 @@ function ConfirmCard({ actionType, isClose, isSubmit, user }) {
             onClick={handleSubmit}
             disabled={isSubmitting}
             className={`px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              isDeactivate || isDelete
+              isDeactivate || isDelete || isReject
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-green-600 hover:bg-green-700"
             }`}

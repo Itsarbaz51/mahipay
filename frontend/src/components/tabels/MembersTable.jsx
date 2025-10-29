@@ -822,6 +822,15 @@ const MembersTable = () => {
           user={selectedUser}
           isClose={() => setShowActionModal(false)}
           isSubmit={confirmAction}
+          predefinedReasons={[
+            "Violation of terms of service",
+            "Inappropriate behavior",
+            "Security concerns",
+            "User request",
+            "Suspicious activity",
+            "Account verification required",
+            "Other",
+          ]}
         />
       )}
 

@@ -31,7 +31,6 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
-
   ],
   "MASTER DISTRIBUTOR": [
     "/dashboard",
@@ -44,7 +43,6 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
-
   ],
   DISTRIBUTOR: [
     "/dashboard",
@@ -57,7 +55,6 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
-
   ],
   RETAILER: [
     "/dashboard",
@@ -68,7 +65,6 @@ const ROLE_PERMISSIONS = {
     "/profile/:id",
     "/transactions",
     "/settings",
-
   ],
 };
 
@@ -87,25 +83,20 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated || !currentUser) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (
-    isAuthenticated &&
-    !currentUser?.isKycVerified &&
-    currentUser?.kyc?.status !== "VERIFIED" &&
-    location.pathname !== "/kyc-submit"
-  ) {
+  // Extract KYC status safely
+  const kycStatus = currentUser?.kycInfo?.currentStatus || "NOT_SUBMITTED";
+  
+  const isKycVerified = currentUser?.isKycVerified === true || kycStatus === "VERIFIED";
+
+  if (!isKycVerified && location.pathname !== "/kyc-submit") {
     return <Navigate to="/kyc-submit" replace state={{ from: location }} />;
   }
 
-  if (
-    currentUser?.isKycVerified &&
-    currentUser?.kyc?.status === "VERIFIED" &&
-    location.pathname === "/kyc-submit"
-  ) {
+  if (isKycVerified && location.pathname === "/kyc-submit") {
     return <Navigate to="/dashboard" replace />;
   }
 
