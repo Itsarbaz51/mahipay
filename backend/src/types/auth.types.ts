@@ -163,7 +163,7 @@ export interface User {
       ifscCode: string;
       bankName: string;
       bankProofFile: string;
-      isVerified: boolean;
+      status: KycStatus;
       isPrimary: boolean;
       userId: string;
       createdAt: Date;

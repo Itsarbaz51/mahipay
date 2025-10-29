@@ -148,7 +148,7 @@ class UserServices {
           },
           bankAccounts: {
             where: {
-              isVerified: true,
+            status: "VERIFIED",
             },
             orderBy: {
               isPrimary: "desc",
@@ -503,7 +503,7 @@ class UserServices {
 
         bankAccounts: {
           where: {
-            isVerified: true,
+            status: "VERIFIED",
           },
           orderBy: {
             isPrimary: "desc",
@@ -566,7 +566,7 @@ class UserServices {
       bankInfo: {
         totalAccounts: user.bankAccounts.length,
         primaryAccount: user.bankAccounts.find((acc) => acc.isPrimary) || null,
-        verifiedAccounts: user.bankAccounts.filter((acc) => acc.isVerified),
+        verifiedAccounts: user.bankAccounts.filter((acc) => acc.status === "VERIFIED"),
       },
       kycs: undefined,
       bankAccounts: undefined,
@@ -637,7 +637,7 @@ class UserServices {
         // Include bankAccounts
         bankAccounts: {
           where: {
-            isVerified: true,
+            status: "VERIFIED",
           },
           take: 1, // Get only primary/verified accounts
         },
