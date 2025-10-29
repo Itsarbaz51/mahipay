@@ -634,12 +634,11 @@ class UserServices {
             createdAt: true,
           },
         },
-        // Include bankAccounts
         bankAccounts: {
           where: {
             status: "VERIFIED",
           },
-          take: 1, // Get only primary/verified accounts
+          take: 1, 
         },
       },
       orderBy: { createdAt: "desc" },
