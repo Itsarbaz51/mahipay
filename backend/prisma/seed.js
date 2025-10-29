@@ -1,5 +1,4 @@
-// seed.ts
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { hashSync } from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -7,7 +6,6 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🚀 Starting minimal seed...");
 
-  // ===== 1. Create States and Cities (Optional but useful) =====
   const statesData = [
     {
       stateName: "Maharashtra",
@@ -16,8 +14,8 @@ async function main() {
     },
   ];
 
-  const createdStates: Record<string, any> = {};
-  const createdCities: Record<string, any[]> = {};
+  const createdStates = {};
+  const createdCities = {};
 
   for (const stateData of statesData) {
     const state = await prisma.state.upsert({
@@ -41,11 +39,10 @@ async function main() {
           cityCode,
         },
       });
-      createdCities[state.id]!.push(city);
+      createdCities[state.id].push(city);
     }
   }
 
-  // ===== 2. Create Roles =====
   console.log("\n👥 Creating roles...");
 
   const roles = [
@@ -56,7 +53,7 @@ async function main() {
     { name: "RETAILER", level: 4, description: "Retailer" },
   ];
 
-  const createdRoles: Record<number, any> = {};
+  const createdRoles = {};
 
   for (const role of roles) {
     const created = await prisma.role.upsert({
@@ -72,7 +69,6 @@ async function main() {
     console.log(`✅ Role created: ${created.name}`);
   }
 
-  // ===== 3. Create Admin User =====
   console.log("\n👑 Creating Admin user...");
 
   const adminPassword = hashSync("Admin@123", 10);
@@ -100,7 +96,6 @@ async function main() {
 
   console.log(`✅ Admin created: ${admin.username}`);
 
-  // ===== 4. Create One State Head User =====
   console.log("\n👤 Creating State Head user...");
 
   const shPassword = hashSync("User@123", 10);
@@ -129,7 +124,6 @@ async function main() {
 
   console.log(`✅ State Head created: ${stateHead.username}`);
 
-  // ===== 5. Create Wallets =====
   console.log("\n💰 Creating wallets...");
 
   const users = [admin, stateHead];
@@ -152,7 +146,6 @@ async function main() {
     console.log(`💳 Wallet created for ${user.username}`);
   }
 
-  // ===== 6. Create Two Service Providers =====
   console.log("\n🏢 Creating service providers...");
 
   const serviceProviders = [
