@@ -31,7 +31,6 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
-
   ],
   "MASTER DISTRIBUTOR": [
     "/dashboard",
@@ -44,7 +43,6 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
-
   ],
   DISTRIBUTOR: [
     "/dashboard",
@@ -57,7 +55,6 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
-
   ],
   RETAILER: [
     "/dashboard",
@@ -68,7 +65,6 @@ const ROLE_PERMISSIONS = {
     "/profile/:id",
     "/transactions",
     "/settings",
-
   ],
 };
 
@@ -92,6 +88,10 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
+  if (currentUser.status === "DELETE" || currentUser.status === "IN_ACTIVE") {
+    return <Navigate to="/unauthorized" replace state={{ from: location }} />;
+  }
+
   if (
     isAuthenticated &&
     !currentUser?.isKycVerified &&
@@ -100,10 +100,7 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/kyc-submit" replace state={{ from: location }} />;
   }
 
-  if (
-    currentUser?.isKycVerified &&
-    location.pathname === "/kyc-submit"
-  ) {
+  if (currentUser?.isKycVerified && location.pathname === "/kyc-submit") {
     return <Navigate to="/dashboard" replace />;
   }
 

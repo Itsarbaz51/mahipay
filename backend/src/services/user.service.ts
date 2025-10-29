@@ -148,7 +148,7 @@ class UserServices {
           },
           bankAccounts: {
             where: {
-            status: "VERIFIED",
+              status: "VERIFIED",
             },
             orderBy: {
               isPrimary: "desc",
@@ -566,7 +566,9 @@ class UserServices {
       bankInfo: {
         totalAccounts: user.bankAccounts.length,
         primaryAccount: user.bankAccounts.find((acc) => acc.isPrimary) || null,
-        verifiedAccounts: user.bankAccounts.filter((acc) => acc.status === "VERIFIED"),
+        verifiedAccounts: user.bankAccounts.filter(
+          (acc) => acc.status === "VERIFIED"
+        ),
       },
       kycs: undefined,
       bankAccounts: undefined,
@@ -638,7 +640,7 @@ class UserServices {
           where: {
             status: "VERIFIED",
           },
-          take: 1, 
+          take: 1,
         },
       },
       orderBy: { createdAt: "desc" },
@@ -1304,6 +1306,7 @@ class UserServices {
         where: { id: userId },
         data: {
           status: UserStatus.IN_ACTIVE,
+          deactivationReason: reason,
           updatedAt: new Date(),
         },
         include: {
@@ -1445,6 +1448,7 @@ class UserServices {
         where: { id: userId },
         data: {
           status: UserStatus.ACTIVE, // Changed from IN_ACTIVE to ACTIVE
+          deactivationReason: reason,
           updatedAt: new Date(),
         },
         include: {
@@ -1579,6 +1583,7 @@ class UserServices {
         where: { id: userId },
         data: {
           status: UserStatus.DELETE,
+          deactivationReason: reason,
           updatedAt: new Date(),
           deletedAt: new Date(),
         },

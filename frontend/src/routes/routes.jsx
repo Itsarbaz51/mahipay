@@ -86,6 +86,14 @@ export const createRouter = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="unauthorized"
+          element={
+            <ProtectedRoute>
+              <KYCVerification />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ---------------- 404 / FALLBACK ---------------- */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

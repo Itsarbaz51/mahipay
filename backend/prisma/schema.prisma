@@ -239,6 +239,8 @@ model User {
   createdRoles   Role[]          @relation("RoleCreatedBy")
   systemSettings SystemSetting[]
 
+  deactivationReason String? @map("user_deactivation_reason") @db.LongText
+
   @@index([parentId])
   @@index([hierarchyLevel])
   @@index([phoneNumber])
@@ -351,13 +353,13 @@ model UserKyc {
 }
 
 model BankDetail {
-  id                 String      @id @default(uuid())
-  accountHolder      String      @map("account_holder") @db.Text
-  accountNumber      String      @unique @map("account_number") @db.VarChar(18)
-  phoneNumber        String      @map("phone_number")
-  accountType        AccountType @map("account_type")
-  ifscCode           String      @map("ifsc_code") @db.Text
-  bankName           String      @map("bank_name") @db.Text
+  id                  String      @id @default(uuid())
+  accountHolder       String      @map("account_holder") @db.Text
+  accountNumber       String      @unique @map("account_number") @db.VarChar(18)
+  phoneNumber         String      @map("phone_number")
+  accountType         AccountType @map("account_type")
+  ifscCode            String      @map("ifsc_code") @db.Text
+  bankName            String      @map("bank_name") @db.Text
   bankRejectionReason String?     @map("bank_rejection_reason") @db.LongText
 
   bankProofFile String    @map("bank_proof_file")
