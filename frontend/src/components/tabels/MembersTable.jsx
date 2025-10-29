@@ -497,17 +497,16 @@ const MembersTable = () => {
             </button>
 
             {/* ✅ Add Member button bhi sirf ADMIN ke liye show karo */}
-            {isAdminUser && (
-              <ButtonField
-                name="Add Member"
-                isOpen={() => {
-                  setSelectedUser(null);
-                  setShowForm(true);
-                }}
-                icon={Users}
-                css
-              />
-            )}
+
+            <ButtonField
+              name="Add Member"
+              isOpen={() => {
+                setSelectedUser(null);
+                setShowForm(true);
+              }}
+              icon={Users}
+              css
+            />
           </div>
         </div>
       </div>
