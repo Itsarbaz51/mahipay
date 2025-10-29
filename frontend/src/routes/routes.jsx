@@ -19,7 +19,6 @@ import Login from "../pages/auth/Login";
 import Dashboard from "../pages/Dashboard";
 import TransactionHistory from "../components/tabels/TransactionHistory.jsx";
 import Reports from "../pages/Reports";
-
 import AllKycTable from "../components/tabels/AllKycTable";
 import PayoutTable from "../components/tabels/PayoutTable";
 import EmployeeTable from "../components/tabels/EmployeeTable";
@@ -36,6 +35,7 @@ import LoginLogs from "../pages/LoginLogs.jsx";
 import PrivacyPolicy from "../pages/landing/Privacypolicy";
 import TermsConditions from "../pages/landing/Terms&conditions";
 import BanksTable from "../components/tabels/BanksTable.jsx";
+import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -51,15 +51,15 @@ export const createRouter = () => {
           <Route path="terms-conditions" element={<TermsConditions />} />
         </Route>
 
-        {/* ---------------- PROTECTED ROUTES ---------------- */}
+        {/* ---------------- PROTECTED ROUTES WITH MAIN LAYOUT ---------------- */}
         <Route
+          path="/"
           element={
             <ProtectedRoute>
               <MainLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="transactions" element={<TransactionHistory />} />
           <Route path="payout" element={<PayoutTable />} />
@@ -76,8 +76,12 @@ export const createRouter = () => {
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="login-logs" element={<LoginLogs />} />
           <Route path="bank-details" element={<BanksTable />} />
+
+          {/* Redirect root to dashboard */}
+          <Route index element={<Navigate to="/dashboard" replace />} />
         </Route>
 
+        {/* ---------------- STANDALONE PROTECTED ROUTES ---------------- */}
         <Route
           path="kyc-submit"
           element={
@@ -86,11 +90,12 @@ export const createRouter = () => {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="unauthorized"
           element={
             <ProtectedRoute>
-              <KYCVerification />
+              <UnauthorizedPage />
             </ProtectedRoute>
           }
         />

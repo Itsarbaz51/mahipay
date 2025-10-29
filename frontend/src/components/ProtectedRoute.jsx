@@ -18,6 +18,7 @@ const ROLE_PERMISSIONS = {
     "/audit-logs",
     "/login-logs",
     "/bank-details",
+    "/payout",
   ],
   "STATE HEAD": [
     "/dashboard",
@@ -31,6 +32,7 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
+    "/payout",
   ],
   "MASTER DISTRIBUTOR": [
     "/dashboard",
@@ -43,6 +45,7 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
+    "/payout",
   ],
   DISTRIBUTOR: [
     "/dashboard",
@@ -55,6 +58,7 @@ const ROLE_PERMISSIONS = {
     "/transactions",
     "/bank-details",
     "/settings",
+    "/payout",
   ],
   RETAILER: [
     "/dashboard",
@@ -65,56 +69,64 @@ const ROLE_PERMISSIONS = {
     "/profile/:id",
     "/transactions",
     "/settings",
+    "/payout",
   ],
 };
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, currentUser, isLoading } = useSelector(
-    (state) => state.auth
-  );
-  const location = useLocation();
+const PUBLIC_ROUTES = [
+  "/",
+  "/about",
+  "/contact",
+  "/login",
+  "/privacy-policy",
+  "/terms-conditions",
+];
 
-  // Show loading spinner
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, currentUser } = useSelector((state) => state.auth);
+  const location = useLocation();
+  const currentPath = location.pathname;
+
+  // Allow public routes without authentication
+  if (PUBLIC_ROUTES.includes(currentPath)) {
+    return children;
   }
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated || !currentUser) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   if (currentUser.status === "DELETE" || currentUser.status === "IN_ACTIVE") {
+    if (currentPath === "/unauthorized" || currentPath === "/logout") {
+      return children;
+    }
     return <Navigate to="/unauthorized" replace state={{ from: location }} />;
   }
 
-  if (
-    isAuthenticated &&
-    !currentUser?.isKycVerified &&
-    location.pathname !== "/kyc-submit"
-  ) {
+  if (!currentUser?.isKycVerified) {
+    if (currentPath === "/kyc-submit") {
+      return children;
+    }
     return <Navigate to="/kyc-submit" replace state={{ from: location }} />;
+  } else {
+    if (currentPath === "/kyc-submit") {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
-  if (currentUser?.isKycVerified && location.pathname === "/kyc-submit") {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  const role = currentUser?.role?.name || currentUser?.role || "USER";
+  const role = currentUser?.role?.name || currentUser?.role;
   const allowedPaths = ROLE_PERMISSIONS[role] || [];
-  const currentPath = location.pathname;
 
   const isPathAllowed = allowedPaths.some((path) => {
     if (path.includes(":")) {
-      // Convert "/profile/:id" to regex like /^\/profile\/[^/]+$/
       const regex = new RegExp("^" + path.replace(/:\w+/g, "[^/]+") + "$");
       return regex.test(currentPath);
     }
-    return currentPath === path || currentPath.startsWith(path + "/");
+
+    if (currentPath === path) return true;
+    if (currentPath.startsWith(path + "/")) return true;
+
+    return false;
   });
 
   if (!isPathAllowed) {

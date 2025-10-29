@@ -1343,7 +1343,7 @@ class UserServices {
     }
   }
 
-   static formatName(name) {
+  static formatName(name) {
     if (!name) return name;
 
     return name

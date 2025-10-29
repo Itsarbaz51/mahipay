@@ -36,13 +36,10 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      if (currentUser.isKycVerified === false) {
-        navigate("/kyc-submit");
-      } else if (currentUser.status === "ACTIVE") {
-        navigate("/dashboard");
-      }
+      const from = location.state?.from?.pathname || "/dashboard";
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, currentUser, navigate]);
+  }, [isAuthenticated, currentUser, navigate, location]);
 
   return (
     <div className="flex items-center justify-center bg-gray-50 min-h-screen">
