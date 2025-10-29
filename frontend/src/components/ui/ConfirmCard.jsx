@@ -52,7 +52,6 @@ function ConfirmCard({
           </div>
         )}
 
-        {!isDelete && (
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Reason for {actionType.toLowerCase()}
@@ -87,7 +86,6 @@ function ConfirmCard({
               Providing a reason helps maintain audit records
             </p>
           </div>
-        )}
 
         <p className="mb-4 text-gray-700 text-sm">
           You are about to{" "}
