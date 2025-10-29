@@ -551,8 +551,8 @@ class KycServices {
 
       // Re-cache only if verified
       if (enumStatus === "VERIFIED") {
-        await cacheUser(existingKyc.userId, updatedUser, 5);
-        await cacheUserKyc(existingKyc.userId, updateVerify, 5);
+        await cacheUser(existingKyc.userId, updatedUser, 5000);
+        await cacheUserKyc(existingKyc.userId, updateVerify, 5000);
       }
     } catch (cacheError) {
       console.error("⚠️ Failed to update cache:", cacheError);

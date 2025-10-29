@@ -12,6 +12,8 @@ import {
   Wallet,
   LogInIcon,
   Landmark,
+  BadgeIndianRupee,
+  RedoDot,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
@@ -41,18 +43,18 @@ const Sidebar = () => {
         "RETAILER",
       ],
     },
-    // {
-    //   id: "add-fund",
-    //   label: "Add Fund",
-    //   icon: BadgeIndianRupee,
-    //   path: "/add-fund",
-    //   permissions: [
-    //     "STATE HEAD",
-    //     "MASTER DISTRIBUTOR",
-    //     "DISTRIBUTOR",
-    //     "RETAILER",
-    //   ],
-    // },
+    {
+      id: "add-fund",
+      label: "Add Fund",
+      icon: BadgeIndianRupee,
+      path: "/add-fund",
+      permissions: [
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
+    },
     {
       id: "members",
       label: "Members",
@@ -116,18 +118,18 @@ const Sidebar = () => {
     // --- ADMIN ONLY ---
     {
       id: "kyc",
-      label: "KYC Profiles",
+      label: "Profiles KYC",
       icon: Shield,
       path: "/all-kyc",
       permissions: ["ADMIN"],
     },
-    // {
-    //   id: "employee-management",
-    //   label: "Employee Management",
-    //   icon: Users,
-    //   path: "/employee-management",
-    //   permissions: ["ADMIN"],
-    // },
+    {
+      id: "employee-management",
+      label: "Employee Management",
+      icon: Users,
+      path: "/employee-management",
+      permissions: ["ADMIN"],
+    },
     {
       id: "reports",
       label: "Reports",
@@ -142,13 +144,13 @@ const Sidebar = () => {
       path: "/login-logs",
       permissions: ["ADMIN"],
     },
-    // {
-    //   id: "audit-logs",
-    //   label: "Audit Logs",
-    //   icon: RedoDot,
-    //   path: "/audit-logs",
-    //   permissions: ["ADMIN"],
-    // },
+    {
+      id: "audit-logs",
+      label: "Audit Logs",
+      icon: RedoDot,
+      path: "/audit-logs",
+      permissions: ["ADMIN"],
+    },
 
     // --- SYSTEM ---
     {
