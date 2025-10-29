@@ -2,7 +2,6 @@ import asyncHandler from "../utils/AsyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import UserServices from "../services/user.service.js";
-import { UserStatus } from "@prisma/client";
 import Helper from "../utils/helper.js";
 
 class UserController {
@@ -30,8 +29,6 @@ class UserController {
 
     const safeUser = Helper.serializeUser(user);
 
-
-
     return res
       .status(201)
       .json(
@@ -55,7 +52,6 @@ class UserController {
 
     const safeUser = Helper.serializeUser(user);
 
-
     return res
       .status(200)
       .json(
@@ -67,34 +63,31 @@ class UserController {
       );
   });
 
-  static updateProfileImage = asyncHandler(
-    async (req, res) => {
-      const { userId } = req.params;
+  static updateProfileImage = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
 
-      if (!userId) {
-        throw ApiError.unauthorized("User not authenticated");
-      }
-
-      if (!req.file) {
-        throw ApiError.badRequest("Profile image is required");
-      }
-
-      const user = await UserServices.updateProfileImage(userId, req.file.path);
-
-      const safeUser = Helper.serializeUser(user);
-
-
-      return res
-        .status(200)
-        .json(
-          ApiResponse.success(
-            { user: safeUser },
-            "Profile image updated successfully",
-            200
-          )
-        );
+    if (!userId) {
+      throw ApiError.unauthorized("User not authenticated");
     }
-  );
+
+    if (!req.file) {
+      throw ApiError.badRequest("Profile image is required");
+    }
+
+    const user = await UserServices.updateProfileImage(userId, req.file.path);
+
+    const safeUser = Helper.serializeUser(user);
+
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(
+          { user: safeUser },
+          "Profile image updated successfully",
+          200
+        )
+      );
+  });
 
   static getUserById = asyncHandler(async (req, res) => {
     const userId = req.params.id;
@@ -104,7 +97,6 @@ class UserController {
     }
 
     const user = await UserServices.getUserById(userId);
-
 
     return res
       .status(200)
@@ -127,7 +119,6 @@ class UserController {
         throw ApiError.notFound("User not found");
       }
 
-
       return res
         .status(200)
         .json(ApiResponse.success({ user }, "Current user fetched", 200));
@@ -137,152 +128,129 @@ class UserController {
     }
   });
 
-  static getAllUsersByRole = asyncHandler(
-    async (req, res) => {
-      const { roleId } = req.params;
+  static getAllUsersByRole = asyncHandler(async (req, res) => {
+    const { roleId } = req.params;
 
-      if (!roleId) {
-        throw ApiError.badRequest("roleId is required");
-      }
-
-      const users = await UserServices.getAllUsersByRole(roleId);
-
-     
-
-      return res
-        .status(200)
-        .json(
-          ApiResponse.success({ users }, "Users fetched successfully", 200)
-        );
+    if (!roleId) {
+      throw ApiError.badRequest("roleId is required");
     }
-  );
 
-  static getAllUsersByParentId = asyncHandler(
-    async (req, res) => {
-      const parentId = req.user?.id;
+    const users = await UserServices.getAllUsersByRole(roleId);
 
-      if (!parentId) {
-        throw ApiError.unauthorized("User not authenticated");
+    return res
+      .status(200)
+      .json(ApiResponse.success({ users }, "Users fetched successfully", 200));
+  });
+
+  static getAllUsersByParentId = asyncHandler(async (req, res) => {
+    const parentId = req.user?.id;
+
+    if (!parentId) {
+      throw ApiError.unauthorized("User not authenticated");
+    }
+
+    const {
+      page = "1",
+      limit = "10",
+      sort = "desc",
+      status = "ALL",
+      search = "",
+    } = req.query;
+
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 10;
+    const parsedSort = sort.toLowerCase() === "asc" ? "asc" : "desc";
+
+    // Accept ALL but validate against real enum values
+    const allowedStatuses = ["ALL", "ACTIVE", "IN_ACTIVE", "DELETED"];
+    const upperStatus = (status || "ALL").toUpperCase();
+
+    const parsedStatus = allowedStatuses.includes(upperStatus)
+      ? upperStatus
+      : "ALL";
+
+    const { users, total } = await UserServices.getAllUsersByParentId(
+      parentId,
+      {
+        page: parsedPage,
+        limit: parsedLimit,
+        sort: parsedSort,
+        status: parsedStatus,
+        search: search,
       }
+    );
 
-      const {
-        page = "1",
-        limit = "10",
-        sort = "desc",
-        status = "ALL",
-        search = "",
-      } = req.query;
-
-      const parsedPage = parseInt(page , 10) || 1;
-      const parsedLimit = parseInt(limit , 10) || 10;
-      const parsedSort =
-        (sort ).toLowerCase() === "asc" ? "asc" : "desc";
-
-      // Accept ALL but validate against real enum values
-      const allowedStatuses = ["ALL", ...Object.values(UserStatus)];
-      const upperStatus = ((status ) || "ALL").toUpperCase();
-
-      const parsedStatus = allowedStatuses.includes(upperStatus)
-        ? upperStatus
-        : "ALL";
-
-      const { users, total } = await UserServices.getAllUsersByParentId(
-        parentId,
+    return res.status(200).json(
+      ApiResponse.success(
         {
+          users,
+          total,
           page: parsedPage,
           limit: parsedLimit,
-          sort: parsedSort,
-          status: parsedStatus,
-          search: search ,
-        }
-      );
+          totalPages: Math.ceil(total / parsedLimit),
+        },
+        "Users fetched successfully",
+        200
+      )
+    );
+  });
 
-      return res.status(200).json(
+  static getAllUsersByChildrenId = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId) {
+      throw ApiError.badRequest("userId is required");
+    }
+
+    const users = await UserServices.getAllUsersByChildrenId(userId);
+
+    return res
+      .status(200)
+      .json(
         ApiResponse.success(
-          {
-            users,
-            total,
-            page: parsedPage,
-            limit: parsedLimit,
-            totalPages: Math.ceil(total / parsedLimit),
-          },
-          "Users fetched successfully",
+          { users },
+          "Children users fetched successfully",
           200
         )
       );
+  });
+
+  static getAllUsersCountByParentId = asyncHandler(async (req, res) => {
+    const { parentId } = req.params;
+
+    if (!parentId) {
+      throw ApiError.badRequest("parentId is required");
     }
-  );
 
-  static getAllUsersByChildrenId = asyncHandler(
-    async (req, res) => {
-      const { userId } = req.params;
+    const result = await UserServices.getAllUsersCountByParentId(parentId);
 
-      if (!userId) {
-        throw ApiError.badRequest("userId is required");
-      }
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(result, "Users count fetched successfully", 200)
+      );
+  });
 
-      const users = await UserServices.getAllUsersByChildrenId(userId);
+  static getAllUsersCountByChildrenId = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
 
-
-      return res
-        .status(200)
-        .json(
-          ApiResponse.success(
-            { users },
-            "Children users fetched successfully",
-            200
-          )
-        );
+    if (!userId) {
+      throw ApiError.badRequest("userId is required");
     }
-  );
 
-  static getAllUsersCountByParentId = asyncHandler(
-    async (req, res) => {
-      const { parentId } = req.params;
+    const result = await UserServices.getAllUsersCountByChildrenId(userId);
 
-      if (!parentId) {
-        throw ApiError.badRequest("parentId is required");
-      }
-
-      const result = await UserServices.getAllUsersCountByParentId(parentId);
-
-
-      return res
-        .status(200)
-        .json(
-          ApiResponse.success(result, "Users count fetched successfully", 200)
-        );
-    }
-  );
-
-  static getAllUsersCountByChildrenId = asyncHandler(
-    async (req, res) => {
-      const { userId } = req.params;
-
-      if (!userId) {
-        throw ApiError.badRequest("userId is required");
-      }
-
-      const result = await UserServices.getAllUsersCountByChildrenId(userId);
-
-
-      return res
-        .status(200)
-        .json(
-          ApiResponse.success(
-            result,
-            "Children count fetched successfully",
-            200
-          )
-        );
-    }
-  );
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(result, "Children count fetched successfully", 200)
+      );
+  });
 
   static deactivateUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const deactivatedBy = req.user?.id;
     const { reason } = req.body;
-
 
     if (!deactivatedBy) {
       throw ApiError.unauthorized("User not authenticated");
@@ -300,7 +268,6 @@ class UserController {
       );
 
       const safeUser = Helper.serializeUser(user);
-
 
       return res
         .status(200)
@@ -322,7 +289,6 @@ class UserController {
     const reactivatedBy = req.user?.id;
     const { reason } = req.body;
 
-
     if (!reactivatedBy) {
       throw ApiError.unauthorized("User not authenticated");
     }
@@ -339,8 +305,6 @@ class UserController {
       );
 
       const safeUser = Helper.serializeUser(user);
-
-    
 
       return res
         .status(200)
@@ -385,7 +349,7 @@ class UserController {
           )
         );
     } catch (error) {
-      console.error("Controller error in deleteUser:". error);
+      console.error("Controller error in deleteUser:".error);
       throw error;
     }
   });

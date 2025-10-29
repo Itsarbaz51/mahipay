@@ -4,7 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 class LoginLogController {
-  private static loginLogService = new LoginLogService();
+  static loginLogService = new LoginLogService();
 
   static index = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
@@ -12,7 +12,7 @@ class LoginLogController {
       throw ApiError.unauthorized("User not authenticated");
     }
 
-    const { status, page, limit, sort, search } = req.body
+    const { status, page, limit, sort, search } = req.body;
 
     const result = await LoginLogController.loginLogService.getAllLoginLogs({
       userId,
@@ -29,7 +29,9 @@ class LoginLogController {
 
     return res
       .status(200)
-      .json(ApiResponse.success(result, "Login logs fetched successfully", 200));
+      .json(
+        ApiResponse.success(result, "Login logs fetched successfully", 200)
+      );
   });
 
   static show = asyncHandler(async (req, res) => {
@@ -39,24 +41,34 @@ class LoginLogController {
       throw ApiError.badRequest("Login log ID is required");
     }
 
-    const loginLog = await LoginLogController.loginLogService.getLoginLogById(id);
+    const loginLog =
+      await LoginLogController.loginLogService.getLoginLogById(id);
 
     if (!loginLog) {
       throw ApiError.notFound("Login log not found");
     }
 
-    res.status(200).json(ApiResponse.success(loginLog, "Login log fetched successfully", 200));
+    res
+      .status(200)
+      .json(
+        ApiResponse.success(loginLog, "Login log fetched successfully", 200)
+      );
   });
 
   static store = asyncHandler(async (req, res) => {
-    const loginLog = await LoginLogController.loginLogService.createLoginLog(req.body);
+    const loginLog = await LoginLogController.loginLogService.createLoginLog(
+      req.body
+    );
 
     if (!loginLog) {
       throw ApiError.internal("Failed to create login log");
     }
 
-
-    res.status(201).json(ApiResponse.success(loginLog, "Login log created successfully", 201));
+    res
+      .status(201)
+      .json(
+        ApiResponse.success(loginLog, "Login log created successfully", 201)
+      );
   });
 
   static destroy = asyncHandler(async (req, res) => {
@@ -66,7 +78,8 @@ class LoginLogController {
       throw ApiError.badRequest("Login log ID is required");
     }
 
-    const existingLog = await LoginLogController.loginLogService.getLoginLogById(id);
+    const existingLog =
+      await LoginLogController.loginLogService.getLoginLogById(id);
 
     if (!existingLog) {
       throw ApiError.notFound("Login log not found");
@@ -78,8 +91,9 @@ class LoginLogController {
       throw ApiError.internal("Failed to delete login log");
     }
 
-    res.status(200).json(ApiResponse.success(result, "Login log deleted successfully", 200));
-
+    res
+      .status(200)
+      .json(ApiResponse.success(result, "Login log deleted successfully", 200));
   });
 }
 

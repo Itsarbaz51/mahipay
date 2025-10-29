@@ -1,7 +1,6 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
-import { CommissionScope } from "@prisma/client";
 
 export class CommissionSettingService {
   static async createOrUpdateCommissionSetting(data, createdBy) {
@@ -22,10 +21,10 @@ export class CommissionSettingService {
       effectiveTo,
     } = data;
 
-    if (scope === CommissionScope.ROLE && !roleId) {
+    if (scope === "ROLE" && !roleId) {
       throw ApiError.badRequest("roleId is required for ROLE scope");
     }
-    if (scope === CommissionScope.USER && !targetUserId) {
+    if (scope === "USER" && !targetUserId) {
       throw ApiError.badRequest("targetUserId is required for USER scope");
     }
 
@@ -106,15 +105,33 @@ export class CommissionSettingService {
       where: {
         OR: [
           { targetUserId: userId },
-          { scope: CommissionScope.ROLE, roleId: user.roleId },
+          { scope: "ROLE", roleId: user.roleId },
         ],
         isActive: true,
       },
       include: {
-        service: { select: { id: true, code: true, name: true, isActive: true } },
+        service: {
+          select: { id: true, code: true, name: true, isActive: true },
+        },
         role: { select: { id: true, name: true, level: true } },
-        targetUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        createdByUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
+        targetUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
     });
@@ -126,10 +143,34 @@ export class CommissionSettingService {
     const settings = await Prisma.commissionSetting.findMany({
       where: { createdBy: userId, isActive: true },
       include: {
-        service: { select: { id: true, type: true, code: true, name: true, isActive: true } },
+        service: {
+          select: {
+            id: true,
+            type: true,
+            code: true,
+            name: true,
+            isActive: true,
+          },
+        },
         role: { select: { id: true, name: true, level: true } },
-        targetUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        createdByUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
+        targetUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -149,10 +190,28 @@ export class CommissionSettingService {
         isActive,
       },
       include: {
-        service: { select: { id: true, code: true, name: true, isActive: true } },
+        service: {
+          select: { id: true, code: true, name: true, isActive: true },
+        },
         role: { select: { id: true, name: true, level: true } },
-        targetUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        createdByUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
+        targetUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
     });
@@ -161,7 +220,9 @@ export class CommissionSettingService {
   }
 
   static async deactivateCommissionSetting(id) {
-    const setting = await Prisma.commissionSetting.findUnique({ where: { id } });
+    const setting = await Prisma.commissionSetting.findUnique({
+      where: { id },
+    });
     if (!setting) throw ApiError.notFound("Commission setting not found");
 
     return Prisma.commissionSetting.update({
@@ -199,12 +260,16 @@ export class CommissionEarningService {
     if (!createdByUser) throw ApiError.notFound("Created by user not found");
 
     if (fromUserId) {
-      const fromUser = await Prisma.user.findUnique({ where: { id: fromUserId } });
+      const fromUser = await Prisma.user.findUnique({
+        where: { id: fromUserId },
+      });
       if (!fromUser) throw ApiError.notFound("From user not found");
     }
 
     if (serviceId) {
-      const service = await Prisma.serviceProvider.findUnique({ where: { id: serviceId } });
+      const service = await Prisma.serviceProvider.findUnique({
+        where: { id: serviceId },
+      });
       if (!service) throw ApiError.notFound("Service not found");
     }
 
@@ -224,11 +289,45 @@ export class CommissionEarningService {
         createdBy,
       },
       include: {
-        user: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        fromUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        service: { select: { id: true, type: true, code: true, name: true, isActive: true } },
-        createdByUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        transaction: { select: { id: true, referenceId: true, amount: true, status: true } },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        fromUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        service: {
+          select: {
+            id: true,
+            type: true,
+            code: true,
+            name: true,
+            isActive: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        transaction: {
+          select: { id: true, referenceId: true, amount: true, status: true },
+        },
       },
     });
 
@@ -236,7 +335,8 @@ export class CommissionEarningService {
   }
 
   static async getCommissionEarnings(filters) {
-    const { userId, fromUserId, serviceId, transactionId, startDate, endDate } = filters;
+    const { userId, fromUserId, serviceId, transactionId, startDate, endDate } =
+      filters;
 
     const whereClause = {
       ...(userId ? { userId } : {}),
@@ -254,11 +354,51 @@ export class CommissionEarningService {
     const earnings = await Prisma.commissionEarning.findMany({
       where: whereClause,
       include: {
-        user: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        fromUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        service: { select: { id: true, type: true, code: true, name: true, isActive: true } },
-        createdByUser: { select: { id: true, username: true, email: true, firstName: true, lastName: true } },
-        transaction: { select: { id: true, referenceId: true, amount: true, status: true, paymentType: true } },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        fromUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        service: {
+          select: {
+            id: true,
+            type: true,
+            code: true,
+            name: true,
+            isActive: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        transaction: {
+          select: {
+            id: true,
+            referenceId: true,
+            amount: true,
+            status: true,
+            paymentType: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -290,9 +430,18 @@ export class CommissionEarningService {
       orderBy: { createdAt: "desc" },
     });
 
-    const totalCommission = earnings.reduce((sum, e) => sum + Number(e.commissionAmount), 0);
-    const totalTDS = earnings.reduce((sum, e) => sum + Number(e.tdsAmount || BigInt(0)), 0);
-    const totalGST = earnings.reduce((sum, e) => sum + Number(e.gstAmount || BigInt(0)), 0);
+    const totalCommission = earnings.reduce(
+      (sum, e) => sum + Number(e.commissionAmount),
+      0
+    );
+    const totalTDS = earnings.reduce(
+      (sum, e) => sum + Number(e.tdsAmount || BigInt(0)),
+      0
+    );
+    const totalGST = earnings.reduce(
+      (sum, e) => sum + Number(e.gstAmount || BigInt(0)),
+      0
+    );
     const totalNet = earnings.reduce((sum, e) => sum + Number(e.netAmount), 0);
 
     const summary = {

@@ -1,5 +1,4 @@
 import Prisma from "../db/db.js";
-import { KycStatus as PrismaKycStatus } from "@prisma/client";
 import { ApiError } from "../utils/ApiError.js";
 import S3Service from "../utils/S3Service.js";
 import Helper from "../utils/helper.js";
@@ -48,7 +47,8 @@ class KycServices {
 
     const where = {
       userId: { in: childUserIds },
-      ...(status && status.toUpperCase() !== "ALL" && { status: status.toUpperCase() }),
+      ...(status &&
+        status.toUpperCase() !== "ALL" && { status: status.toUpperCase() }),
       ...(search && {
         user: {
           OR: [
@@ -83,8 +83,13 @@ class KycServices {
 
     const frontendData = kycs.map((kyc) => {
       const pii = kyc.piiConsents.map((p) => {
-        if (p.piiType === "PAN") return { type: "PAN", value: p.piiHash.slice(0, 2) + "XXX" + p.piiHash.slice(-3) };
-        if (p.piiType === "AADHAAR") return { type: "AADHAAR", value: "XXXX-XXXX-" + p.piiHash.slice(-4) };
+        if (p.piiType === "PAN")
+          return {
+            type: "PAN",
+            value: p.piiHash.slice(0, 2) + "XXX" + p.piiHash.slice(-3),
+          };
+        if (p.piiType === "AADHAAR")
+          return { type: "AADHAAR", value: "XXXX-XXXX-" + p.piiHash.slice(-4) };
         return { type: p.piiType, value: "******" };
       });
 
@@ -123,11 +128,7 @@ class KycServices {
     return result;
   }
 
-  static async showUserKyc(
-    id,
-    userId,
-    requestingUser
-  ) {
+  static async showUserKyc(id, userId, requestingUser) {
     if (!id && !userId) {
       throw ApiError.badRequest("Either KYC ID or User ID is required");
     }
@@ -173,14 +174,19 @@ class KycServices {
             return { type: p.piiType, value: decryptedValue };
           } else {
             let masked = "******";
-            if (p.piiType === "PAN") masked = `${decryptedValue.slice(0, 2)}XXXX${decryptedValue.slice(-3)}`;
-            else if (p.piiType === "AADHAAR") masked = `${decryptedValue.slice(0, 2)}XX-XXXX-${decryptedValue.slice(-4)}`;
+            if (p.piiType === "PAN")
+              masked = `${decryptedValue.slice(0, 2)}XXXX${decryptedValue.slice(-3)}`;
+            else if (p.piiType === "AADHAAR")
+              masked = `${decryptedValue.slice(0, 2)}XX-XXXX-${decryptedValue.slice(-4)}`;
             return { type: p.piiType, value: masked };
           }
         } catch (error) {
           return {
             type: p.piiType,
-            value: isAdmin || isOwner ? `[Encrypted Data - ${p.piiHash.slice(0, 8)}...]` : "******",
+            value:
+              isAdmin || isOwner
+                ? `[Encrypted Data - ${p.piiHash.slice(0, 8)}...]`
+                : "******",
           };
         }
       })
@@ -334,15 +340,12 @@ class KycServices {
       ].filter(Boolean);
 
       for (const filePath of allFiles) {
-        await Helper.deleteOldImage(filePath );
+        await Helper.deleteOldImage(filePath);
       }
     }
   }
 
-  static async updateUserKyc(
-    id,
-    payload
-  ) {
+  static async updateUserKyc(id, payload) {
     try {
       const existingKyc = await Prisma.userKyc.findUnique({
         where: { id: id },
@@ -375,7 +378,7 @@ class KycServices {
         }
       }
 
-      const uploadTasks= [];
+      const uploadTasks = [];
       const fileFields = [
         ["panFile", "panFile"],
         ["photo", "photo"],
@@ -388,10 +391,7 @@ class KycServices {
         if (file && typeof file === "object" && "path" in file) {
           uploadTasks.push(
             (async () => {
-              const newUrl = await S3Service.upload(
-                (file).path,
-                "user-kyc"
-              );
+              const newUrl = await S3Service.upload(file.path, "user-kyc");
               if (newUrl) {
                 const oldUrl = existingKyc[dbField];
                 if (oldUrl) {
@@ -449,8 +449,7 @@ class KycServices {
       throw ApiError.notFound("KYC not found");
     }
 
-    const enumStatus =
-      PrismaKycStatus[payload.status];
+    const enumStatus = payload.status;
 
     if (!enumStatus) {
       throw ApiError.badRequest("Invalid status value");
@@ -488,7 +487,6 @@ class KycServices {
     if (!updatedUser) {
       throw ApiError.internal("Failed to update user KYC status");
     }
-
 
     return {
       ...updateVerify,

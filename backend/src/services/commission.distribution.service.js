@@ -10,11 +10,7 @@ const ROLE_HIERARCHY = {
 };
 
 export class CommissionDistributionService {
-  static async getCommissionChain(
-    userId,
-    serviceId,
-    channel = null
-  ) {
+  static async getCommissionChain(userId, serviceId, channel = null) {
     const userWithPath = await Prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -66,11 +62,11 @@ export class CommissionDistributionService {
     return await this.resolveCommissionSettings(chainUsers, serviceId, channel);
   }
 
-   static validateHierarchyOrder(chainUsers) {
+  static validateHierarchyOrder(chainUsers) {
     const roleLevels = chainUsers.map((user) => {
       const roleName =
         user.role?.name?.toUpperCase().replace(/\s+/g, "_") || "";
-      return ROLE_HIERARCHY[roleName ] ?? 999;
+      return ROLE_HIERARCHY[roleName] ?? 999;
     });
 
     for (let i = 1; i < roleLevels.length; i++) {
@@ -80,19 +76,15 @@ export class CommissionDistributionService {
     }
   }
 
-   static async resolveCommissionSettings(
-    chainUsers,
-    serviceId,
-    channel
-  ) {
-    const results  = [];
+  static async resolveCommissionSettings(chainUsers, serviceId, channel) {
+    const results = [];
     const roleCommissionCache = new Map();
     const now = new Date();
 
     const userIds = chainUsers.map((u) => u.id);
     const userSettings = await Prisma.commissionSetting.findMany({
       where: {
-        scope: CommissionScope.USER,
+        scope: "USER",
         targetUserId: { in: userIds },
         serviceId,
         isActive: true,
@@ -129,7 +121,7 @@ export class CommissionDistributionService {
         if (roleSetting === undefined) {
           roleSetting = await Prisma.commissionSetting.findFirst({
             where: {
-              scope: CommissionScope.ROLE,
+              scope: "ROLE",
               roleId: user.roleId,
               serviceId,
               isActive: true,
@@ -188,7 +180,7 @@ export class CommissionDistributionService {
     }
   }
 
-   static validateCommissionChain(chain) {
+  static validateCommissionChain(chain) {
     if (chain.length === 0) return;
 
     const userIds = new Set();
@@ -218,13 +210,9 @@ export class CommissionDistributionService {
         }
       }
     }
-
   }
 
-  static calculateHierarchicalCommissions(
-    chain,
-    baseAmount
-  ) {
+  static calculateHierarchicalCommissions(chain, baseAmount) {
     const commissions = [];
 
     if (chain.length === 0) return commissions;
@@ -265,10 +253,7 @@ export class CommissionDistributionService {
     return this.distributeCommissionPool(sortedChain, totalCommissionPool);
   }
 
-   static distributeCommissionPool(
-    chain,
-    totalCommissionPool
-  ) {
+  static distributeCommissionPool(chain, totalCommissionPool) {
     const commissions = [];
     let remainingPool = totalCommissionPool;
 
@@ -320,8 +305,6 @@ export class CommissionDistributionService {
     );
 
     if (totalDistributed !== totalCommissionPool) {
-
-
       if (Math.abs(Number(totalCommissionPool - totalDistributed)) <= 1) {
         console.log("Minor rounding difference auto-corrected");
         if (commissions.length > 0) {
@@ -340,11 +323,8 @@ export class CommissionDistributionService {
     return commissions;
   }
 
-  static calculateCommissionPayouts(
-    commissions,
-    transactionId
-  ){
-    const payouts= [];
+  static calculateCommissionPayouts(commissions, transactionId) {
+    const payouts = [];
 
     if (commissions.length === 0) return payouts;
 
@@ -405,10 +385,7 @@ export class CommissionDistributionService {
     return payouts;
   }
 
-  static async distribute(
-    transaction,
-    createdBy
-  ){
+  static async distribute(transaction, createdBy) {
     const { id: transactionId, serviceId, amount: txAmount } = transaction;
     const baseAmount = BigInt(txAmount);
 
@@ -583,7 +560,7 @@ export class CommissionDistributionService {
     return createdEarnings;
   }
 
-   static async creditUserWallet(
+  static async creditUserWallet(
     tx,
     userId,
     amount,
@@ -638,7 +615,7 @@ export class CommissionDistributionService {
     });
   }
 
-   static async debitUserWallet(
+  static async debitUserWallet(
     tx,
     userId,
     amount,
