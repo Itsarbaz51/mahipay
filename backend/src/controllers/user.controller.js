@@ -106,9 +106,6 @@ class UserController {
   static getCurrentUser = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
-    console.log("🔍 DEBUG - User ID from auth middleware:", userId);
-    console.log("🔍 DEBUG - Full user object from request:", req.user);
-
     if (!userId) {
       throw ApiError.unauthorized("User not authenticated");
     }
