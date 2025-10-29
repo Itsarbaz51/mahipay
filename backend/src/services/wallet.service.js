@@ -1,11 +1,9 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
-import { LedgerEntryType, ReferenceType, WalletType } from "@prisma/client";
-import logger from "../utils/WinstonLogger.js";
 
 export class WalletService {
-  static async getWalletByUserId(userId: string, walletType?: WalletType) {
-    const where: any = { userId, isActive: true };
+  static async getWalletByUserId(userId, walletType) {
+    const where = { userId, isActive: true };
     if (walletType) {
       where.walletType = walletType;
     }
@@ -24,7 +22,6 @@ export class WalletService {
       throw ApiError.notFound("Wallet not found for user");
     }
 
-    // Get latest balance from ledger for consistency
     const latestLedger = await Prisma.ledgerEntry.findFirst({
       where: { walletId: wallet.id },
       orderBy: { createdAt: "desc" },
@@ -43,8 +40,8 @@ export class WalletService {
     };
   }
 
-  static async getWalletBalance(userId: string, walletType?: WalletType) {
-    const where: any = { userId, isActive: true };
+  static async getWalletBalance(userId, walletType) {
+    const where = { userId, isActive: true };
     if (walletType) {
       where.walletType = walletType;
     }
@@ -57,7 +54,6 @@ export class WalletService {
       throw ApiError.notFound("Wallet not found for user");
     }
 
-    // Get latest balance from ledger for accuracy
     const latestLedger = await Prisma.ledgerEntry.findFirst({
       where: { walletId: wallet.id },
       orderBy: { createdAt: "desc" },
@@ -72,19 +68,19 @@ export class WalletService {
   }
 
   static async creditWallet(
-    userId: string,
-    amount: number,
-    narration?: string,
-    createdBy?: string,
-    idempotencyKey?: string,
-    walletType?: WalletType,
-    referenceType?: ReferenceType,
-    serviceId?: string // ServiceId add kiya
+    userId,
+    amount,
+    narration,
+    createdBy,
+    idempotencyKey,
+    walletType,
+    referenceType,
+    serviceId
   ) {
     if (amount <= 0) throw ApiError.badRequest("Amount must be greater than 0");
 
     return await Prisma.$transaction(async (tx) => {
-      const where: any = { userId, isActive: true };
+      const where = { userId, isActive: true };
       if (walletType) {
         where.walletType = walletType;
       }
@@ -111,7 +107,6 @@ export class WalletService {
       const newBalance = currentBalance + creditAmount;
       const newAvailableBalance = currentAvailableBalance + creditAmount;
 
-      // Service details nikalenge agar serviceId diya hai to
       let serviceDetails = null;
       if (serviceId) {
         serviceDetails = await tx.serviceProvider.findUnique({
@@ -124,13 +119,12 @@ export class WalletService {
         ? `${serviceDetails.type} - ${serviceDetails.name}`
         : "Wallet credit";
 
-      // Create ledger entry
       const ledgerEntry = await tx.ledgerEntry.create({
         data: {
           walletId: wallet.id,
-          entryType: LedgerEntryType.CREDIT,
-          referenceType: referenceType || ReferenceType.ADJUSTMENT,
-          serviceId: serviceId || null, // ServiceId add kiya
+          entryType: "CREDIT",
+          referenceType: referenceType || "ADJUSTMENT",
+          serviceId: serviceId || null,
           amount: creditAmount,
           runningBalance: newBalance,
           narration: narration || serviceNarration,
@@ -139,7 +133,6 @@ export class WalletService {
         },
       });
 
-      // Update wallet balance
       await tx.wallet.update({
         where: { id: wallet.id },
         data: {
@@ -149,7 +142,7 @@ export class WalletService {
         },
       });
 
-      logger.info("Wallet credited successfully", {
+      console.log("Wallet credited successfully", {
         walletId: wallet.id,
         userId,
         walletType: wallet.walletType,
@@ -174,19 +167,19 @@ export class WalletService {
   }
 
   static async debitWallet(
-    userId: string,
-    amount: number,
-    narration?: string,
-    createdBy?: string,
-    idempotencyKey?: string,
-    walletType?: WalletType,
-    referenceType?: ReferenceType,
-    serviceId?: string // ServiceId add kiya
+    userId,
+    amount,
+    narration,
+    createdBy,
+    idempotencyKey,
+    walletType,
+    referenceType,
+    serviceId
   ) {
     if (amount <= 0) throw ApiError.badRequest("Amount must be greater than 0");
 
     return await Prisma.$transaction(async (tx) => {
-      const where: any = { userId, isActive: true };
+      const where = { userId, isActive: true };
       if (walletType) {
         where.walletType = walletType;
       }
@@ -218,7 +211,6 @@ export class WalletService {
       const newBalance = currentBalance - debitAmount;
       const newAvailableBalance = currentAvailableBalance - debitAmount;
 
-      // Service details nikalenge agar serviceId diya hai to
       let serviceDetails = null;
       if (serviceId) {
         serviceDetails = await tx.serviceProvider.findUnique({
@@ -231,13 +223,12 @@ export class WalletService {
         ? `${serviceDetails.type} - ${serviceDetails.name}`
         : "Wallet debit";
 
-      // Create ledger entry
       const ledgerEntry = await tx.ledgerEntry.create({
         data: {
           walletId: wallet.id,
-          entryType: LedgerEntryType.DEBIT,
-          referenceType: referenceType || ReferenceType.ADJUSTMENT,
-          serviceId: serviceId || null, // ServiceId add kiya
+          entryType: "DEBIT",
+          referenceType: referenceType || "ADJUSTMENT",
+          serviceId: serviceId || null,
           amount: debitAmount,
           runningBalance: newBalance,
           narration: narration || serviceNarration,
@@ -246,7 +237,6 @@ export class WalletService {
         },
       });
 
-      // Update wallet balance
       await tx.wallet.update({
         where: { id: wallet.id },
         data: {
@@ -256,7 +246,7 @@ export class WalletService {
         },
       });
 
-      logger.info("Wallet debited successfully", {
+      console.log("Wallet debited successfully", {
         walletId: wallet.id,
         userId,
         walletType: wallet.walletType,
@@ -281,17 +271,17 @@ export class WalletService {
   }
 
   static async holdAmount(
-    userId: string,
-    amount: number,
-    narration?: string,
-    createdBy?: string,
-    idempotencyKey?: string,
-    walletType?: WalletType
+    userId,
+    amount,
+    narration,
+    createdBy,
+    idempotencyKey,
+    walletType
   ) {
     if (amount <= 0) throw ApiError.badRequest("Amount must be greater than 0");
 
     return await Prisma.$transaction(async (tx) => {
-      const where: any = { userId, isActive: true };
+      const where = { userId, isActive: true };
       if (walletType) {
         where.walletType = walletType;
       }
@@ -323,7 +313,6 @@ export class WalletService {
       const newAvailableBalance = currentAvailableBalance - holdAmount;
       const newHoldBalance = currentHoldBalance + holdAmount;
 
-      // Update wallet balances
       await tx.wallet.update({
         where: { id: wallet.id },
         data: {
@@ -333,7 +322,7 @@ export class WalletService {
         },
       });
 
-      logger.info("Amount held successfully", {
+      console.log("Amount held successfully", {
         walletId: wallet.id,
         userId,
         walletType: wallet.walletType,
@@ -356,17 +345,17 @@ export class WalletService {
   }
 
   static async releaseHoldAmount(
-    userId: string,
-    amount: number,
-    narration?: string,
-    createdBy?: string,
-    idempotencyKey?: string,
-    walletType?: WalletType
+    userId,
+    amount,
+    narration,
+    createdBy,
+    idempotencyKey,
+    walletType
   ) {
     if (amount <= 0) throw ApiError.badRequest("Amount must be greater than 0");
 
     return await Prisma.$transaction(async (tx) => {
-      const where: any = { userId, isActive: true };
+      const where = { userId, isActive: true };
       if (walletType) {
         where.walletType = walletType;
       }
@@ -398,7 +387,6 @@ export class WalletService {
       const newHoldBalance = currentHoldBalance - releaseAmount;
       const newAvailableBalance = currentAvailableBalance + releaseAmount;
 
-      // Update wallet balances
       await tx.wallet.update({
         where: { id: wallet.id },
         data: {
@@ -408,7 +396,7 @@ export class WalletService {
         },
       });
 
-      logger.info("Hold amount released successfully", {
+      console.log("Hold amount released successfully", {
         walletId: wallet.id,
         userId,
         walletType: wallet.walletType,
@@ -431,12 +419,12 @@ export class WalletService {
   }
 
   static async getWalletTransactions(
-    userId: string,
-    page: number = 1,
-    limit: number = 10,
-    walletType?: WalletType
+    userId,
+    page = 1,
+    limit = 10,
+    walletType
   ) {
-    const where: any = { userId, isActive: true };
+    const where = { userId, isActive: true };
     if (walletType) {
       where.walletType = walletType;
     }
@@ -484,7 +472,7 @@ export class WalletService {
     };
   }
 
-  static async getUserWallets(userId: string) {
+  static async getUserWallets(userId) {
     const wallets = await Prisma.wallet.findMany({
       where: { userId, isActive: true },
       orderBy: { walletType: "asc" },

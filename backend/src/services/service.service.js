@@ -1,15 +1,8 @@
 import Prisma from "../db/db.js";
-import type {
-  CreateServiceProviderInput,
-  UpdateServiceProviderInput,
-} from "../types/serivce.type.js";
 import { ApiError } from "../utils/ApiError.js";
-import logger from "../utils/WinstonLogger.js";
 
 export class ServiceProviderService {
-  static async create(
-    data: CreateServiceProviderInput & { createdBy: string }
-  ) {
+  static async create(data) {
     const existingCode = await Prisma.serviceProvider.findUnique({
       where: { code: data.code },
     });
@@ -18,15 +11,13 @@ export class ServiceProviderService {
       throw ApiError.badRequest("Service Provider code already exists");
     }
 
-    // Create proper data object with explicit null handling
-    const createData: any = {
+    const createData = {
       type: data.type,
       code: data.code,
       isActive: data.isActive ?? true,
       createdBy: data.createdBy,
     };
 
-    // Handle optional fields explicitly
     if (data.name !== undefined) {
       createData.name = data.name || null;
     }
@@ -49,11 +40,10 @@ export class ServiceProviderService {
       },
     });
 
-    logger.info("Service Provider created", { id: serviceProvider.id });
     return serviceProvider;
   }
 
-  static async getAllByCreatedUser(userId: string) {
+  static async getAllByCreatedUser(userId) {
     const serviceProviders = await Prisma.serviceProvider.findMany({
       where: {
         createdBy: userId,
@@ -73,7 +63,7 @@ export class ServiceProviderService {
     return serviceProviders;
   }
 
-  static async getAllByCreatedUserAndStatus(userId: string) {
+  static async getAllByCreatedUserAndStatus(userId) {
     const serviceProviders = await Prisma.serviceProvider.findMany({
       where: {
         createdBy: userId,
@@ -94,7 +84,7 @@ export class ServiceProviderService {
     return serviceProviders;
   }
 
-  static async getById(id: string) {
+  static async getById(id) {
     const serviceProvider = await Prisma.serviceProvider.findUnique({
       where: { id },
       include: {
@@ -132,7 +122,7 @@ export class ServiceProviderService {
     return serviceProvider;
   }
 
-  static async toggleActiveStatus(id: string, isActive: boolean) {
+  static async toggleActiveStatus(id, isActive) {
     const existing = await Prisma.serviceProvider.findUnique({
       where: { id },
     });
@@ -156,20 +146,16 @@ export class ServiceProviderService {
       },
     });
 
-    logger.info("Service Provider status updated", {
-      id,
-      isActive: isActive,
-    });
+    
     return updated;
   }
 
-  static async delete(id: string) {
+  static async delete(id) {
     const existing = await Prisma.serviceProvider.findUnique({
       where: { id },
     });
     if (!existing) throw ApiError.notFound("Service Provider not found");
 
-    // Check if provider has related records using transaction for consistency
     const relatedRecords = await Prisma.$transaction([
       Prisma.transaction.count({ where: { serviceId: id } }),
       Prisma.commissionSetting.count({ where: { serviceId: id } }),
@@ -204,11 +190,10 @@ export class ServiceProviderService {
     }
 
     await Prisma.serviceProvider.delete({ where: { id } });
-    logger.info("Service Provider deleted", { id });
     return { message: "Service Provider deleted successfully" };
   }
 
-  static async update(id: string, data: UpdateServiceProviderInput) {
+  static async update(id, data) {
     const existing = await Prisma.serviceProvider.findUnique({
       where: { id },
     });
@@ -223,12 +208,10 @@ export class ServiceProviderService {
       }
     }
 
-    // Create proper update data object
-    const updateData: any = {
+    const updateData = {
       updatedAt: new Date(),
     };
 
-    // Handle each field explicitly
     if (data.type !== undefined) {
       updateData.type = data.type;
     }
@@ -264,7 +247,6 @@ export class ServiceProviderService {
       },
     });
 
-    logger.info("Service Provider updated", { id });
     return updated;
   }
 }

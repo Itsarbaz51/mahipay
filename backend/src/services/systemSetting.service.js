@@ -1,15 +1,9 @@
 import Prisma from "../db/db.js";
-import type {
-  SystemSettingInput,
-  SystemSetting,
-} from "../types/systemSetting.types.js";
 import { ApiError } from "../utils/ApiError.js";
-import Helper from "../utils/helper.js";
-import { clearPattern, getCacheWithPrefix, setCacheWithPrefix } from "../utils/redisCasheHelper.js";
 import S3Service from "../utils/S3Service.js";
 
 class SystemSettingService {
-  private static mapToSystemSetting(record: any): SystemSetting {
+  static mapToSystemSetting(record) {
     return {
       userId: record.userId,
       companyName: record.companyName,
@@ -26,7 +20,7 @@ class SystemSettingService {
     };
   }
 
-  static async upsert(data: SystemSettingInput, userId: string): Promise<SystemSetting> {
+  static async upsert(data, userId) {
     const existing = await Prisma.systemSetting.findFirst({ where: { userId } });
 
     let companyLogoUrl = existing?.companyLogo ?? null;
@@ -66,30 +60,18 @@ class SystemSettingService {
       result = await Prisma.systemSetting.create({ data: payload });
     }
 
-    await clearPattern(`systemSetting:*:${userId}*`);
-    await clearPattern(`systemSetting:getAll:*`);
-
     return this.mapToSystemSetting(result);
   }
 
-  static async getById(userId: string): Promise<SystemSetting> {
-    const cacheKey = `systemSetting:getById:${userId}`;
-    const cached = await getCacheWithPrefix<SystemSetting>("systemSetting", `getById:${userId}`);
-    if (cached) return cached;
-
+  static async getById(userId) {
     const setting = await Prisma.systemSetting.findFirst({ where: { userId } });
     if (!setting) throw ApiError.notFound("System setting not found");
 
     const mapped = this.mapToSystemSetting(setting);
-    await setCacheWithPrefix("systemSetting", `getById:${userId}`, mapped, 300);
     return mapped;
   }
 
-  static async getAll(page = 1, limit = 10, sort: "asc" | "desc" = "desc") {
-    const cacheKey = `systemSetting:getAll:${page}:${limit}:${sort}`;
-    const cached = await getCacheWithPrefix<any>("systemSetting", `getAll:${page}:${limit}:${sort}`);
-    if (cached) return cached;
-
+  static async getAll(page = 1, limit = 10, sort = "desc") {
     const skip = (page - 1) * limit;
     const dataRaw = await Prisma.systemSetting.findMany({
       skip,
@@ -105,11 +87,10 @@ class SystemSettingService {
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
 
-    await setCacheWithPrefix("systemSetting", `getAll:${page}:${limit}:${sort}`, result, 180);
     return result;
   }
 
-  static async delete(id: string): Promise<SystemSetting> {
+  static async delete(id) {
     const existing = await Prisma.systemSetting.findUnique({ where: { id } });
     if (!existing) throw ApiError.notFound("System setting not found");
 
@@ -120,9 +101,6 @@ class SystemSettingService {
       where: { id },
       data: { deletedAt: new Date() },
     });
-
-    await clearPattern(`systemSetting:*:${existing.userId}*`);
-    await clearPattern(`systemSetting:getAll:*`);
 
     return this.mapToSystemSetting(deleted);
   }

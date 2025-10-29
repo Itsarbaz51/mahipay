@@ -1,20 +1,16 @@
-// src/controllers/CCPayoutController.ts
-import type { Request, Response } from "express";
 import CCPayoutService from "../../services/bulkpay/ccPayout.service.js";
 import asyncHandler from "../../utils/AsyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 
 export class CCPayoutController {
-  private payoutService: CCPayoutService;
-
   constructor() {
     this.payoutService = new CCPayoutService();
   }
 
-  createSender = asyncHandler(async (req: Request, res: Response) => {
+  createSender = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
-    const reqIp = req.ip!;
+    const reqIp = req.ip;
 
     if (!userId) {
       throw ApiError.internal("Failed to get user ID in createSender");
@@ -31,7 +27,7 @@ export class CCPayoutController {
       .json(ApiResponse.success(result, "Sender created successfully", 201));
   });
 
-  uploadCardImage = asyncHandler(async (req: Request, res: Response) => {
+  uploadCardImage = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     const { senderId, cardImageType } = req.body;
 
@@ -57,7 +53,7 @@ export class CCPayoutController {
       );
   });
 
-  listSenders = asyncHandler(async (req: Request, res: Response) => {
+  listSenders = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) {
@@ -71,7 +67,7 @@ export class CCPayoutController {
       .json(ApiResponse.success(result, "Senders retrieved successfully", 200));
   });
 
-  createBeneficiary = asyncHandler(async (req: Request, res: Response) => {
+  createBeneficiary = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) {
@@ -87,7 +83,7 @@ export class CCPayoutController {
       );
   });
 
-  listBeneficiaries = asyncHandler(async (req: Request, res: Response) => {
+  listBeneficiaries = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) {
@@ -106,7 +102,7 @@ export class CCPayoutController {
       );
   });
 
-  createCollection = asyncHandler(async (req: Request, res: Response) => {
+  createCollection = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) {
@@ -125,7 +121,7 @@ export class CCPayoutController {
       );
   });
 
-  listCollections = asyncHandler(async (req: Request, res: Response) => {
+  listCollections = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) {
@@ -141,7 +137,7 @@ export class CCPayoutController {
       );
   });
 
-  webhookHandler = asyncHandler(async (req: Request, res: Response) => {
+  webhookHandler = asyncHandler(async (req, res) => {
     const result = await this.payoutService.handleWebhook(req.body);
 
     res
@@ -149,7 +145,7 @@ export class CCPayoutController {
       .json(ApiResponse.success(result, "Webhook handled successfully", 200));
   });
 
-  getDashboard = asyncHandler(async (req: Request, res: Response) => {
+  getDashboard = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
     if (!userId) {

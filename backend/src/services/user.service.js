@@ -1,24 +1,10 @@
-import { UserStatus, WalletType, Currency } from "@prisma/client";
 import Prisma from "../db/db.js";
-import type { RegisterPayload, User } from "../types/auth.types.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
-import {
-  getCache,
-  setCache,
-  cacheUser,
-  getCachedUser,
-  clearPattern,
-} from "../utils/redisCasheHelper.js";
-import logger from "../utils/WinstonLogger.js";
 import S3Service from "../utils/S3Service.js";
 
 class UserServices {
-  private static readonly USER_CACHE_TTL = 600; // 10 minutes
-
-  static async register(
-    payload: RegisterPayload
-  ): Promise<{ user: User; accessToken: string }> {
+  static async register(payload) {
     const {
       username,
       firstName,
@@ -32,38 +18,25 @@ class UserServices {
       parentId,
     } = payload;
 
-    const cacheKey = `user_check:${email}:${phoneNumber}:${username}`;
     let profileImageUrl = "";
 
     try {
-      // Check cache first
-      const cachedCheck = await getCache(cacheKey);
+      const existingUser = await Prisma.user.findFirst({
+        where: {
+          OR: [{ email }, { phoneNumber }, { username }],
+        },
+      });
 
-      if (!cachedCheck) {
-        const existingUser = await Prisma.user.findFirst({
-          where: {
-            OR: [{ email }, { phoneNumber }, { username }],
-          },
-        });
-
-        if (existingUser) {
-          await setCache(cacheKey, "exists", 60);
-          throw ApiError.badRequest("User already exists");
-        }
-
-        await setCache(cacheKey, "not_exists", 60);
-      } else if (cachedCheck === "exists") {
+      if (existingUser) {
         throw ApiError.badRequest("User already exists");
       }
 
-      // Validate role
       const role = await Prisma.role.findUnique({ where: { id: roleId } });
       if (!role) throw ApiError.badRequest("Invalid roleId");
 
       const hashedPassword = await Helper.hashPassword(password);
       const hashedPin = await Helper.hashPassword(transactionPin);
 
-      // Parent hierarchy setup
       let hierarchyLevel = 0;
       let hierarchyPath = "";
 
@@ -78,7 +51,6 @@ class UserServices {
           : `${parentId}`;
       }
 
-      // Upload profile image if present
       if (profileImage) {
         try {
           profileImageUrl =
@@ -88,11 +60,9 @@ class UserServices {
         }
       }
 
-      // Apply proper casing to names
       const formattedFirstName = this.formatName(firstName);
       const formattedLastName = this.formatName(lastName);
 
-      // Create user
       const user = await Prisma.user.create({
         data: {
           username,
@@ -107,9 +77,8 @@ class UserServices {
           parentId,
           hierarchyLevel,
           hierarchyPath,
-          status: UserStatus.ACTIVE,
+          status: "ACTIVE",
           isKycVerified: false,
-          // Auth fields set to null initially
           refreshToken: null,
           passwordResetToken: null,
           passwordResetExpires: null,
@@ -157,13 +126,12 @@ class UserServices {
         },
       });
 
-      // Create primary wallet
       await Prisma.wallet.create({
         data: {
           userId: user.id,
           balance: BigInt(0),
-          currency: Currency.INR,
-          walletType: WalletType.PRIMARY,
+          currency: "INR",
+          walletType: "PRIMARY",
           holdBalance: BigInt(0),
           availableBalance: BigInt(0),
           isActive: true,
@@ -178,13 +146,6 @@ class UserServices {
         roleLevel: user.role.level,
       });
 
-      // Cache user with TTL
-      await cacheUser(user.id, Helper.serializeUser(user), this.USER_CACHE_TTL);
-
-      // Clear relevant cache patterns
-      await this.clearUserRelatedCache(user.id, parentId, roleId);
-
-      // Audit log
       await Prisma.auditLog.create({
         data: {
           userId: user.id,
@@ -193,11 +154,9 @@ class UserServices {
         },
       });
 
-      logger.info("User registered successfully", { userId: user.id, email });
-
       return { user, accessToken };
-    } catch (err: any) {
-      logger.error("Registration error", {
+    } catch (err) {
+      console.error("Registration error", {
         email,
         error: err.message,
         stack: err.stack,
@@ -206,25 +165,14 @@ class UserServices {
       if (err instanceof ApiError) throw err;
       throw ApiError.internal("Failed to register user. Please try again.");
     } finally {
-      Helper.deleteOldImage(profileImage!);
+      Helper.deleteOldImage(profileImage);
     }
   }
 
-  static async updateProfile(
-    userId: string,
-    updateData: {
-      username?: string;
-      firstName?: string;
-      lastName?: string;
-      phoneNumber?: string;
-      email?: string;
-      roleId?: string; // role name
-    }
-  ): Promise<User> {
+  static async updateProfile(userId, updateData) {
     const { username, phoneNumber, firstName, lastName, email, roleId } =
       updateData;
 
-    // Check for duplicates (excluding current user)
     if (username || phoneNumber || email) {
       const existingUser = await Prisma.user.findFirst({
         where: {
@@ -251,8 +199,7 @@ class UserServices {
       }
     }
 
-    // Prepare data for update
-    const formattedData: any = {};
+    const formattedData = {};
 
     if (username) formattedData.username = username.trim();
     if (firstName) formattedData.firstName = this.formatName(firstName);
@@ -260,7 +207,6 @@ class UserServices {
     if (phoneNumber) formattedData.phoneNumber = phoneNumber;
     if (email) formattedData.email = email.trim().toLowerCase();
 
-    // Handle role update
     if (roleId) {
       const roleRecord = await Prisma.role.findUnique({
         where: { id: roleId },
@@ -269,7 +215,6 @@ class UserServices {
       formattedData.role = { connect: { id: roleRecord.id } };
     }
 
-    // Update user
     const updatedUser = await Prisma.user.update({
       where: { id: userId },
       data: formattedData,
@@ -305,19 +250,6 @@ class UserServices {
       },
     });
 
-    // Update cache
-    await cacheUser(
-      userId,
-      Helper.serializeUser(updatedUser),
-      this.USER_CACHE_TTL
-    );
-    await this.clearUserRelatedCache(
-      userId,
-      updatedUser.parentId,
-      updatedUser.roleId
-    );
-
-    // Audit log
     await Prisma.auditLog.create({
       data: {
         userId,
@@ -326,15 +258,10 @@ class UserServices {
       },
     });
 
-    logger.info("Profile updated successfully", { userId });
-
     return updatedUser;
   }
 
-  static async updateProfileImage(
-    userId: string,
-    profileImagePath: string
-  ): Promise<User> {
+  static async updateProfileImage(userId, profileImagePath) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -350,12 +277,11 @@ class UserServices {
         throw ApiError.notFound("User not found");
       }
 
-      // Delete old profile image from S3 if exists
       if (user.profileImage) {
         try {
           await S3Service.delete({ fileUrl: user.profileImage });
         } catch (error) {
-          logger.error("Failed to delete old profile image", {
+          console.error("Failed to delete old profile image", {
             userId,
             profileImage: user.profileImage,
             error,
@@ -363,7 +289,6 @@ class UserServices {
         }
       }
 
-      // Upload new profile image
       const profileImageUrl =
         (await S3Service.upload(profileImagePath, "profile")) ?? "";
 
@@ -402,19 +327,6 @@ class UserServices {
         },
       });
 
-      // Update cache and clear related cache with TTL
-      await cacheUser(
-        userId,
-        Helper.serializeUser(updatedUser),
-        this.USER_CACHE_TTL
-      );
-
-      await this.clearUserRelatedCache(
-        userId,
-        updatedUser.parentId,
-        updatedUser.roleId
-      );
-
       await Prisma.auditLog.create({
         data: {
           userId,
@@ -423,22 +335,13 @@ class UserServices {
         },
       });
 
-      logger.info("Profile image updated successfully", { userId });
-
       return updatedUser;
     } finally {
       Helper.deleteOldImage(profileImagePath);
     }
   }
 
-  static async getUserById(userId: string): Promise<User | null> {
-    const cachedUser = await getCachedUser<User>(userId);
-
-    if (cachedUser) {
-      logger.debug("User fetched from cache", { userId });
-      return cachedUser;
-    }
-
+  static async getUserById(userId) {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -541,7 +444,7 @@ class UserServices {
     });
 
     if (!user) {
-      logger.warn("User not found", { userId });
+      console.warn("User not found", { userId });
       throw ApiError.notFound("User not found");
     }
 
@@ -550,14 +453,14 @@ class UserServices {
       kycInfo:
         user.kycs.length > 0
           ? {
-              currentStatus: user.kycs[0]!.status,
+              currentStatus: user.kycs[0].status,
               isKycSubmitted: user.kycs.length > 0,
               latestKyc: user.kycs[0],
               kycHistory: user.kycs,
               totalKycAttempts: user.kycs.length,
             }
           : {
-              currentStatus: "NOT_SUBMITTED" as const,
+              currentStatus: "NOT_SUBMITTED",
               isKycSubmitted: false,
               latestKyc: null,
               kycHistory: [],
@@ -576,36 +479,19 @@ class UserServices {
 
     const safeUser = Helper.serializeUser(transformedUser);
 
-    // Cache the user with TTL
-    await cacheUser(userId, safeUser, this.USER_CACHE_TTL);
-
-    logger.debug("User fetched from database and cached", { userId });
-
     return safeUser;
   }
 
-  static async getAllUsersByRole(roleId: string): Promise<User[]> {
+  static async getAllUsersByRole(roleId) {
     if (!roleId) {
-      logger.warn("Get users by role attempted without role ID");
+      console.warn("Get users by role attempted without role ID");
       throw ApiError.badRequest("roleId is required");
-    }
-
-    // Check cache first
-    const cacheKey = `users:role:${roleId}`;
-    const cachedUsers = await getCache<User[]>(cacheKey);
-
-    if (cachedUsers) {
-      logger.debug("Users by role fetched from cache", {
-        roleId,
-        count: cachedUsers.length,
-      });
-      return cachedUsers;
     }
 
     const users = await Prisma.user.findMany({
       where: {
         roleId,
-        status: UserStatus.ACTIVE,
+        status: "ACTIVE",
       },
       include: {
         role: {
@@ -648,27 +534,10 @@ class UserServices {
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
 
-    // Cache the results with TTL
-    await setCache(cacheKey, safeUsers, this.USER_CACHE_TTL);
-
-    logger.debug("Users by role fetched from database", {
-      roleId,
-      count: safeUsers.length,
-    });
-
     return safeUsers;
   }
 
-  static async getAllUsersByParentId(
-    parentId: string,
-    options: {
-      page?: number;
-      limit?: number;
-      sort?: "asc" | "desc";
-      status?: UserStatus | "ALL";
-      search?: string;
-    } = {}
-  ): Promise<{ users: User[]; total: number }> {
+  static async getAllUsersByParentId(parentId, options = {}) {
     const parent = await Prisma.user.findUnique({
       where: { id: parentId },
       include: {
@@ -684,47 +553,41 @@ class UserServices {
       page = 1,
       limit = 10,
       sort = "desc",
-      status = UserStatus.ACTIVE,
+      status = "ACTIVE",
       search = "",
     } = options;
 
     const skip = (page - 1) * limit;
     const isAll = status === "ALL";
 
-    // ✅ ADMIN role ka ID find karo
     const adminRole = await Prisma.role.findFirst({
       where: { name: "ADMIN" },
       select: { id: true },
     });
 
-    // Base query conditions
-    let queryWhere: any =
+    let queryWhere =
       parent.role?.name === "ADMIN"
         ? {
-            // ✅ ADMIN ke liye: sab users lekin ADMIN role wale exclude karo
             ...(adminRole && {
               roleId: {
-                not: adminRole.id, // ADMIN role ID wale users ko exclude karo
+                not: adminRole.id,
               },
             }),
             ...(isAll ? {} : { status }),
           }
         : {
-            // Non-ADMIN users ke liye: sirf unke children
             parentId,
             ...(isAll ? {} : { status }),
           };
 
-    // ✅ FIXED: Search conditions without mode (case insensitive ke liye)
     if (search && search.trim() !== "") {
-      const searchTerm = search.toLowerCase(); // ✅ Manual case insensitive ke liye
+      const searchTerm = search.toLowerCase();
 
       const searchConditions = {
         OR: [
           {
             username: {
               contains: searchTerm,
-              // ✅ mode: "insensitive" remove karo
             },
           },
           {
@@ -793,7 +656,6 @@ class UserServices {
         skip,
         take: limit,
       }),
-      // ✅ FIXED: Simple count without mode
       Prisma.user.count({
         where: queryWhere,
       }),
@@ -804,13 +666,12 @@ class UserServices {
     return { users: safeUsers, total };
   }
 
-  static async getAllUsersByChildrenId(userId: string): Promise<User[]> {
+  static async getAllUsersByChildrenId(userId) {
     if (!userId) {
-      logger.warn("Get children users attempted without user ID");
+      console.warn("Get children users attempted without user ID");
       throw ApiError.badRequest("userId is required");
     }
 
-    // Verify user exists
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, hierarchyPath: true },
@@ -820,24 +681,12 @@ class UserServices {
       throw ApiError.notFound("User not found");
     }
 
-    // Check cache first
-    const cacheKey = `users:children:${userId}`;
-    const cachedUsers = await getCache<User[]>(cacheKey);
-
-    if (cachedUsers) {
-      logger.debug("Children users fetched from cache", {
-        userId,
-        count: cachedUsers.length,
-      });
-      return cachedUsers;
-    }
-
     const users = await Prisma.user.findMany({
       where: {
         hierarchyPath: {
           contains: userId,
         },
-        status: UserStatus.ACTIVE,
+        status: "ACTIVE",
       },
       include: {
         role: {
@@ -874,73 +723,29 @@ class UserServices {
 
     const safeUsers = users.map((user) => Helper.serializeUser(user));
 
-    // Cache the results with TTL
-    await setCache(cacheKey, safeUsers, this.USER_CACHE_TTL);
-
-    logger.debug("Children users fetched from database", {
-      userId,
-      count: safeUsers.length,
-    });
-
     return safeUsers;
   }
 
-  static async getAllUsersCountByParentId(
-    parentId: string
-  ): Promise<{ count: number }> {
+  static async getAllUsersCountByParentId(parentId) {
     if (!parentId) {
-      logger.warn("Get users count by parent attempted without parent ID");
+      console.warn("Get users count by parent attempted without parent ID");
       throw ApiError.badRequest("parentId is required");
-    }
-
-    // Check cache first
-    const cacheKey = `users:parent:count:${parentId}`;
-    const cachedCount = await getCache<number>(cacheKey);
-
-    if (cachedCount !== null) {
-      logger.debug("Users count by parent fetched from cache", {
-        parentId,
-        count: cachedCount,
-      });
-      return { count: cachedCount };
     }
 
     const count = await Prisma.user.count({
       where: {
         parentId,
-        status: UserStatus.ACTIVE,
+        status: "ACTIVE",
       },
-    });
-
-    // Cache the count with TTL
-    await setCache(cacheKey, count, this.USER_CACHE_TTL);
-
-    logger.debug("Users count by parent fetched from database", {
-      parentId,
-      count,
     });
 
     return { count };
   }
 
-  static async getAllUsersCountByChildrenId(
-    userId: string
-  ): Promise<{ count: number }> {
+  static async getAllUsersCountByChildrenId(userId) {
     if (!userId) {
-      logger.warn("Get children count attempted without user ID");
+      console.warn("Get children count attempted without user ID");
       throw ApiError.badRequest("userId is required");
-    }
-
-    // Check cache first
-    const cacheKey = `users:children:count:${userId}`;
-    const cachedCount = await getCache<number>(cacheKey);
-
-    if (cachedCount !== null) {
-      logger.debug("Children count fetched from cache", {
-        userId,
-        count: cachedCount,
-      });
-      return { count: cachedCount };
     }
 
     const user = await Prisma.user.findUnique({
@@ -957,26 +762,14 @@ class UserServices {
         hierarchyPath: {
           contains: userId,
         },
-        status: UserStatus.ACTIVE,
+        status: "ACTIVE",
       },
-    });
-
-    // Cache the count with TTL
-    await setCache(cacheKey, count, this.USER_CACHE_TTL);
-
-    logger.debug("Children count fetched from database", {
-      userId,
-      count,
     });
 
     return { count };
   }
 
-  static async updateUserStatus(
-    userId: string,
-    status: UserStatus,
-    updatedBy: string
-  ): Promise<User> {
+  static async updateUserStatus(userId, status, updatedBy) {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
     });
@@ -1020,19 +813,6 @@ class UserServices {
       },
     });
 
-    // Update cache and clear related cache
-    await cacheUser(
-      userId,
-      Helper.serializeUser(updatedUser),
-      this.USER_CACHE_TTL
-    );
-
-    await this.clearUserRelatedCache(
-      userId,
-      updatedUser.parentId,
-      updatedUser.roleId
-    );
-
     await Prisma.auditLog.create({
       data: {
         userId: updatedBy,
@@ -1047,35 +827,15 @@ class UserServices {
       },
     });
 
-    logger.info("User status updated successfully", {
-      userId,
-      previousStatus: user.status,
-      newStatus: status,
-      updatedBy,
-    });
-
     return updatedUser;
   }
 
-  static async searchUsers(
-    searchTerm: string,
-    options: {
-      page?: number;
-      limit?: number;
-      roleId?: string;
-      status?: UserStatus;
-    } = {}
-  ): Promise<{ users: User[]; total: number }> {
-    const {
-      page = 1,
-      limit = 10,
-      roleId,
-      status = UserStatus.ACTIVE,
-    } = options;
+  static async searchUsers(searchTerm, options = {}) {
+    const { page = 1, limit = 10, roleId, status = "ACTIVE" } = options;
 
     const skip = (page - 1) * limit;
 
-    const searchConditions: any = {
+    const searchConditions = {
       OR: [
         { username: { contains: searchTerm, mode: "insensitive" } },
         { firstName: { contains: searchTerm, mode: "insensitive" } },
@@ -1135,11 +895,7 @@ class UserServices {
     return { users: safeUsers, total };
   }
 
-  static async getUserHierarchy(userId: string): Promise<{
-    parent: User | null;
-    children: User[];
-    siblings: User[];
-  }> {
+  static async getUserHierarchy(userId) {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1183,7 +939,7 @@ class UserServices {
       Prisma.user.findMany({
         where: {
           parentId: userId,
-          status: UserStatus.ACTIVE,
+          status: "ACTIVE",
         },
         include: {
           role: {
@@ -1222,7 +978,7 @@ class UserServices {
             where: {
               parentId: user.parentId,
               id: { not: userId },
-              status: UserStatus.ACTIVE,
+              status: "ACTIVE",
             },
             include: {
               role: {
@@ -1258,11 +1014,7 @@ class UserServices {
     };
   }
 
-  static async deactivateUser(
-    userId: string,
-    deactivatedBy: string,
-    reason?: string
-  ): Promise<User> {
+  static async deactivateUser(userId, deactivatedBy, reason) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -1273,15 +1025,10 @@ class UserServices {
         throw ApiError.notFound("User not found");
       }
 
-      // if (user.status === UserStatus.DELETE) {
-      //   throw ApiError.badRequest("User is already deleted");
-      // }
-
-      if (user.status === UserStatus.IN_ACTIVE) {
+      if (user.status === "IN_ACTIVE") {
         throw ApiError.badRequest("User is already deactivated");
       }
 
-      // Check if deactivatedBy user has permission to deactivate
       const deactivator = await Prisma.user.findUnique({
         where: { id: deactivatedBy },
         include: { role: true },
@@ -1291,7 +1038,6 @@ class UserServices {
         throw ApiError.unauthorized("Invalid deactivator user");
       }
 
-      // Allow ADMIN, parent, or users with higher role level to deactivate
       const isAdmin = deactivator.role.name === "ADMIN";
       const isParent = user.parentId === deactivatedBy;
       const hasHigherRole = deactivator.role.level > user.role.level;
@@ -1305,7 +1051,7 @@ class UserServices {
       const updatedUser = await Prisma.user.update({
         where: { id: userId },
         data: {
-          status: UserStatus.IN_ACTIVE,
+          status: "IN_ACTIVE",
           deactivationReason: reason,
           updatedAt: new Date(),
         },
@@ -1341,19 +1087,6 @@ class UserServices {
         },
       });
 
-      // Update cache and clear related cache
-      await cacheUser(
-        userId,
-        Helper.serializeUser(updatedUser),
-        this.USER_CACHE_TTL
-      );
-
-      await this.clearUserRelatedCache(
-        userId,
-        updatedUser.parentId,
-        updatedUser.roleId
-      );
-
       await Prisma.auditLog.create({
         data: {
           userId: deactivatedBy,
@@ -1361,7 +1094,7 @@ class UserServices {
           entityType: "User",
           metadata: {
             previousStatus: user.status,
-            newStatus: UserStatus.IN_ACTIVE,
+            newStatus: "IN_ACTIVE",
             reason: reason || "No reason provided",
             deactivatedBy,
             timestamp: new Date().toISOString(),
@@ -1370,16 +1103,9 @@ class UserServices {
         },
       });
 
-      logger.info("User deactivated successfully", {
-        userId,
-        deactivatedBy,
-        previousStatus: user.status,
-        reason,
-      });
-
       return updatedUser;
-    } catch (error: any) {
-      logger.error("Failed to deactivate user", {
+    } catch (error) {
+      console.error("Failed to deactivate user", {
         userId,
         deactivatedBy,
         error: error.message,
@@ -1388,9 +1114,8 @@ class UserServices {
 
       if (error instanceof ApiError) throw error;
 
-      // Specific error message for Prisma errors
       if (error.code) {
-        logger.error("Prisma error details:", {
+        console.error("Prisma error details:", {
           code: error.code,
           meta: error.meta,
         });
@@ -1400,11 +1125,7 @@ class UserServices {
     }
   }
 
-  static async reactivateUser(
-    userId: string,
-    reactivatedBy: string,
-    reason?: string
-  ): Promise<User> {
+  static async reactivateUser(userId, reactivatedBy, reason) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -1415,15 +1136,14 @@ class UserServices {
         throw ApiError.notFound("User not found");
       }
 
-      if (user.status === UserStatus.DELETE) {
+      if (user.status === "DELETE") {
         throw ApiError.badRequest("Cannot reactivate a deleted user");
       }
 
-      if (user.status === UserStatus.ACTIVE) {
+      if (user.status === "ACTIVE") {
         throw ApiError.badRequest("User is already active");
       }
 
-      // Check if reactivatedBy user has permission to reactivate
       const activator = await Prisma.user.findUnique({
         where: { id: reactivatedBy },
         include: { role: true },
@@ -1433,7 +1153,6 @@ class UserServices {
         throw ApiError.unauthorized("Invalid activator user");
       }
 
-      // Allow ADMIN, parent, or users with higher role level to reactivate
       const isAdmin = activator.role.name === "ADMIN";
       const isParent = user.parentId === reactivatedBy;
       const hasHigherRole = activator.role.level > user.role.level;
@@ -1447,7 +1166,7 @@ class UserServices {
       const updatedUser = await Prisma.user.update({
         where: { id: userId },
         data: {
-          status: UserStatus.ACTIVE, // Changed from IN_ACTIVE to ACTIVE
+          status: "ACTIVE",
           deactivationReason: reason,
           updatedAt: new Date(),
         },
@@ -1483,58 +1202,35 @@ class UserServices {
         },
       });
 
-      // Update cache and clear related cache
-      await cacheUser(
-        userId,
-        Helper.serializeUser(updatedUser),
-        this.USER_CACHE_TTL
-      );
-
-      await this.clearUserRelatedCache(
-        userId,
-        updatedUser.parentId,
-        updatedUser.roleId
-      );
-
-      // Create reactivation audit log (FIXED: was using DEACTIVATE_USER)
       await Prisma.auditLog.create({
         data: {
-          userId: reactivatedBy, // FIXED: was using deactivatedBy
-          action: "REACTIVATE_USER", // FIXED: was DEACTIVATE_USER
+          userId: reactivatedBy,
+          action: "REACTIVATE_USER",
           entityType: "User",
           metadata: {
             previousStatus: user.status,
-            newStatus: UserStatus.ACTIVE, // FIXED: was IN_ACTIVE
+            newStatus: "ACTIVE",
             reason: reason || "No reason provided",
-            reactivatedBy, // FIXED: was deactivatedBy
+            reactivatedBy,
             timestamp: new Date().toISOString(),
             targetUserId: userId,
           },
         },
       });
 
-      logger.info("User reactivated successfully", {
-        userId,
-        reactivatedBy, // FIXED: was deactivatedBy
-        previousStatus: user.status,
-        reason,
-      });
-
       return updatedUser;
-    } catch (error: any) {
-      logger.error("Failed to reactivate user", {
-        // FIXED: error message
+    } catch (error) {
+      console.error("Failed to reactivate user", {
         userId,
-        reactivatedBy, // FIXED: was deactivatedBy
+        reactivatedBy,
         error: error.message,
         stack: error.stack,
       });
 
       if (error instanceof ApiError) throw error;
 
-      // Specific error message for Prisma errors
       if (error.code) {
-        logger.error("Prisma error details:", {
+        console.error("Prisma error details:", {
           code: error.code,
           meta: error.meta,
         });
@@ -1544,11 +1240,7 @@ class UserServices {
     }
   }
 
-  static async deleteUser(
-    userId: string,
-    deletedBy: string,
-    reason?: string
-  ): Promise<User> {
+  static async deleteUser(userId, deletedBy, reason) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -1559,11 +1251,6 @@ class UserServices {
         throw ApiError.notFound("User not found");
       }
 
-      // if (user.status === UserStatus.DELETE) {
-      //   throw ApiError.badRequest("User is already deleted");
-      // }
-
-      // Check if deletedBy user has permission to delete (ONLY ADMIN)
       const deleter = await Prisma.user.findUnique({
         where: { id: deletedBy },
         include: { role: true },
@@ -1573,7 +1260,6 @@ class UserServices {
         throw ApiError.unauthorized("Invalid deleter user");
       }
 
-      // ONLY ADMIN can delete users
       const isAdmin = deleter.role.name === "ADMIN";
       if (!isAdmin) {
         throw ApiError.forbidden("Only ADMIN can delete users");
@@ -1582,7 +1268,7 @@ class UserServices {
       const updatedUser = await Prisma.user.update({
         where: { id: userId },
         data: {
-          status: UserStatus.DELETE,
+          status: "DELETE",
           deactivationReason: reason,
           updatedAt: new Date(),
           deletedAt: new Date(),
@@ -1619,19 +1305,6 @@ class UserServices {
         },
       });
 
-      // Update cache and clear related cache
-      await cacheUser(
-        userId,
-        Helper.serializeUser(updatedUser),
-        this.USER_CACHE_TTL
-      );
-
-      await this.clearUserRelatedCache(
-        userId,
-        updatedUser.parentId,
-        updatedUser.roleId
-      );
-
       await Prisma.auditLog.create({
         data: {
           userId: deletedBy,
@@ -1639,7 +1312,7 @@ class UserServices {
           entityType: "User",
           metadata: {
             previousStatus: user.status,
-            newStatus: UserStatus.DELETE,
+            newStatus: "DELETE",
             reason: reason || "No reason provided",
             deletedBy,
             timestamp: new Date().toISOString(),
@@ -1648,16 +1321,9 @@ class UserServices {
         },
       });
 
-      logger.info("User deleted successfully", {
-        userId,
-        deletedBy,
-        previousStatus: user.status,
-        reason,
-      });
-
       return updatedUser;
-    } catch (error: any) {
-      logger.error("Failed to delete user", {
+    } catch (error) {
+      console.error("Failed to delete user", {
         userId,
         deletedBy,
         error: error.message,
@@ -1666,9 +1332,8 @@ class UserServices {
 
       if (error instanceof ApiError) throw error;
 
-      // Specific error message for Prisma errors
       if (error.code) {
-        logger.error("Prisma error details:", {
+        console.error("Prisma error details:", {
           code: error.code,
           meta: error.meta,
         });
@@ -1678,10 +1343,7 @@ class UserServices {
     }
   }
 
-  // ===================== HELPER METHODS =====================
-
-  // Format name with proper casing (First Letter Capital
-  private static formatName(name: string): string {
+   static formatName(name) {
     if (!name) return name;
 
     return name
@@ -1690,50 +1352,6 @@ class UserServices {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
       .trim();
-  }
-
-  // Clear all cache related to user operation
-  private static async clearUserRelatedCache(
-    userId: string,
-    parentId: string | null,
-    roleId: string
-  ): Promise<void> {
-    try {
-      const patternsToClear = [
-        "user_check:*",
-        `users:role:${roleId}`,
-        `users:children:${userId}`,
-        `users:children:count:${userId}`,
-        `user:${userId}`,
-      ];
-
-      // Add parent-related cache patterns if parent exists
-      if (parentId) {
-        patternsToClear.push(
-          `users:parent:${parentId}:*`,
-          `users:parent:count:${parentId}`
-        );
-      }
-
-      // Clear all patterns
-      await Promise.all(
-        patternsToClear.map((pattern) => clearPattern(pattern))
-      );
-
-      logger.debug("User-related cache cleared successfully", {
-        userId,
-        parentId,
-        roleId,
-        patternsCleared: patternsToClear,
-      });
-    } catch (error) {
-      logger.error("Failed to clear user-related cache", {
-        userId,
-        parentId,
-        roleId,
-        error,
-      });
-    }
   }
 }
 
