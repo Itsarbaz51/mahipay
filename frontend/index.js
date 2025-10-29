@@ -111,7 +111,7 @@ export const navbarTitleConfig = {
     icon: Activity,
   },
   "/bank-details": {
-    title: "Bank Details",
+    title: "Bank Verification",
     tagLine: "View and manage your Users bank details",
     icon: Landmark,
   },

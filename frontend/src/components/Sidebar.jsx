@@ -88,7 +88,7 @@ const Sidebar = () => {
     },
     {
       id: "Bank",
-      label: "Bank Details",
+      label: "Bank KYC",
       icon: Landmark,
       path: "/bank-details",
       permissions: [
@@ -116,7 +116,7 @@ const Sidebar = () => {
     // --- ADMIN ONLY ---
     {
       id: "kyc",
-      label: "KYC Requests",
+      label: "KYC Profiles",
       icon: Shield,
       path: "/all-kyc",
       permissions: ["ADMIN"],

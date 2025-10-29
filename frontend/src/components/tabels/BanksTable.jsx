@@ -347,9 +347,9 @@ const BankTable = () => {
       {/* Header */}
       <div className="space-y-3">
         <PageHeader
-          breadcrumb={["Dashboard", "Bank Details"]}
-          title="Bank Details"
-          description="Review customer Bank details and take necessary actions"
+          breadcrumb={["Dashboard", "Bank KYC"]}
+          title="Bank KYC"
+          description="Review customer Bank KYC and take necessary actions"
         />
       </div>
 
