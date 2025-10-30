@@ -57,9 +57,9 @@ const BankTable = () => {
   const [sortOrder, setSortOrder] = useState("desc");
   const [selectedAction, setSelectedAction] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
-  const [rejectionReason, setRejectionReason] = useState("");
+
   const [showModal, setShowModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
+
   const [showViewKyc, setShowViewKyc] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -68,7 +68,7 @@ const BankTable = () => {
 
   // Redux selectors with memoization
   const { currentUser = {} } = useSelector((state) => state.auth);
-  const bankData = useSelector((state) => state.bank?.bankList?.banks) || [];
+  const bankData = useSelector((state) => state.bank?.bankList?.banks || []);
   const bankMeta = useSelector((state) => state.bank?.bankList?.data?.meta);
   const bankDetail = useSelector((state) => state.bank?.bankDetail);
 
@@ -131,52 +131,39 @@ const BankTable = () => {
     [dispatch]
   );
 
-  const confirmAction = useCallback(() => {
-    if (selectedAction === "REJECT") {
-      setShowModal(false);
-      setShowRejectModal(true);
-      return;
-    }
+  const confirmAction = useCallback(
+    (reason = "") => {
+      const trimmedReason = reason.trim();
 
-    if (selectedAction === "VERIFIED") {
-      dispatch(
-        verifyBank({
-          id: selectedId,
-          status: "VERIFIED",
-          bankRejectionReason: "",
-        })
-      );
-    }
-
-    setShowModal(false);
-  }, [selectedAction, selectedId, dispatch]);
-
-  const handleRejectSubmit = useCallback(() => {
-    if (!rejectionReason.trim()) {
-      alert("Please enter a rejection reason");
-      return;
-    }
-
-    dispatch(
-      verifyBank({
-        id: selectedId,
-        status: "REJECT",
-        bankRejectionReason: rejectionReason.trim(),
-      })
-    );
-
-    setShowRejectModal(false);
-    setRejectionReason("");
-    setSelectedAction(null);
-    setSelectedId(null);
-  }, [rejectionReason, selectedId, dispatch]);
-
-  const handleCloseRejectModal = useCallback(() => {
-    setShowRejectModal(false);
-    setRejectionReason("");
-    setSelectedAction(null);
-    setSelectedId(null);
-  }, []);
+      try {
+        if (selectedAction === "VERIFIED") {
+          dispatch(
+            verifyBank({
+              id: selectedId,
+              status: "VERIFIED",
+              bankRejectionReason: "",
+            })
+          );
+        } else if (selectedAction === "REJECT") {
+          dispatch(
+            verifyBank({
+              id: selectedId,
+              status: "REJECT",
+              bankRejectionReason: trimmedReason,
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Bank verification error:", error);
+        alert("Failed to update Bank. Please try again.");
+      } finally {
+        setShowModal(false);
+        setSelectedAction(null);
+        setSelectedId(null);
+      }
+    },
+    [selectedAction, selectedId, dispatch]
+  );
 
   const handleRefresh = useCallback(() => {
     fetchBankData(true);
@@ -272,77 +259,35 @@ const BankTable = () => {
     });
   }, [bankData, isAdmin, handleActionClick, handleViewShow, getStatusConfig]);
 
-  // Reject Modal Component
-  const RejectModal = useMemo(
-    () =>
-      showRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Reject Bank details
-              </h3>
-              <button
-                onClick={handleCloseRejectModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Rejection Reason *
-              </label>
-              <textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Please provide a detailed reason for rejection..."
-                className="w-full border border-gray-300 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                rows={4}
-                required
-                autoFocus
-              />
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleCloseRejectModal}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRejectSubmit}
-                disabled={!rejectionReason.trim()}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Confirm Reject
-              </button>
-            </div>
-          </div>
-        </div>
-      ),
-    [
-      showRejectModal,
-      rejectionReason,
-      handleCloseRejectModal,
-      handleRejectSubmit,
-    ]
-  );
-
   return (
     <div className="space-y-6">
       {/* Modals */}
       {showModal && (
         <ConfirmCard
           actionType={selectedAction}
-          isClose={() => setShowModal(false)}
+          user={bankData.find((b) => b.id === selectedId)}
+          isClose={() => {
+            setShowModal(false);
+            setSelectedAction(null);
+            setSelectedId(null);
+          }}
           isSubmit={confirmAction}
+          {...(selectedAction === "REJECT" && {
+            predefinedReasons: [
+              "Invalid or unreadable ID document",
+              "Mismatched name or personal details",
+              "Expired identification document",
+              "Blurry or unclear document image",
+              "Incomplete proof of address",
+              "Document appears to be fraudulent",
+              "Selfie does not match ID photo",
+              "Incorrect document type uploaded",
+              "Incomplete KYC submission",
+              "Other",
+            ],
+          })}
         />
       )}
-
-      {RejectModal}
 
       {/* Header */}
       <div className="space-y-3">
@@ -428,7 +373,7 @@ const BankTable = () => {
         </div>
 
         {/* Pagination */}
-        {bankData.length > 0 && (
+        {bankData?.length > 0 && (
           <div className="p-4 border-t border-gray-200">
             <Pagination
               currentPage={currentPage}

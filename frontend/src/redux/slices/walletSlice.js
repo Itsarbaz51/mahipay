@@ -87,7 +87,7 @@ export const addFunds = (payload) => async (dispatch) => {
         ? { headers: { "Content-Type": "multipart/form-data" } }
         : {};
 
-    const { data } = await axios.post(`/wallet/add-fund`, payload, config);
+    const { data } = await axios.post(`/wallet/request-fund`, payload, config);
     dispatch(walletSuccess(data));
     dispatch(getWalletBalance());
     return data;

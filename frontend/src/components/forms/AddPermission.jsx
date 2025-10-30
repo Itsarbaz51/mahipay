@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-const PermissionForm = ({
+const AddPermission = ({
   mode,
   onSubmit,
   onCancel,
@@ -42,7 +42,8 @@ const PermissionForm = ({
             parsedServiceIds = JSON.parse(existingPermissions.serviceIds);
           } catch (error) {
             console.warn(
-              "Failed to parse serviceIds as JSON, trying CSV split"
+              "Failed to parse serviceIds as JSON, trying CSV split",
+              error
             );
             parsedServiceIds = existingPermissions.serviceIds
               .split(",")
@@ -439,4 +440,4 @@ const PermissionForm = ({
   );
 };
 
-export default PermissionForm;
+export default AddPermission;

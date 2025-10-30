@@ -9,12 +9,12 @@ import {
   updateRole,
   getAllRoles,
 } from "../redux/slices/roleSlice";
-import PermissionForm from "./forms/PermissionForm";
+import AddPermission from "./forms/AddPermission";
 import {
   getPermissionRoleById,
   upsertRolePermission,
 } from "../redux/slices/permissionSlice";
-import { getServiceProvidersByUser } from "../redux/slices/serviceSlice";
+import { getServicesActive } from "../redux/slices/serviceSlice";
 
 export default function RoleManager() {
   const dispatch = useDispatch();
@@ -40,7 +40,7 @@ export default function RoleManager() {
 
   useEffect(() => {
     if (showPermissionModal) {
-      dispatch(getServiceProvidersByUser());
+      dispatch(getServicesActive());
     }
   }, [showPermissionModal, dispatch]);
 
@@ -211,7 +211,7 @@ export default function RoleManager() {
       /> */}
 
       {showPermissionModal && permissionRole && (
-        <PermissionForm
+        <AddPermission
           mode={permissionMode}
           onSubmit={handlePermissionSubmit}
           onCancel={handleClosePermissionModal}

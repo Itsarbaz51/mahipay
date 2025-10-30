@@ -4,7 +4,7 @@ import { Search } from "lucide-react";
 import { createOrUpdateCommissionSetting } from "../../redux/slices/commissionSlice";
 import { getAllRoles } from "../../redux/slices/roleSlice";
 import { getAllUsersByParentId } from "../../redux/slices/userSlice";
-import { getServiceProvidersByUser } from "../../redux/slices/serviceSlice";
+import { getServicesActive } from "../../redux/slices/serviceSlice";
 
 const scopes = ["ROLE", "USER"];
 const commissionTypes = ["FLAT", "PERCENTAGE"];
@@ -89,7 +89,7 @@ const AddCommissionModal = ({ onClose, onSuccess, editData }) => {
   useEffect(() => {
     dispatch(getAllRoles());
     dispatch(getAllUsersByParentId({ search: "", status: "ACTIVE" }));
-    dispatch(getServiceProvidersByUser());
+    dispatch(getServicesActive());
   }, [dispatch]);
 
   // Filter users based on search

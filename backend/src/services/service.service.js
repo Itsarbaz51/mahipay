@@ -43,6 +43,7 @@ export class ServiceProviderService {
     return serviceProvider;
   }
 
+  // get all
   static async getAllByCreatedUser(userId) {
     const serviceProviders = await Prisma.serviceProvider.findMany({
       where: {
@@ -63,6 +64,7 @@ export class ServiceProviderService {
     return serviceProviders;
   }
 
+  // get by status
   static async getAllByCreatedUserAndStatus(userId) {
     const serviceProviders = await Prisma.serviceProvider.findMany({
       where: {
@@ -146,7 +148,6 @@ export class ServiceProviderService {
       },
     });
 
-    
     return updated;
   }
 

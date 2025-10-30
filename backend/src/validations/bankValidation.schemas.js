@@ -21,6 +21,27 @@ class BankValidationSchemas {
     });
   }
 
+  static get VerificationBankSchema() {
+    return z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["VERIFIED", "REJECT"]),
+        bankRejectionReason: z.string(),
+      })
+      .refine(
+        (data) => {
+          if (data.status === "REJECT") {
+            return !!data.bankRejectionReason?.trim();
+          }
+          return true;
+        },
+        {
+          message: "Rejection reason is required when status is REJECT",
+          path: ["bankRejectionReason"],
+        }
+      );
+  }
+
   static get BankDetailUpdateSchema() {
     return this.BankDetailSchema.partial();
   }

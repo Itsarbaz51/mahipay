@@ -274,8 +274,6 @@ const KYCStatusCard = ({ kycDetail }) => {
     }
   };
 
-  console.log(kycDetail);
-
   const config = getStatusConfig(kycDetail.status);
   const StatusIcon = config.icon;
 
@@ -310,7 +308,7 @@ const KYCStatusCard = ({ kycDetail }) => {
 };
 
 // ---------- Main Form ----------
-export default function KYCWithAddressForm() {
+export default function AddProfileKYC() {
   const dispatch = useDispatch();
   const addressState = useSelector((state) => state.address);
   const { kycDetail, loading } = useSelector((state) => state.kyc);

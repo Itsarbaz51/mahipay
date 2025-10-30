@@ -19,7 +19,7 @@ function ConfirmCard({
   const handleSubmit = async () => {
     const trimmedReason = reason.trim() || "";
     const finalReason = isReject
-      ? ""
+      ? trimmedReason
       : trimmedReason || `${actionType}d by admin`;
 
     setIsSubmitting(true);

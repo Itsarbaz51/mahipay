@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Search,
   Eye,
@@ -37,9 +37,18 @@ const AllKycTable = () => {
   const [debouncedSearch] = useDebounce(search, 400);
   const limit = 10;
 
-  const kycProfiles = useSelector((state) => state.kyc?.kycList?.data || []);
-  const kycMeta = useSelector((state) => state.kyc?.kycList?.meta);
-  const kycDetail = useSelector((state) => state.kyc?.kycDetail);
+  const EMPTY_ARRAY = [];
+  const EMPTY_OBJECT = {};
+
+  const kycProfiles = useSelector(
+    (state) => state.kyc?.kycList?.data ?? EMPTY_ARRAY
+  );
+  const kycMeta = useSelector(
+    (state) => state.kyc?.kycList?.meta ?? EMPTY_OBJECT
+  );
+  const kycDetail = useSelector(
+    (state) => state.kyc?.kycDetail ?? EMPTY_OBJECT
+  );
   const totalPages = kycMeta?.totalPages || 1;
 
   useEffect(() => {
@@ -95,7 +104,7 @@ const AllKycTable = () => {
 
   const [loading, setLoading] = useState(false);
 
-  const fetchKycData = async () => {
+  const fetchKycData = useCallback(async () => {
     setLoading(true);
     await dispatch(
       getKycAll({
@@ -106,11 +115,11 @@ const AllKycTable = () => {
       })
     );
     setLoading(false);
-  };
+  }, [dispatch, currentPage, limit, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchKycData();
-  }, [currentPage, statusFilter, debouncedSearch]);
+  }, [fetchKycData]);
 
   const getStatusConfig = (status) => {
     const config = {
@@ -148,7 +157,6 @@ const AllKycTable = () => {
 
   const handleConfirmAction = async (reason) => {
     if (!selectedAction || !selectedId) return;
-
     try {
       if (selectedAction === "VERIFIED") {
         await dispatch(
@@ -321,8 +329,8 @@ const AllKycTable = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {kyc.documents?.map((doc) => (
-                          <div key={doc.id} className="mb-1 last:mb-0">
+                        {kyc.documents?.map((doc, i) => (
+                          <div key={i} className="mb-1 last:mb-0">
                             <span className="font-medium">{doc.type}:</span>{" "}
                             {doc.value}
                           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Upload, X } from "lucide-react";
 
-const BankForm = ({
+const AddBank = ({
   accountForm = {},
   onChange,
   onFileChange,
@@ -31,8 +31,6 @@ const BankForm = ({
     setPreview(null);
     onChange({ target: { name: "bankProofFile", value: null } });
   };
-  console.log(accountForm);
-  
 
   return (
     <div className="fixed inset-0 bg-black/10 backdrop-blur-xs bg-opacity-40 flex items-center justify-center z-50">
@@ -245,4 +243,4 @@ const BankForm = ({
   );
 };
 
-export default BankForm;
+export default AddBank;

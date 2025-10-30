@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
-import PermissionForm from "./forms/PermissionForm";
+import AddPermission from "./forms/AddPermission";
 import { useDispatch, useSelector } from "react-redux";
 import { getAllRoles } from "../redux/slices/roleSlice";
 import { getAllUsersByParentId } from "../redux/slices/userSlice";
 import {
-  setPermissions,
-  addPermission,
   updatePermissionInList,
   removePermissionFromList,
   createPermission,
@@ -63,7 +61,6 @@ const RolePermissionsManager = () => {
     },
     [dispatch]
   );
-
 
   const handleAddPermission = async (permissionData) => {
     try {
@@ -186,7 +183,7 @@ const RolePermissionsManager = () => {
 
       {/* Form Modal */}
       {showForm && (
-        <PermissionForm
+        <AddPermission
           key={editingPermission?.id || "add-form"} // forces remount
           mode={formMode}
           permission={editingPermission}

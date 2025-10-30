@@ -96,6 +96,19 @@ export const getServiceProvidersByUser = () => async (dispatch) => {
   }
 };
 
+export const getServicesActive = () => async (dispatch) => {
+  try {
+    dispatch(serviceRequest());
+    const { data } = await axios.get(`/services/providers/status`);
+    dispatch(setServiceProviders(data));
+    return data;
+  } catch (error) {
+    const errMsg = error?.response?.data?.message || error?.message;
+    dispatch(serviceFail(errMsg));
+    throw error;
+  }
+};
+
 // Get service provider by ID
 export const getServiceProviderById = (id) => async (dispatch) => {
   try {
@@ -110,7 +123,7 @@ export const getServiceProviderById = (id) => async (dispatch) => {
   }
 };
 
-// Toggle active status
+// Toggle active status change active status
 export const toggleServiceProviderStatus =
   (id, isActive) => async (dispatch) => {
     try {

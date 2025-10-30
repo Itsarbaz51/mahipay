@@ -1,6 +1,5 @@
 export const protectedRoute = [
   "/dashboard",
-  "/payin",
   "/payout",
   "/transactions",
   "/users",
@@ -12,18 +11,17 @@ export const protectedRoute = [
   "/employee-management",
   "/wallet",
   "/all-kyc",
-  "/add-fund",
+  "/request-fund",
   "/permission",
   "/profile/:id",
   "/login-logs",
   "/audit-logs",
   "/card-payout",
-  "/bank-details"
+  "/bank-details",
 ];
 
 import {
   Wallet,
-  ArrowUpCircle,
   ArrowDownCircle,
   Users,
   Percent,
@@ -33,7 +31,6 @@ import {
   Settings,
   User,
   BadgeIndianRupee,
-  Logs,
   LogIn,
   Activity,
   Landmark,
@@ -45,9 +42,9 @@ export const navbarTitleConfig = {
     tagLine: "Overview of your system",
     icon: BarChart3,
   },
-  "/add-fund": {
-    title: "Payin",
-    tagLine: "Manage incoming transactions",
+  "/request-fund": {
+    title: "Add Fund Request",
+    tagLine: "Manage fund request",
     icon: BadgeIndianRupee,
   },
   "/card-payout": {

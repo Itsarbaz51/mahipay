@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -7,12 +7,18 @@ import {
   updateBank,
   deleteBank,
 } from "../redux/slices/bankSlice";
-import BankForm from "../components/forms/BankForm";
+import AddBank from "../components/forms/AddBank";
 
 export const AccountType = Object.freeze({
   PERSONAL: "PERSONAL",
   BUSINESS: "BUSINESS",
 });
+
+const statusStyles = {
+  PENDING: "bg-yellow-100 text-yellow-800",
+  VERIFIED: "bg-green-100 text-green-700",
+  REJECT: "bg-red-100 text-red-700",
+};
 
 const CompanyAccounts = () => {
   const dispatch = useDispatch();
@@ -49,6 +55,16 @@ const CompanyAccounts = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      const maxSize = 3 * 1024 * 1024;
+      if (file.size > maxSize) {
+        setFormErrors((prev) => ({
+          ...prev,
+          bankProofFile: "File size should not exceed 3 MB.",
+        }));
+        setAccountForm((prev) => ({ ...prev, bankProofFile: null }));
+        return;
+      }
+
       setAccountForm((prev) => ({ ...prev, bankProofFile: file }));
       if (formErrors.bankProofFile)
         setFormErrors((prev) => ({ ...prev, bankProofFile: "" }));
@@ -144,7 +160,7 @@ const CompanyAccounts = () => {
   return (
     <div className="">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold ">Company Bank Accounts</h1>
+        <h1 className="text-3xl font-bold ">Bank Accounts</h1>
         <p className="text-gray-600 mt-1">
           Manage your company's banking information
         </p>
@@ -191,10 +207,10 @@ const CompanyAccounts = () => {
                 {Object.values(myBankList || []).filter(Boolean).length > 0 ? (
                   Object.values(myBankList || [])
                     .filter((account) => account && typeof account === "object")
-                    .map((account) => (
-                      <>
+                    .map((account, i) => (
+                      <React.Fragment key={account.id || account.accountNumber}>
                         {account?.bankRejectionReason && (
-                          <tr key={account.id} className="bg-red-50">
+                          <tr key={i} className="bg-red-50">
                             <td
                               colSpan={6}
                               className="px-6 py-3 text-red-700 text-sm font-medium"
@@ -245,8 +261,19 @@ const CompanyAccounts = () => {
                             </span>
                           </td>
 
-                          <td className="px-6 py-4 font-mono text-sm ">
-                            {account?.status || "-"} <br />
+                          <td className="px-6 py-4">
+                            {account?.status ? (
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                  statusStyles[account.status.toUpperCase()] ||
+                                  "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {account.status}
+                              </span>
+                            ) : (
+                              "-"
+                            )}
                           </td>
 
                           <td className="px-6 py-4 text-sm  flex items-center space-x-3">
@@ -293,7 +320,7 @@ const CompanyAccounts = () => {
                             </button>
                           </td>
                         </tr>
-                      </>
+                      </React.Fragment>
                     ))
                 ) : (
                   <tr>
@@ -313,7 +340,7 @@ const CompanyAccounts = () => {
         </div>
 
         {showAccountForm && (
-          <BankForm
+          <AddBank
             accountForm={accountForm}
             errors={formErrors}
             accountTypes={Object.values(AccountType).map((t) => ({

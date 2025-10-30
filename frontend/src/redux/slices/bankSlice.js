@@ -155,12 +155,12 @@ export const getBankDetail = (bankId) => async (dispatch) => {
 export const verifyBank = (payload) => async (dispatch) => {
   try {
     dispatch(bankRequest());
-    const { data } = await axios.put(`/banks/bank-verify`,  payload );
+    const { data } = await axios.put(`/banks/bank-verify`, payload);
     dispatch(bankActionSuccess(data));
     dispatch(getAllBanks());
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
+    const errMsg = error?.response?.data?.errors[0].message || error?.message;
     dispatch(bankFail(errMsg));
   }
 };

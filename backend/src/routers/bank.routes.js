@@ -57,6 +57,7 @@ bankRoutes.put(
   "/bank-verify",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
+  validateRequest(BankValidationSchemas.VerificationBankSchema),
   AddBankController.verify
 );
 
