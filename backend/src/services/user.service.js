@@ -1503,7 +1503,6 @@ class UserServices {
         html,
       });
 
-      console.log(`Credentials email sent successfully to ${user.email}`);
     } catch (emailError) {
       console.error("Failed to send credentials email:", {
         userId: user.id,
