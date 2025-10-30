@@ -1,5 +1,6 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
 
@@ -34,8 +35,8 @@ class UserServices {
       const role = await Prisma.role.findUnique({ where: { id: roleId } });
       if (!role) throw ApiError.badRequest("Invalid roleId");
 
-      const hashedPassword = await Helper.hashPassword(password);
-      const hashedPin = await Helper.hashPassword(transactionPin);
+      const hashedPassword = CryptoService.encrypt(password);
+      const hashedPin = CryptoService.encrypt(transactionPin);
 
       let hierarchyLevel = 0;
       let hierarchyPath = "";
@@ -77,7 +78,9 @@ class UserServices {
           parentId,
           hierarchyLevel,
           hierarchyPath,
-          status: "ACTIVE",
+          status: "IN_ACTIVE",
+          deactivationReason:
+            "Kindly contact the administrator to have your account activated.",
           isKycVerified: false,
           refreshToken: null,
           passwordResetToken: null,
@@ -660,8 +663,35 @@ class UserServices {
         where: queryWhere,
       }),
     ]);
+    let safeUsers;
 
-    const safeUsers = users.map((user) => Helper.serializeUser(user));
+    if (parent.role.name === "ADMIN") {
+      safeUsers = users.map((user) => {
+        const serialized = Helper.serializeUser(user);
+
+        if (serialized.password) {
+          try {
+            serialized.password = CryptoService.decrypt(serialized.password);
+          } catch {
+            serialized.password = "Error decrypting";
+          }
+        }
+
+        if (serialized.transactionPin) {
+          try {
+            serialized.transactionPin = CryptoService.decrypt(
+              serialized.transactionPin
+            );
+          } catch {
+            serialized.transactionPin = "Error decrypting";
+          }
+        }
+
+        return serialized;
+      });
+    } else {
+      safeUsers = users.map((user) => Helper.serializeUser(user));
+    }
 
     return { users: safeUsers, total };
   }

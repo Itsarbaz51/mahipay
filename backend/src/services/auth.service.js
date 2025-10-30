@@ -2,6 +2,7 @@ import crypto from "crypto";
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
+import { CryptoService } from "../utils/cryptoService.js";
 
 class AuthServices {
   static async login(payload, req) {
@@ -42,11 +43,12 @@ class AuthServices {
     });
 
     if (!user) {
-      throw ApiError.unauthorized("Invalid credentials");
+      throw ApiError.unauthorized("User not found");
     }
 
-    const isValid = await Helper.comparePassword(password, user.password);
-    if (!isValid) {
+    const isValid = CryptoService.decrypt(user.password);
+
+    if (isValid !== password) {
       throw ApiError.unauthorized("Invalid credentials");
     }
 
@@ -138,7 +140,7 @@ class AuthServices {
         },
       },
     });
-    
+
     if (!user || !user.refreshToken)
       throw ApiError.unauthorized("Invalid refresh token");
 
@@ -156,7 +158,7 @@ class AuthServices {
       role: user.role.name,
       roleLevel: user.role.level,
     });
-    
+
     const newRefreshToken = Helper.generateRefreshToken({
       id: user.id,
       email: user.email,

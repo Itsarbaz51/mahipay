@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { hashSync } from "bcryptjs";
+import { CryptoService } from "../src/utils/cryptoService.js";
 
 const prisma = new PrismaClient();
 
@@ -71,8 +71,8 @@ async function main() {
 
   console.log("\n👑 Creating Admin user...");
 
-  const adminPassword = hashSync("Admin@123", 10);
-  const adminPin = hashSync("1234", 10);
+  const adminPassword = CryptoService.encrypt("Admin@123");
+  const adminPin = CryptoService.encrypt("1234");
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@gmail.com" },
@@ -98,8 +98,8 @@ async function main() {
 
   console.log("\n👤 Creating State Head user...");
 
-  const shPassword = hashSync("User@123", 10);
-  const shPin = hashSync("1234", 10);
+  const shPassword = CryptoService.encrypt("User@123");
+  const shPin = CryptoService.encrypt("1234");
 
   const stateHead = await prisma.user.upsert({
     where: { email: "statehead@gmail.com" },

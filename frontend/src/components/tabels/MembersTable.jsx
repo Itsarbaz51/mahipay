@@ -11,9 +11,10 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
+  UsersRound,
+  UserRound,
 } from "lucide-react";
 import { toast } from "react-toastify";
-
 import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -42,6 +43,7 @@ import {
   upsertPermission,
 } from "../../redux/slices/permissionSlice";
 import { getServiceProvidersByUser } from "../../redux/slices/serviceSlice";
+import { login } from "../../redux/slices/authSlice";
 
 const MembersTable = () => {
   const [search, setSearch] = useState("");
@@ -329,12 +331,6 @@ const MembersTable = () => {
     }
   };
 
-  // Mask sensitive data
-  const maskSensitiveData = (data, type = "password") => {
-    if (!data) return "••••••";
-    return "•".repeat(type === "password" ? 8 : 6);
-  };
-
   const togglePasswordVisibility = (userId) => {
     setShowPasswords((prev) => ({
       ...prev,
@@ -347,6 +343,20 @@ const MembersTable = () => {
       ...prev,
       [userId]: !prev[userId],
     }));
+  };
+
+  const handleLogin = async (user) => {
+    if (!user?.email || !user?.password) return;
+
+    try {
+      await dispatch(
+        login({ emailOrUsername: user.email, password: user.password })
+      );
+      toast.success(`Logged in as ${user.username}`);
+    } catch (err) {
+      console.error("Login failed:", err);
+      toast.error("Login failed!");
+    }
   };
 
   const confirmAction = async (reason) => {
@@ -523,17 +533,25 @@ const MembersTable = () => {
                 Member
               </th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
+                Username
+              </th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Contact
               </th>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Role
               </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
-                Password
-              </th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
-                Transaction PIN
-              </th>
+              {currentUserRole === "ADMIN" && (
+                <>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
+                    Password
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
+                    Transaction PIN
+                  </th>
+                </>
+              )}
+
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Wallet
               </th>
@@ -591,10 +609,20 @@ const MembersTable = () => {
                           <Mail className="w-3 h-3 mr-1" />
                           {user.email || "No email"}
                         </div>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <UsersRound className="w-3 h-3 mr-1" />
+                          Parent: {user.parent.username || ""}
+                        </div>
                       </div>
                     </div>
                   </td>
 
+                  <td className="px-6 py-5 text-sm text-gray-700">
+                    <div className="flex items-center">
+                      <UserRound className="w-4 h-4 mr-2 text-gray-400" />
+                      {user.username || "No phone"}
+                    </div>
+                  </td>
                   <td className="px-6 py-5 text-sm text-gray-700">
                     <div className="flex items-center">
                       <Phone className="w-4 h-4 mr-2 text-gray-400" />
@@ -612,49 +640,51 @@ const MembersTable = () => {
                     </span>
                   </td>
 
-                  {/* Password Column */}
-                  <td className="px-6 py-5">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-mono">
-                        {showPasswords[user.id]
-                          ? "••••••••"
-                          : maskSensitiveData(user.password)}
-                      </span>
-                      <button
-                        onClick={() => togglePasswordVisibility(user.id)}
-                        className="text-gray-500 hover:text-gray-700 transition-colors"
-                        title={showPasswords[user.id] ? "Hide" : "Show"}
-                      >
-                        {showPasswords[user.id] ? (
-                          <EyeOff size={14} />
-                        ) : (
-                          <Eye size={14} />
-                        )}
-                      </button>
-                    </div>
-                  </td>
+                  {currentUserRole === "ADMIN" && (
+                    <>
+                      {/* Password Column */}
+                      <td className="px-6 py-5">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-mono">
+                            {showPasswords[user.id]
+                              ? user.password
+                              : "••••••••"}
+                          </span>
+                          <button
+                            onClick={() => togglePasswordVisibility(user.id)}
+                            className="text-gray-500 hover:text-gray-700 transition-colors"
+                            title={showPasswords[user.id] ? "Hide" : "Show"}
+                          >
+                            {showPasswords[user.id] ? (
+                              <EyeOff size={14} />
+                            ) : (
+                              <Eye size={14} />
+                            )}
+                          </button>
+                        </div>
+                      </td>
 
-                  {/* Transaction PIN Column */}
-                  <td className="px-6 py-5">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-mono">
-                        {showPins[user.id]
-                          ? "••••••"
-                          : maskSensitiveData(user.transactionPin, "pin")}
-                      </span>
-                      <button
-                        onClick={() => togglePinVisibility(user.id)}
-                        className="text-gray-500 hover:text-gray-700 transition-colors"
-                        title={showPins[user.id] ? "Hide" : "Show"}
-                      >
-                        {showPins[user.id] ? (
-                          <EyeOff size={14} />
-                        ) : (
-                          <Eye size={14} />
-                        )}
-                      </button>
-                    </div>
-                  </td>
+                      {/* Transaction PIN Column */}
+                      <td className="px-6 py-5">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-mono">
+                            {showPins[user.id] ? user.transactionPin : "••••••"}
+                          </span>
+                          <button
+                            onClick={() => togglePinVisibility(user.id)}
+                            className="text-gray-500 hover:text-gray-700 transition-colors"
+                            title={showPins[user.id] ? "Hide" : "Show"}
+                          >
+                            {showPins[user.id] ? (
+                              <EyeOff size={14} />
+                            ) : (
+                              <Eye size={14} />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
 
                   <td className="px-6 py-5">
                     <div className="flex items-center space-x-2">
@@ -759,6 +789,7 @@ const MembersTable = () => {
                               setShowActionModal(true);
                               setOpenMenuId(null);
                             }}
+                            onLogin={handleLogin}
                             onClose={() => setOpenMenuId(null)}
                           />
                         )}

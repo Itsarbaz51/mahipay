@@ -5,7 +5,8 @@ import {
   User,
   Power,
   Shield,
-  Trash2, // 🧩 Added delete icon
+  Trash2,
+  KeyRound, // 🧩 Added delete icon
 } from "lucide-react";
 
 const ActionsMenu = ({
@@ -19,6 +20,7 @@ const ActionsMenu = ({
   onClose,
   onPermission,
   onDelete, // 🧩 Added delete handler
+  onLogin, // 🧩 Added delete handler
 }) => {
   const menuItems = [
     {
@@ -69,7 +71,12 @@ const ActionsMenu = ({
           ? "text-red-600"
           : "text-green-600",
     },
-
+    {
+      icon: Power,
+      label: "Login as User",
+      onClick: () => onLogin && onLogin(user),
+      color: "text-blue-600",
+    },
     {
       icon: Trash2,
       label: "Delete User",
