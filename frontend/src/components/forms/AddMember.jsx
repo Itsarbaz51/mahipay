@@ -10,17 +10,12 @@ export default function AddMember({ onClose, onSuccess, editData }) {
     lastName: "",
     email: "",
     phoneNumber: "",
-    password: "",
-    confirmPassword: "",
-    transactionPin: "",
     roleId: "",
     profileImage: null,
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState({ type: "", text: "" });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const dispatch = useDispatch();
 
@@ -37,9 +32,6 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         email: editData.email || "",
         phoneNumber: editData.phoneNumber || "",
         roleId: editData.roleId || "",
-        password: "",
-        confirmPassword: "",
-        transactionPin: "",
         profileImage: null,
       });
       if (editData.profileImage) {
@@ -89,23 +81,6 @@ export default function AddMember({ onClose, onSuccess, editData }) {
 
     // ✅ Role validation for both new and edit modes
     if (!formData.roleId) newErrors.roleId = "Role is required";
-
-    if (!editData) {
-      if (!formData.password) newErrors.password = "Password is required";
-      if (formData.password.length < 8)
-        newErrors.password = "Password must be at least 8 characters";
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = "Passwords do not match";
-      }
-      if (!formData.transactionPin)
-        newErrors.transactionPin = "Transaction PIN is required";
-      if (
-        formData.transactionPin.length < 4 ||
-        formData.transactionPin.length > 6
-      ) {
-        newErrors.transactionPin = "Transaction PIN must be 4-6 digits";
-      }
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -402,132 +377,33 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                 )}
               </div>
 
-              {/* ❌ REMOVED: Password and Transaction PIN fields for edit mode */}
-              {/* Only show password fields for new members */}
-              {!editData && (
-                <>
-                  {/* Password - Only show for new members */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Password *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                          errors.password
-                            ? "border-red-400 focus:ring-red-300 bg-red-50"
-                            : "border-gray-300 focus:ring-blue-400"
-                        }`}
-                        placeholder="Enter password (min 8 characters)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        {showPassword ? "Hide" : "Show"}
-                      </button>
-                    </div>
-                    {errors.password && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {errors.password}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Confirm Password - Only show for new members */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Confirm Password *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                          errors.confirmPassword
-                            ? "border-red-400 focus:ring-red-300 bg-red-50"
-                            : "border-gray-300 focus:ring-blue-400"
-                        }`}
-                        placeholder="Confirm password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        {showConfirmPassword ? "Hide" : "Show"}
-                      </button>
-                    </div>
-                    {errors.confirmPassword && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {errors.confirmPassword}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Transaction Pin - Only show for new members */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Transaction PIN *
-                    </label>
-                    <input
-                      type="text"
-                      name="transactionPin"
-                      value={formData.transactionPin}
-                      onChange={handleChange}
-                      maxLength={6}
-                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                        errors.transactionPin
-                          ? "border-red-400 focus:ring-red-300 bg-red-50"
-                          : "border-gray-300 focus:ring-blue-400"
-                      }`}
-                      placeholder="6-digit PIN"
+              {/* Profile Image - Show for both new and edit modes */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Profile Image
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full"
+                    disabled={loading}
+                  />
+                  {imagePreview && (
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-16 h-16 object-cover rounded-full border border-gray-300"
                     />
-                    {errors.transactionPin && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {errors.transactionPin}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Profile Image - Only show for new members */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Profile Image
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="w-full"
-                        disabled={loading}
-                      />
-                      {imagePreview && (
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-16 h-16 object-cover rounded-full border border-gray-300"
-                        />
-                      )}
-                    </div>
-                    {errors.profileImage && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {errors.profileImage}
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
+                  )}
+                </div>
+                {errors.profileImage && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.profileImage}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Submit */}

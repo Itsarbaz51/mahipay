@@ -1,5 +1,6 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
 
@@ -12,8 +13,6 @@ class UserServices {
       profileImage,
       email,
       phoneNumber,
-      transactionPin,
-      password,
       roleId,
       parentId,
     } = payload;
@@ -34,8 +33,11 @@ class UserServices {
       const role = await Prisma.role.findUnique({ where: { id: roleId } });
       if (!role) throw ApiError.badRequest("Invalid roleId");
 
-      const hashedPassword = await Helper.hashPassword(password);
-      const hashedPin = await Helper.hashPassword(transactionPin);
+      const generatedPassword = Helper.generatePassword();
+      const generatedTransactionPin = Helper.generateTransactionPin();
+
+      const hashedPassword = CryptoService.encrypt(generatedPassword);
+      const hashedPin = CryptoService.encrypt(generatedTransactionPin);
 
       let hierarchyLevel = 0;
       let hierarchyPath = "";
@@ -77,7 +79,9 @@ class UserServices {
           parentId,
           hierarchyLevel,
           hierarchyPath,
-          status: "ACTIVE",
+          status: "IN_ACTIVE",
+          deactivationReason:
+            "Kindly contact the administrator to have your account activated.",
           isKycVerified: false,
           refreshToken: null,
           passwordResetToken: null,
@@ -139,6 +143,12 @@ class UserServices {
         },
       });
 
+      await this.sendCredentialsEmail(
+        user,
+        generatedPassword,
+        generatedTransactionPin
+      );
+
       const accessToken = Helper.generateAccessToken({
         id: user.id,
         email: user.email,
@@ -172,6 +182,13 @@ class UserServices {
   static async updateProfile(userId, updateData) {
     const { username, phoneNumber, firstName, lastName, email, roleId } =
       updateData;
+
+    const currentUser = await Prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    const isEmailChanged = email && email !== currentUser.email;
 
     if (username || phoneNumber || email) {
       const existingUser = await Prisma.user.findFirst({
@@ -250,11 +267,18 @@ class UserServices {
       },
     });
 
+    if (isEmailChanged) {
+      await this.regenerateCredentialsAndNotify(userId, email);
+    }
+
     await Prisma.auditLog.create({
       data: {
         userId,
         action: "UPDATE_PROFILE",
-        metadata: { updatedFields: Object.keys(updateData) },
+        metadata: {
+          updatedFields: Object.keys(updateData),
+          emailChanged: isEmailChanged,
+        },
       },
     });
 
@@ -398,19 +422,12 @@ class UserServices {
               },
             },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
+          orderBy: { createdAt: "desc" },
           take: 1,
         },
-
         bankAccounts: {
-          where: {
-            status: "VERIFIED",
-          },
-          orderBy: {
-            isPrimary: "desc",
-          },
+          where: { status: "VERIFIED" },
+          orderBy: { isPrimary: "desc" },
         },
         userPermissions: {
           include: {
@@ -434,19 +451,12 @@ class UserServices {
             expiresAt: true,
             userKycId: true,
           },
-          where: {
-            expiresAt: {
-              gt: new Date(),
-            },
-          },
+          where: { expiresAt: { gt: new Date() } },
         },
       },
     });
 
-    if (!user) {
-      console.warn("User not found", { userId });
-      throw ApiError.notFound("User not found");
-    }
+    if (!user) throw ApiError.notFound("User not found");
 
     const transformedUser = {
       ...user,
@@ -454,7 +464,7 @@ class UserServices {
         user.kycs.length > 0
           ? {
               currentStatus: user.kycs[0].status,
-              isKycSubmitted: user.kycs.length > 0,
+              isKycSubmitted: true,
               latestKyc: user.kycs[0],
               kycHistory: user.kycs,
               totalKycAttempts: user.kycs.length,
@@ -477,7 +487,34 @@ class UserServices {
       bankAccounts: undefined,
     };
 
-    const safeUser = Helper.serializeUser(transformedUser);
+    let safeUser;
+
+    // Use user's role instead of parent.role
+    if (user.role.name === "ADMIN") {
+      const serialized = Helper.serializeUser(transformedUser);
+
+      if (serialized.password) {
+        try {
+          serialized.password = CryptoService.decrypt(serialized.password);
+        } catch {
+          serialized.password = "Error decrypting";
+        }
+      }
+
+      if (serialized.transactionPin) {
+        try {
+          serialized.transactionPin = CryptoService.decrypt(
+            serialized.transactionPin
+          );
+        } catch {
+          serialized.transactionPin = "Error decrypting";
+        }
+      }
+
+      safeUser = serialized;
+    } else {
+      safeUser = Helper.serializeUser(transformedUser);
+    }
 
     return safeUser;
   }
@@ -660,8 +697,35 @@ class UserServices {
         where: queryWhere,
       }),
     ]);
+    let safeUsers;
 
-    const safeUsers = users.map((user) => Helper.serializeUser(user));
+    if (parent.role.name === "ADMIN") {
+      safeUsers = users.map((user) => {
+        const serialized = Helper.serializeUser(user);
+
+        if (serialized.password) {
+          try {
+            serialized.password = CryptoService.decrypt(serialized.password);
+          } catch {
+            serialized.password = "Error decrypting";
+          }
+        }
+
+        if (serialized.transactionPin) {
+          try {
+            serialized.transactionPin = CryptoService.decrypt(
+              serialized.transactionPin
+            );
+          } catch {
+            serialized.transactionPin = "Error decrypting";
+          }
+        }
+
+        return serialized;
+      });
+    } else {
+      safeUsers = users.map((user) => Helper.serializeUser(user));
+    }
 
     return { users: safeUsers, total };
   }
@@ -1340,6 +1404,145 @@ class UserServices {
       }
 
       throw ApiError.internal("Failed to delete user. Please try again.");
+    }
+  }
+
+  static async sendCredentialsEmail(user, password, transactionPin) {
+    try {
+      const formattedFirstName = this.formatName(user.firstName);
+
+      const subject = "Your Account Credentials";
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #4F46E5; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
+                .credentials { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #4F46E5; }
+                .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin: 15px 0; }
+                .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Welcome to Our Platform!</h1>
+                </div>
+                <div class="content">
+                    <p>Hello <strong>${formattedFirstName}</strong>,</p>
+                    
+                    <p>Your account has been successfully created. Here are your login credentials:</p>
+                    
+                    <div class="credentials">
+                        <h3>Your Account Details:</h3>
+                        <p><strong>Username:</strong> ${user.username}</p>
+                        <p><strong>Email:</strong> ${user.email}</p>
+                        <p><strong>Password:</strong> ${password}</p>
+                        <p><strong>Transaction PIN:</strong> ${transactionPin}</p>
+                    </div>
+                    
+                    <div class="warning">
+                        <strong>Important Security Notice:</strong>
+                        <ul>
+                            <li>Keep your credentials secure and confidential</li>
+                            <li>Change your password after first login</li>
+                            <li>Do not share your Transaction PIN with anyone</li>
+                            <li>These credentials are for your use only</li>
+                        </ul>
+                    </div>
+                    
+                    <p>You can login to your account using the above credentials.</p>
+                    
+                    <p>If you have any questions, please contact our support team.</p>
+                    
+                    <p>Best regards,<br>Support Team</p>
+                </div>
+                <div class="footer">
+                    <p>This is an automated message. Please do not reply to this email.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+      `;
+
+      const text = `
+        Welcome to Our Platform!
+
+        Hello ${formattedFirstName},
+
+        Your account has been successfully created. Here are your login credentials:
+
+        Username: ${user.username}
+        Email: ${user.email}
+        Password: ${password}
+        Transaction PIN: ${transactionPin}
+
+        Important Security Notice:
+        - Keep your credentials secure and confidential
+        - Change your password after first login
+        - Do not share your Transaction PIN with anyone
+        - These credentials are for your use only
+
+        You can login to your account using the above credentials.
+
+        If you have any questions, please contact our support team.
+
+        Best regards,
+        Support Team
+
+        This is an automated message. Please do not reply to this email.
+      `;
+
+      await Helper.sendEmail({
+        to: user.email,
+        subject,
+        text,
+        html,
+      });
+
+      console.log(`Credentials email sent successfully to ${user.email}`);
+    } catch (emailError) {
+      console.error("Failed to send credentials email:", {
+        userId: user.id,
+        email: user.email,
+        error: emailError.message,
+      });
+    }
+  }
+
+  static async regenerateCredentialsAndNotify(userId, newEmail) {
+    try {
+      const newPassword = Helper.generatePassword();
+      const newTransactionPin = Helper.generateTransactionPin();
+
+      const hashedPassword = CryptoService.encrypt(newPassword);
+      const hashedTransactionPin = CryptoService.encrypt(newTransactionPin);
+
+      const user = await Prisma.user.update({
+        where: { id: userId },
+        data: {
+          password: hashedPassword,
+          transactionPin: hashedTransactionPin,
+        },
+      });
+
+      await this.sendCredentialsEmail(user, newPassword, newTransactionPin);
+
+      await Prisma.auditLog.create({
+        data: {
+          userId,
+          action: "CREDENTIALS_REGENERATED",
+          metadata: {
+            reason: "EMAIL_UPDATED",
+            newEmail: newEmail,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error regenerating credentials:", error);
     }
   }
 
