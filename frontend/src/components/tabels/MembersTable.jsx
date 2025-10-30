@@ -36,12 +36,12 @@ import ActionsMenu from "../ui/ActionsMenu";
 import UserProfileView from "../../pages/view/UserProfileView";
 import EditCredentialsModal from "../forms/EditCredentialsModal";
 import EditProfileImageModal from "../forms/EditProfileImageModal";
-import PermissionForm from "../forms/PermissionForm";
+import AddPermission from "../forms/AddPermission";
 import {
   getPermissionById,
   upsertPermission,
 } from "../../redux/slices/permissionSlice";
-import { getServiceProvidersByUser } from "../../redux/slices/serviceSlice";
+import { getServicesActive } from "../../redux/slices/serviceSlice";
 
 const MembersTable = () => {
   const [search, setSearch] = useState("");
@@ -226,7 +226,7 @@ const MembersTable = () => {
   // Service providers effect
   useEffect(() => {
     if (showPermissionModal) {
-      dispatch(getServiceProvidersByUser());
+      dispatch(getServicesActive());
     }
   }, [showPermissionModal, dispatch]);
 
@@ -885,7 +885,7 @@ const MembersTable = () => {
 
       {/* Permission Modal */}
       {showPermissionModal && permissionUser && (
-        <PermissionForm
+        <AddPermission
           mode={permissionMode}
           onSubmit={handlePermissionSubmit}
           onCancel={handleClosePermissionModal}

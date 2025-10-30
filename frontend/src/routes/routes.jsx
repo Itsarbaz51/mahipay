@@ -19,13 +19,12 @@ import Login from "../pages/auth/Login";
 import Dashboard from "../pages/Dashboard";
 import TransactionHistory from "../components/tabels/TransactionHistory.jsx";
 import Reports from "../pages/Reports";
-import AllKycTable from "../components/tabels/AllKycTable";
+import ProfileKYC from "../components/tabels/ProfileKYC";
 import PayoutTable from "../components/tabels/PayoutTable";
 import EmployeeTable from "../components/tabels/EmployeeTable";
 import MembersTable from "../components/tabels/MembersTable";
 import WalletTable from "../components/tabels/Wallet";
-import KYCVerification from "../components/forms/KYCForm";
-import AddFundRequest from "../components/forms/AddFundRequest";
+import AddProfileKYC from "../components/forms/AddProfileKYC";
 import Settings from "../components/Settings";
 import CommissionManagement from "../pages/CommissionManagement";
 import CardPayout from "../pages/services/CardPayout";
@@ -36,6 +35,7 @@ import PrivacyPolicy from "../pages/landing/Privacypolicy";
 import TermsConditions from "../pages/landing/Terms&conditions";
 import BanksTable from "../components/tabels/BanksTable.jsx";
 import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";
+import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -65,8 +65,8 @@ export const createRouter = () => {
           <Route path="payout" element={<PayoutTable />} />
           <Route path="commission" element={<CommissionManagement />} />
           <Route path="reports" element={<Reports />} />
-          <Route path="add-fund" element={<AddFundRequest />} />
-          <Route path="all-kyc" element={<AllKycTable />} />
+          <Route path="request-fund" element={<FundRequestTable />} />
+          <Route path="all-kyc" element={<ProfileKYC />} />
           <Route path="members" element={<MembersTable />} />
           <Route path="settings" element={<Settings />} />
           <Route path="employee-management" element={<EmployeeTable />} />
@@ -86,7 +86,7 @@ export const createRouter = () => {
           path="kyc-submit"
           element={
             <ProtectedRoute>
-              <KYCVerification />
+              <AddProfileKYC />
             </ProtectedRoute>
           }
         />

@@ -14,6 +14,7 @@ import {
   Landmark,
   BadgeIndianRupee,
   RedoDot,
+  HandCoins,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
@@ -28,6 +29,7 @@ const Sidebar = () => {
   const handleLogout = () => {
     dispatch(logout());
   };
+
   const menuItems = [
     // --- MAIN ---
     {
@@ -45,10 +47,11 @@ const Sidebar = () => {
     },
     {
       id: "add-fund",
-      label: "Add Fund",
+      label: currentUser.role.name === "ADMIN" ? "Fund Request" : "Add Fund",
       icon: BadgeIndianRupee,
-      path: "/add-fund",
+      path: "/request-fund",
       permissions: [
+        "ADMIN",
         "STATE HEAD",
         "MASTER DISTRIBUTOR",
         "DISTRIBUTOR",
@@ -93,12 +96,7 @@ const Sidebar = () => {
       label: "Bank KYC",
       icon: Landmark,
       path: "/bank-details",
-      permissions: [
-        "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR"
-      ],
+      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
     },
 
     // --- SERVICE ---
@@ -197,6 +195,7 @@ const Sidebar = () => {
       "login-logs",
       "audit-logs",
       "Bank",
+      "fund-request",
     ].includes(item.id)
   );
 
