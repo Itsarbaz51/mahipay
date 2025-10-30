@@ -18,7 +18,7 @@ import {
   Hash, // New icon for ID
 } from "lucide-react";
 
-export default function UserProfileView({ userData, onClose }) {
+export default function UserProfileView({ isAdminUser, userData, onClose }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showTransactionPin, setShowTransactionPin] = useState(false);
 
@@ -324,7 +324,7 @@ export default function UserProfileView({ userData, onClose }) {
               </div>
 
               {/* Security Info */}
-              {user.role.name === "ADMIN" && (
+              {isAdminUser && (
                 <div className={detailCard}>
                   <h3 className={sectionTitleClass}>
                     <Lock className="text-cyan-500" size={24} /> Security

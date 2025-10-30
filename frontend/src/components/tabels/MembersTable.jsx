@@ -807,6 +807,7 @@ const MembersTable = () => {
       {showViewProfile && (
         <UserProfileView
           userData={viewedUser || selectedUser}
+          isAdminUser={isAdminUser}
           onClose={() => {
             setShowViewProfile(false);
             dispatch(setCurrentUser(null));

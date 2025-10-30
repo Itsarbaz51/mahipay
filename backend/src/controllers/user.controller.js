@@ -91,12 +91,14 @@ class UserController {
 
   static getUserById = asyncHandler(async (req, res) => {
     const userId = req.params.id;
+    const currentUser = req.user; // Current authenticated user from middleware
 
     if (!userId) {
       throw ApiError.badRequest("userId required");
     }
 
-    const user = await UserServices.getUserById(userId);
+    // Pass current user to the service function
+    const user = await UserServices.getUserById(userId, currentUser);
 
     return res
       .status(200)

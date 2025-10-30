@@ -365,7 +365,7 @@ class UserServices {
     }
   }
 
-  static async getUserById(userId) {
+  static async getUserById(userId, currentUser = null) {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -489,8 +489,11 @@ class UserServices {
 
     let safeUser;
 
-    // Use user's role instead of parent.role
-    if (user.role.name === "ADMIN") {
+    const isCurrentUserAdmin = currentUser && currentUser.role === "ADMIN";
+
+    console.log(currentUser);
+
+    if (isCurrentUserAdmin) {
       const serialized = Helper.serializeUser(transformedUser);
 
       if (serialized.password) {
@@ -1502,7 +1505,6 @@ class UserServices {
         text,
         html,
       });
-
     } catch (emailError) {
       console.error("Failed to send credentials email:", {
         userId: user.id,
