@@ -30,11 +30,22 @@ class KycServices {
     });
 
     if (!user) throw ApiError.notFound("User not found");
-    if (!["ADMIN", "SUPER ADMIN"].includes(user.role.name.toUpperCase()))
-      throw ApiError.forbidden("Access denied: insufficient permissions");
 
-    const childUserIds = user.children.map((child) => child.id);
-    if (childUserIds.length === 0) {
+    // Modified logic: ADMIN ko saare users, SUPER ADMIN ko apne created users
+    let targetUserIds = [];
+
+    if (user.role.name.toUpperCase() === "ADMIN") {
+      // ADMIN ke liye saare users
+      const allUsers = await Prisma.user.findMany({
+        select: { id: true },
+      });
+      targetUserIds = allUsers.map((user) => user.id);
+    } else {
+      // SUPER ADMIN ke liye sirf apne created users
+      targetUserIds = user.children.map((child) => child.id);
+    }
+
+    if (targetUserIds.length === 0) {
       const emptyResult = {
         data: [],
         meta: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 },
@@ -46,7 +57,7 @@ class KycServices {
     const skip = (pageNum - 1) * limitNum;
 
     const where = {
-      userId: { in: childUserIds },
+      userId: { in: targetUserIds },
       ...(status &&
         status.toUpperCase() !== "ALL" && { status: status.toUpperCase() }),
       ...(search && {

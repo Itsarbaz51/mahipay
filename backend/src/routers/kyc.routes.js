@@ -11,14 +11,22 @@ const kycRoutes = Router();
 kycRoutes.post(
   "/list-kyc",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   validateRequest(KycValidationSchemas.ListkycSchema),
   UserKycController.index
 );
+
 kycRoutes.get(
   "/user-kyc-show/:id",
   AuthMiddleware.isAuthenticated,
   UserKycController.show
 );
+
 kycRoutes.post(
   "/user-kyc-store",
   AuthMiddleware.isAuthenticated,
@@ -31,12 +39,15 @@ kycRoutes.post(
   validateRequest(KycValidationSchemas.UserKyc),
   UserKycController.store
 );
+
 kycRoutes.put(
   "/user-verify",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
   validateRequest(KycValidationSchemas.VerificationKycSchema),
   UserKycController.verification
 );
+
 kycRoutes.put(
   "/user-kyc-update/:id",
   AuthMiddleware.isAuthenticated,

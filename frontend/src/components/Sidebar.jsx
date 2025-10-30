@@ -119,7 +119,7 @@ const Sidebar = () => {
       label: "Profiles KYC",
       icon: Shield,
       path: "/all-kyc",
-      permissions: ["ADMIN"],
+      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
     },
     {
       id: "employee-management",
@@ -330,7 +330,7 @@ const Sidebar = () => {
               <Wallet className="h-3 w-3 text-gray-500" />
             </div>
             <p className="text-sm font-semibold mt-1 text-gray-800">
-              ₹{(walletBalance).toLocaleString()}
+              ₹{walletBalance.toLocaleString()}
             </p>
           </div>
         </div>

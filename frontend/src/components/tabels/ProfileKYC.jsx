@@ -188,6 +188,8 @@ const AllKycTable = () => {
     }
   };
 
+  const { currentUser } = useSelector((state) => state.auth || {});
+
   return (
     <div>
       {/* Confirm Modal */}
@@ -284,7 +286,9 @@ const AllKycTable = () => {
                 <th className="px-6 py-4">Type</th>
                 <th className="px-6 py-4">Location</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Actions</th>
+                {currentUser.role.name === "ADMIN" && (
+                  <th className="px-6 py-4">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -361,10 +365,34 @@ const AllKycTable = () => {
                           <span className="ml-1">{kyc.status}</span>
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                          {kyc.status === "PENDING" && (
-                            <>
+                      {currentUser.role.name === "ADMIN" && (
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            {kyc.status === "PENDING" && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleActionClick("VERIFIED", kyc.id)
+                                  }
+                                  className="p-1 hover:bg-green-50 rounded transition-colors"
+                                  title="Approve KYC"
+                                >
+                                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                </button>
+
+                                <button
+                                  onClick={() =>
+                                    handleActionClick("REJECT", kyc.id)
+                                  }
+                                  className="p-1 hover:bg-red-50 rounded transition-colors"
+                                  title="Reject KYC"
+                                >
+                                  <X className="w-5 h-5 text-red-600" />
+                                </button>
+                              </>
+                            )}
+
+                            {kyc.status === "REJECT" && (
                               <button
                                 onClick={() =>
                                   handleActionClick("VERIFIED", kyc.id)
@@ -374,54 +402,32 @@ const AllKycTable = () => {
                               >
                                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                               </button>
+                            )}
 
-                              <button
-                                onClick={() =>
-                                  handleActionClick("REJECT", kyc.id)
-                                }
-                                className="p-1 hover:bg-red-50 rounded transition-colors"
-                                title="Reject KYC"
-                              >
-                                <X className="w-5 h-5 text-red-600" />
-                              </button>
-                            </>
-                          )}
+                            {kyc.status === "VERIFIED" && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleActionClick("REJECT", kyc.id)
+                                  }
+                                  className="p-1 hover:bg-red-50 rounded transition-colors"
+                                  title="Reject KYC"
+                                >
+                                  <X className="w-5 h-5 text-red-600" />
+                                </button>
+                              </>
+                            )}
 
-                          {kyc.status === "REJECT" && (
                             <button
-                              onClick={() =>
-                                handleActionClick("VERIFIED", kyc.id)
-                              }
-                              className="p-1 hover:bg-green-50 rounded transition-colors"
-                              title="Approve KYC"
+                              onClick={() => handleViewShow(kyc.id)}
+                              className="p-1 hover:bg-blue-50 rounded transition-colors"
+                              title="View Details"
                             >
-                              <CheckCircle2 className="w-5 h-5 text-green-600" />
+                              <Eye className="w-5 h-5 text-blue-600" />
                             </button>
-                          )}
-
-                          {kyc.status === "VERIFIED" && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  handleActionClick("REJECT", kyc.id)
-                                }
-                                className="p-1 hover:bg-red-50 rounded transition-colors"
-                                title="Reject KYC"
-                              >
-                                <X className="w-5 h-5 text-red-600" />
-                              </button>
-                            </>
-                          )}
-
-                          <button
-                            onClick={() => handleViewShow(kyc.id)}
-                            className="p-1 hover:bg-blue-50 rounded transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-5 h-5 text-blue-600" />
-                          </button>
-                        </div>
-                      </td>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
