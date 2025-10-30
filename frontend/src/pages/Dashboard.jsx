@@ -158,7 +158,7 @@ const Dashboard = ({
   const stats = getUserStats();
 
   const formatCurrency = (amountInPaise) => {
-    return `₹${(amountInPaise / 100).toLocaleString('en-IN', {
+    return `₹${(amountInPaise).toLocaleString('en-IN', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;

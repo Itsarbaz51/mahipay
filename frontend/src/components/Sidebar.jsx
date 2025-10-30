@@ -331,7 +331,7 @@ const Sidebar = () => {
               <Wallet className="h-3 w-3 text-gray-500" />
             </div>
             <p className="text-sm font-semibold mt-1 text-gray-800">
-              ₹{(walletBalance / 100).toLocaleString()}
+              ₹{(walletBalance).toLocaleString()}
             </p>
           </div>
         </div>

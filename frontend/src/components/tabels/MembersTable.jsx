@@ -219,7 +219,6 @@ const MembersTable = () => {
           }
         })
         .catch((error) => {
-          console.log("No existing permissions found:", error);
           setExistingPermissions([]);
         });
     }
@@ -252,7 +251,6 @@ const MembersTable = () => {
     } catch (error) {
       setPermissionMode("add");
       setExistingPermissions([]);
-      console.log("No existing permissions found, using add mode", error);
     }
 
     setShowPermissionModal(true);
@@ -559,11 +557,9 @@ const MembersTable = () => {
                 Status
               </th>
               {/* ✅ Actions column header bhi sirf ADMIN ke liye show karo */}
-              {isAdminUser && (
-                <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
-                  Actions
-                </th>
-              )}
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
+                Actions
+              </th>
             </tr>
           </thead>
 
@@ -697,9 +693,8 @@ const MembersTable = () => {
                         }`}
                       >
                         ₹
-                        {(
-                          (user.wallets?.[0]?.balance || 0) / 100
-                        ).toLocaleString() || 0}
+                        {(user.wallets?.[0]?.balance || 0).toLocaleString() ||
+                          0}
                       </span>
                     </div>
                   </td>
@@ -726,76 +721,72 @@ const MembersTable = () => {
                     </span>
                   </td>
 
-                  {/* ✅ Actions column sirf ADMIN ke liye show karo */}
-                  {isAdminUser && (
-                    <td className="px-6 py-5 text-center relative">
-                      <div className="inline-block relative">
-                        <button
-                          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                          onClick={() =>
-                            setOpenMenuId(
-                              openMenuId === user.id ? null : user.id
-                            )
-                          }
-                        >
-                          {openMenuId === user.id ? (
-                            <X className="w-5 h-5 text-gray-600" />
-                          ) : (
-                            <MoreVertical className="w-5 h-5 text-gray-600" />
-                          )}
-                        </button>
-
-                        {openMenuId === user.id && (
-                          <ActionsMenu
-                            user={user}
-                            onView={handleViewUser}
-                            onEdit={(user) => {
-                              setSelectedUser(user);
-                              setShowForm(true);
-                              setOpenMenuId(null);
-                            }}
-                            onEditProfile={(user) => {
-                              setSelectedUser(user);
-                              setShowEditProfile(true);
-                              setOpenMenuId(null);
-                            }}
-                            onEditPassword={(user) => {
-                              setSelectedUser(user);
-                              setShowEditPassword(true);
-                              setOpenMenuId(null);
-                            }}
-                            onEditPin={(user) => {
-                              setSelectedUser(user);
-                              setShowEditPin(true);
-                              setOpenMenuId(null);
-                            }}
-                            onPermission={(user) => {
-                              handleAddPermission(user);
-                              setOpenMenuId(null);
-                            }}
-                            onToggleStatus={(user) => {
-                              setActionType(
-                                user.status === "IN_ACTIVE"
-                                  ? "Activate"
-                                  : "Deactivate"
-                              );
-                              setSelectedUser(user);
-                              setShowActionModal(true);
-                              setOpenMenuId(null);
-                            }}
-                            onDelete={(user) => {
-                              setActionType("Delete");
-                              setSelectedUser(user);
-                              setShowActionModal(true);
-                              setOpenMenuId(null);
-                            }}
-                            onLogin={handleLogin}
-                            onClose={() => setOpenMenuId(null)}
-                          />
+                  <td className="px-6 py-5 text-center relative">
+                    <div className="inline-block relative">
+                      <button
+                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                        onClick={() =>
+                          setOpenMenuId(openMenuId === user.id ? null : user.id)
+                        }
+                      >
+                        {openMenuId === user.id ? (
+                          <X className="w-5 h-5 text-gray-600" />
+                        ) : (
+                          <MoreVertical className="w-5 h-5 text-gray-600" />
                         )}
-                      </div>
-                    </td>
-                  )}
+                      </button>
+
+                      {openMenuId === user.id && (
+                        <ActionsMenu
+                          user={user}
+                          isAdminUser={isAdminUser} // 🆕 Add this prop
+                          onView={handleViewUser}
+                          onEdit={(user) => {
+                            setSelectedUser(user);
+                            setShowForm(true);
+                            setOpenMenuId(null);
+                          }}
+                          onEditProfile={(user) => {
+                            setSelectedUser(user);
+                            setShowEditProfile(true);
+                            setOpenMenuId(null);
+                          }}
+                          onEditPassword={(user) => {
+                            setSelectedUser(user);
+                            setShowEditPassword(true);
+                            setOpenMenuId(null);
+                          }}
+                          onEditPin={(user) => {
+                            setSelectedUser(user);
+                            setShowEditPin(true);
+                            setOpenMenuId(null);
+                          }}
+                          onPermission={(user) => {
+                            handleAddPermission(user);
+                            setOpenMenuId(null);
+                          }}
+                          onToggleStatus={(user) => {
+                            setActionType(
+                              user.status === "IN_ACTIVE"
+                                ? "Activate"
+                                : "Deactivate"
+                            );
+                            setSelectedUser(user);
+                            setShowActionModal(true);
+                            setOpenMenuId(null);
+                          }}
+                          onDelete={(user) => {
+                            setActionType("Delete");
+                            setSelectedUser(user);
+                            setShowActionModal(true);
+                            setOpenMenuId(null);
+                          }}
+                          onLogin={handleLogin}
+                          onClose={() => setOpenMenuId(null)}
+                        />
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))
             )}

@@ -26,11 +26,7 @@ class UserValidationSchemas {
         phoneNumber: z
           .string()
           .regex(/^\d{10}$/, "Phone number must be 10 digits"),
-        transactionPin: z
-          .string()
-          .regex(/^\d{4,6}$/, "Transaction PIN must be 4-6 digits"),
-        password: z.string().min(8, "Password must be at least 8 characters"),
-        confirmPassword: z.string().min(6, "Confirm password is required"),
+
         roleId: z.string().uuid(),
       })
       .refine((data) => data.password === data.confirmPassword, {

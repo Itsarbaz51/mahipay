@@ -6,7 +6,7 @@ import {
   Power,
   Shield,
   Trash2,
-  KeyRound, // 🧩 Added delete icon
+  KeyRound,
 } from "lucide-react";
 
 const ActionsMenu = ({
@@ -19,16 +19,22 @@ const ActionsMenu = ({
   onToggleStatus,
   onClose,
   onPermission,
-  onDelete, // 🧩 Added delete handler
-  onLogin, // 🧩 Added delete handler
+  onDelete,
+  onLogin,
+  isAdminUser, // 🆕 Added prop to check if current user is admin
 }) => {
-  const menuItems = [
+  // 🆕 Base menu items that everyone can see
+  const baseMenuItems = [
     {
       icon: User,
       label: "View Profile",
       onClick: () => onView(user),
       color: "text-blue-600",
     },
+  ];
+
+  // 🆕 Admin-only menu items
+  const adminMenuItems = [
     {
       icon: User,
       label: "Change Profile",
@@ -85,6 +91,11 @@ const ActionsMenu = ({
       isDanger: true,
     },
   ];
+
+  // 🆕 Combine menu items based on user role
+  const menuItems = isAdminUser
+    ? [...baseMenuItems, ...adminMenuItems]
+    : baseMenuItems;
 
   return (
     <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">

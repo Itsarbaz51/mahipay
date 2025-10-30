@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { getUserById } from "../../redux/slices/userSlice";
+import { getUserById } from "../redux/slices/userSlice";
 import { useParams } from "react-router-dom";
 
 const UserProfilePage = ({ onClose }) => {
