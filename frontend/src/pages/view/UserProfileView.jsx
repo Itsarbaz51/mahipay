@@ -171,11 +171,17 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                 </p>
                 <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                   <StatusBadge status={user.status} />
-                  {user.isKycVerified && (
+
+                  {user.isKycVerified ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold border border-blue-300 transition-all duration-200 hover:bg-blue-200">
                       <CheckCircle size={14} /> KYC Verified
                     </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-semibold border border-gray-300 transition-all duration-200 hover:bg-gray-200">
+                      <XCircle size={14} /> KYC Not Verified
+                    </span>
                   )}
+
                   {user.isAuthorized && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold border border-purple-300 transition-all duration-200 hover:bg-purple-200">
                       <Shield size={14} /> Authorized
