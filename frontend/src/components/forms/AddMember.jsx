@@ -79,7 +79,6 @@ export default function AddMember({ onClose, onSuccess, editData }) {
     if (!formData.phoneNumber)
       newErrors.phoneNumber = "Phone number is required";
 
-    // ✅ Role validation for both new and edit modes
     if (!formData.roleId) newErrors.roleId = "Role is required";
 
     setErrors(newErrors);
@@ -105,14 +104,14 @@ export default function AddMember({ onClose, onSuccess, editData }) {
       let res;
 
       if (editData) {
-        // ✅ Edit case - include email and role in update data
+        // Edit case
         const submitData = {
           username: formData.username,
           firstName: formData.firstName,
           lastName: formData.lastName,
-          email: formData.email, // ✅ Email included for edit
+          email: formData.email,
           phoneNumber: formData.phoneNumber,
-          roleId: formData.roleId, // ✅ Role included for edit
+          roleId: formData.roleId,
         };
 
         // Remove undefined fields
@@ -128,7 +127,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
 
         res = await dispatch(updateProfile(editData.id, submitData));
       } else {
-        // New member case - always use FormData
+        // New member case
         const form = new FormData();
         Object.keys(formData).forEach((key) => {
           if (
@@ -142,7 +141,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         res = await dispatch(register(form));
       }
 
-      // ✅ Check for success using multiple patterns
+      // Check for success
       if (
         res?.success ||
         res?.status === "success" ||
@@ -159,8 +158,8 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         onSuccess();
         onClose();
       } else {
-        // ✅ Handle API error responses
-        const errorData = res?.error || res?.payload || res?.data;
+        // Handle other types of errors from dispatch
+        const errorData = res?.error || res?.payload || res?.data || {};
         const errorMessage = errorData?.message || "Operation failed";
 
         setMessage({
@@ -168,7 +167,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
           text: errorMessage,
         });
 
-        // ✅ Set field-specific errors if available
+        // Set field-specific errors if available
         if (errorData?.errors && Array.isArray(errorData.errors)) {
           const formattedErrors = {};
           errorData.errors.forEach((err) => {
@@ -178,12 +177,26 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         }
       }
     } catch (error) {
-      // ✅ Catch network or other errors
-      console.error("Form submission error:", error);
-      setMessage({
-        type: "error",
-        text: error?.message || "Something went wrong. Please try again.",
-      });
+      const errorData = error?.response?.data || error;
+
+      if (errorData.status === "fail" && Array.isArray(errorData.errors)) {
+        const formattedErrors = {};
+        errorData.errors.forEach((err) => {
+          formattedErrors[err.field] = err.message;
+        });
+        setErrors(formattedErrors);
+
+        setMessage(formattedErrors);
+      } else {
+        // Handle other errors
+        setMessage({
+          type: "error",
+          text:
+            errorData?.message ||
+            error?.message ||
+            "Something went wrong. Please try again.",
+        });
+      }
     } finally {
       setLoading(false);
     }

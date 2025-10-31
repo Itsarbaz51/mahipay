@@ -168,20 +168,16 @@ export const register = (userData) => async (dispatch) => {
 
     dispatch(userSuccess(data));
 
-    // SINGLE TOAST - Only show success toast here
     if (data.message) {
       toast.success(data.message || "User registered successfully!");
     }
 
     return data;
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message || error?.message || "Registration failed";
-    dispatch(userFail(errMsg));
+    const errorResponse = error?.response?.data;
+    dispatch(userFail(errorResponse || error.message));
 
-    // SINGLE TOAST - Only show error toast here
-    toast.error(errMsg);
-    throw new Error(errMsg);
+    throw error;
   }
 };
 
@@ -220,8 +216,6 @@ export const updateUserProfileImage =
   };
 
 export const updateProfile = (userId, profileData) => async (dispatch) => {
-  console.log(profileData);
-
   try {
     dispatch(userSubmitRequest());
 
@@ -239,22 +233,16 @@ export const updateProfile = (userId, profileData) => async (dispatch) => {
     dispatch(userSuccess(data));
     dispatch(updateUserInList(data.data.user));
 
-    // SINGLE TOAST
     if (data.message) {
       toast.success(data.message || "Profile updated successfully!");
     }
 
     return data;
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Profile update failed";
-    dispatch(userFail(errMsg));
+    const errorResponse = error?.response?.data;
+    dispatch(userFail(errorResponse || error.message));
 
-    // SINGLE TOAST
-    toast.error(errMsg);
-    throw new Error(errMsg);
+    throw error;
   }
 };
 
