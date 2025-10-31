@@ -179,17 +179,62 @@ class UserServices {
     }
   }
 
-  static async updateProfile(userId, updateData) {
+  static async updateProfile(userId, updateData, currentUserId) {
     const { username, phoneNumber, firstName, lastName, email, roleId } =
       updateData;
 
+    // Pehle current user ko fetch karo
     const currentUser = await Prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
+      where: { id: currentUserId },
+      include: {
+        role: {
+          select: { name: true, level: true },
+        },
+      },
     });
 
-    const isEmailChanged = email && email !== currentUser.email;
+    if (!currentUser) {
+      throw ApiError.unauthorized("Current user not found");
+    }
 
+    // Phir userToUpdate ko fetch karo
+    const userToUpdate = await Prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, // id bhi include karo
+        email: true,
+        role: {
+          select: { level: true },
+        },
+      },
+    });
+
+    if (!userToUpdate) {
+      throw ApiError.notFound("User to update not found");
+    }
+
+    // Admin check sahi tarike se karo
+    const isAdmin = currentUser.role.name === "ADMIN";
+
+    // Check if trying to update own profile - sahi variable use karo
+    const isUpdatingOwnProfile = userId === currentUserId;
+
+    // Email change logic
+    const isEmailChanged = email && email !== userToUpdate.email;
+
+    // Only allow email change if admin
+    if (isEmailChanged && !isAdmin) {
+      throw ApiError.forbidden(
+        "Only administrators can update email addresses"
+      );
+    }
+
+    // Role change logic - only admins can change roles
+    if (roleId && !isAdmin) {
+      throw ApiError.forbidden("Only administrators can change user roles");
+    }
+
+    // Check for duplicate username, phone, email
     if (username || phoneNumber || email) {
       const existingUser = await Prisma.user.findFirst({
         where: {
@@ -224,7 +269,8 @@ class UserServices {
     if (phoneNumber) formattedData.phoneNumber = phoneNumber;
     if (email) formattedData.email = email.trim().toLowerCase();
 
-    if (roleId) {
+    // Only include role if user is admin
+    if (roleId && isAdmin) {
       const roleRecord = await Prisma.role.findUnique({
         where: { id: roleId },
       });
@@ -270,14 +316,19 @@ class UserServices {
     if (isEmailChanged) {
       await this.regenerateCredentialsAndNotify(userId, email);
     }
-
     await Prisma.auditLog.create({
       data: {
-        userId,
+        user: {
+          connect: { id: currentUserId },
+        },
         action: "UPDATE_PROFILE",
+        entityType: "User",
+        entityId: userId,
         metadata: {
           updatedFields: Object.keys(updateData),
           emailChanged: isEmailChanged,
+          isAdmin: isAdmin,
+          isOwnProfile: isUpdatingOwnProfile,
         },
       },
     });

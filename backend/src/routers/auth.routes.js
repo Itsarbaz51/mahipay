@@ -26,7 +26,7 @@ authRoutes.post(
 authRoutes.post(
   "/forgot-password",
   validateRequest(AuthValidationSchemas.forgotPassword),
-  AuthController.forgotPassword
+  AuthController.requestPasswordReset
 );
 
 authRoutes.post(
@@ -34,7 +34,7 @@ authRoutes.post(
   AuthMiddleware.isAuthenticated,
   validateRequest(AuthValidationSchemas.resetPassword),
 
-  AuthController.resetPassword
+  AuthController.confirmPasswordReset
 );
 authRoutes.get("/verify-email", AuthController.verifyEmail);
 

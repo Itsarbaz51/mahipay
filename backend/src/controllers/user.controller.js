@@ -42,13 +42,18 @@ class UserController {
 
   static updateProfile = asyncHandler(async (req, res) => {
     const { userId } = req.params;
+    const currentUserId = req.user.id;
 
-    if (!userId) {
+    if (!currentUserId) {
       throw ApiError.unauthorized("User not authenticated");
     }
 
     const updateData = req.body;
-    const user = await UserServices.updateProfile(userId, updateData);
+    const user = await UserServices.updateProfile(
+      userId,
+      updateData,
+      currentUserId
+    );
 
     const safeUser = Helper.serializeUser(user);
 

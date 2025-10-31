@@ -226,12 +226,17 @@ export default function AddMember({
         <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">
-              {editData ? "Edit Member" : "Add New Member"}
+              {profileEdit
+                ? "Profile Update"
+                : editData
+                ? "Edit Member"
+                : "Add New Member"}
             </h2>
+
             <p className="text-blue-100 text-sm mt-1">
               {editData
-                ? "Update existing member details"
-                : "Create a new team member account"}
+                ? "Update existing user details"
+                : "Create a new team user account"}
             </p>
           </div>
           <button

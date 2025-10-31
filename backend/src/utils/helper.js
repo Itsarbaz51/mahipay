@@ -1,4 +1,3 @@
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import nodemailer from "nodemailer";
@@ -6,17 +5,8 @@ import axios from "axios";
 import crypto from "crypto";
 import fs from "fs";
 import { Decimal } from "@prisma/client/runtime/library";
-import { CryptoService } from "./cryptoService.js";
 
 class Helper {
-  static async hashPassword(password) {
-    return await bcrypt.hash(password, 10);
-  }
-
-  static async comparePassword(password, hashed) {
-    return bcrypt.compare(password, hashed);
-  }
-
   static generateAccessToken(payload) {
     const secret = process.env.ACCESS_TOKEN_SECRET;
     const options = {

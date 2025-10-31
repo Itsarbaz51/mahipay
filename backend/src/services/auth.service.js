@@ -182,7 +182,7 @@ class AuthServices {
     };
   }
 
-  static async forgotPassword(email) {
+  static async requestPasswordReset(email) {
     const user = await Prisma.user.findUnique({
       where: { email },
       include: {
@@ -204,9 +204,9 @@ class AuthServices {
       return { message: "If the email exists, a reset link has been sent." };
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const expires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const token = CryptoService.generateSecureToken(32);
+    const tokenHash = CryptoService.hashData(token);
+    const expires = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
 
     await Prisma.user.update({
       where: { id: user.id },
@@ -216,18 +216,20 @@ class AuthServices {
       },
     });
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+    // Encrypt the token for URL safety
+    const encryptedToken = CryptoService.encrypt(token);
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(encryptedToken)}&email=${encodeURIComponent(email)}`;
 
     const formattedFirstName = AuthServices.formatName(user.firstName);
 
     const subject = "Password Reset Instructions";
-    const text = `Hello ${formattedFirstName},\n\nYou requested a password reset.\n\nClick the link to reset your password:\n${resetUrl}\n\nThis link expires in 5 minutes.`;
+    const text = `Hello ${formattedFirstName},\n\nYou requested a password reset.\n\nClick the link to reset your password:\n${resetUrl}\n\nThis link expires in 2 minutes.`;
     const html = `
     <p>Hello ${formattedFirstName},</p>
     <p>You requested a password reset.</p>
     <p>Click the link below to reset your password:</p>
     <p><a href="${resetUrl}">${resetUrl}</a></p>
-    <p>This link will expire in 5 minutes.</p>
+    <p>This link will expire in 2 minutes.</p>
   `;
 
     await Helper.sendEmail({ to: user.email, subject, text, html });
@@ -235,55 +237,63 @@ class AuthServices {
     return { message: "If the email exists, a reset link has been sent." };
   }
 
-  static async resetPassword(token, newPassword) {
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  static async confirmPasswordReset(encryptedToken, newPassword) {
+    try {
+      const token = CryptoService.decrypt(encryptedToken);
+      const tokenHash = CryptoService.hashData(token);
 
-    const user = await Prisma.user.findFirst({
-      where: {
-        passwordResetToken: tokenHash,
-        passwordResetExpires: { gt: new Date() },
-      },
-      include: {
-        parent: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
+      const user = await Prisma.user.findFirst({
+        where: {
+          passwordResetToken: tokenHash,
+          passwordResetExpires: { gt: new Date() },
+        },
+        include: {
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!user) {
-      throw ApiError.badRequest("Invalid or expired token");
+      if (!user) {
+        throw ApiError.badRequest("Invalid or expired token");
+      }
+
+      const hashedPassword = await Helper.hashPassword(newPassword);
+
+      await Prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          passwordResetToken: null,
+          passwordResetExpires: null,
+          refreshToken: null, // Invalidate all sessions
+        },
+      });
+
+      const formattedFirstName = AuthServices.formatName(user.firstName);
+
+      await Helper.sendEmail({
+        to: user.email,
+        subject: "Your password has been changed",
+        text: `Hello ${formattedFirstName},\n\nYour password was successfully changed. If this wasn't you, please contact support immediately.`,
+        html: `<p>Hello ${formattedFirstName},</p><p>Your password was successfully changed. If this wasn't you, please <a href="mailto:support@example.com">contact support</a> immediately.</p>`,
+      });
+
+      return { message: "Password reset successful" };
+    } catch (error) {
+      if (error.message.includes("Decryption failed")) {
+        throw ApiError.badRequest("Invalid or malformed token");
+      }
+      throw error;
     }
-
-    const hashedPassword = await Helper.hashPassword(newPassword);
-
-    await Prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        passwordResetToken: null,
-        passwordResetExpires: null,
-        refreshToken: null, // Invalidate all sessions
-      },
-    });
-
-    const formattedFirstName = AuthServices.formatName(user.firstName);
-
-    await Helper.sendEmail({
-      to: user.email,
-      subject: "Your password has been changed",
-      text: `Hello ${formattedFirstName},\n\nYour password was successfully changed. If this wasn't you, please contact support immediately.`,
-      html: `<p>Hello ${formattedFirstName},</p><p>Your password was successfully changed. If this wasn't you, please <a href="mailto:support@example.com">contact support</a> immediately.</p>`,
-    });
-
-    return { message: "Password reset successful" };
   }
 
   static async verifyEmail(token) {
