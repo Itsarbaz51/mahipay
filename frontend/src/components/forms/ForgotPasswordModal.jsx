@@ -1,5 +1,4 @@
 import { Mail, X } from "lucide-react";
-import React from "react";
 
 export default function ForgotPasswordModal({
   setForgotPasswordMode,
@@ -25,7 +24,13 @@ export default function ForgotPasswordModal({
           </button>
         </div>
 
-        <form onSubmit={handleForgotPassword} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleForgotPassword(forgotPasswordForm.email);
+          }}
+          className="space-y-4"
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Email Address *
@@ -39,7 +44,7 @@ export default function ForgotPasswordModal({
                   email: e.target.value,
                 })
               }
-              disabled={userData}
+              disabled={Boolean(userData)}
               className={`${
                 userData && "cursor-not-allowed"
               } mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}

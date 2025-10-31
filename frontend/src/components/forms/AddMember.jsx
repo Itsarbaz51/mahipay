@@ -3,7 +3,13 @@ import { useDispatch, useSelector } from "react-redux";
 import { getAllRoles } from "../../redux/slices/roleSlice";
 import { register, updateProfile } from "../../redux/slices/userSlice";
 
-export default function AddMember({ onClose, onSuccess, editData }) {
+export default function AddMember({
+  isAdmin = false,
+  profileEdit = false,
+  onClose,
+  onSuccess,
+  editData,
+}) {
   const [formData, setFormData] = useState({
     username: "",
     firstName: "",
@@ -79,7 +85,8 @@ export default function AddMember({ onClose, onSuccess, editData }) {
     if (!formData.phoneNumber)
       newErrors.phoneNumber = "Phone number is required";
 
-    if (!formData.roleId) newErrors.roleId = "Role is required";
+    // Only validate role if not in profileEdit mode
+    if (!profileEdit && !formData.roleId) newErrors.roleId = "Role is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -124,6 +131,11 @@ export default function AddMember({ onClose, onSuccess, editData }) {
             delete submitData[key];
           }
         });
+
+        // If profileEdit is true, don't send roleId
+        if (profileEdit) {
+          delete submitData.roleId;
+        }
 
         res = await dispatch(updateProfile(editData.id, submitData));
       } else {
@@ -202,6 +214,11 @@ export default function AddMember({ onClose, onSuccess, editData }) {
     }
   };
 
+  // Conditionally determine field visibility/state
+  const shouldDisableEmail = editData && !isAdmin;
+  const shouldHideRole = profileEdit;
+  const shouldHideProfileImage = profileEdit;
+
   return (
     <div className="fixed inset-0 bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-fadeIn">
@@ -264,7 +281,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                 )}
               </div>
 
-              {/* ✅ Email - Show for both new and edit modes */}
+              {/* ✅ Email - Conditionally disabled in edit mode if not admin */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Email *
@@ -274,15 +291,23 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  disabled={shouldDisableEmail}
                   className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
                     errors.email
                       ? "border-red-400 focus:ring-red-300 bg-red-50"
                       : "border-gray-300 focus:ring-blue-400"
+                  } ${
+                    shouldDisableEmail ? "bg-gray-100 cursor-not-allowed" : ""
                   }`}
                   placeholder="email@example.com"
                 />
                 {errors.email && (
                   <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                )}
+                {shouldDisableEmail && (
+                  <p className="text-gray-500 text-sm mt-1">
+                    Only admins can update email address
+                  </p>
                 )}
               </div>
 
@@ -363,60 +388,64 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                 )}
               </div>
 
-              {/* ✅ Role - Show for both new and edit modes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Role *
-                </label>
-                <select
-                  name="roleId"
-                  value={formData.roleId}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                    errors.roleId
-                      ? "border-red-400 focus:ring-red-300 bg-red-50"
-                      : "border-gray-300 focus:ring-blue-400"
-                  }`}
-                >
-                  <option value="">Select a role</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name || role.roleName}
-                    </option>
-                  ))}
-                </select>
-                {errors.roleId && (
-                  <p className="text-red-500 text-sm mt-1">{errors.roleId}</p>
-                )}
-              </div>
-
-              {/* Profile Image - Show for both new and edit modes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Profile Image
-                </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="w-full"
-                    disabled={loading}
-                  />
-                  {imagePreview && (
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-16 h-16 object-cover rounded-full border border-gray-300"
-                    />
+              {/* ✅ Role - Hidden in profileEdit mode */}
+              {!shouldHideRole && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    name="roleId"
+                    value={formData.roleId}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                      errors.roleId
+                        ? "border-red-400 focus:ring-red-300 bg-red-50"
+                        : "border-gray-300 focus:ring-blue-400"
+                    }`}
+                  >
+                    <option value="">Select a role</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name || role.roleName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.roleId && (
+                    <p className="text-red-500 text-sm mt-1">{errors.roleId}</p>
                   )}
                 </div>
-                {errors.profileImage && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.profileImage}
-                  </p>
-                )}
-              </div>
+              )}
+
+              {/* ✅ Profile Image - Completely hidden in profileEdit mode */}
+              {!shouldHideProfileImage && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Profile Image
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="w-full"
+                      disabled={loading}
+                    />
+                    {imagePreview && (
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-16 h-16 object-cover rounded-full border border-gray-300"
+                      />
+                    )}
+                  </div>
+                  {errors.profileImage && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.profileImage}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Submit */}

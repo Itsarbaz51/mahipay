@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   User,
@@ -19,36 +19,8 @@ import {
 } from "../redux/slices/userSlice";
 import { updateCredentials, forgotPassword } from "../redux/slices/authSlice";
 import ForgotPasswordModal from "../components/forms/ForgotPasswordModal";
-
-const DebouncedInput = ({ value, onChange, delay = 300, ...props }) => {
-  const [internalValue, setInternalValue] = useState(value);
-  const timeoutRef = useRef(null);
-
-  useEffect(() => {
-    setInternalValue(value);
-  }, [value]);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
-
-  const handleChange = (e) => {
-    const newValue = e.target.value;
-    setInternalValue(newValue);
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      onChange(newValue);
-    }, delay);
-  };
-
-  return <input value={internalValue} onChange={handleChange} {...props} />;
-};
+import AddMember from "../components/forms/AddMember"; // Import AddMember component
+import EditCredentialsModal from "../components/forms/EditCredentialsModal"; // Import EditCredentialsModal component
 
 const UserProfilePage = ({ onClose }) => {
   const dispatch = useDispatch();
@@ -56,109 +28,27 @@ const UserProfilePage = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [credentialsMode, setCredentialsMode] = useState(false);
+
+  // Modal states
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
 
-  // Use refs to prevent unnecessary re-renders
-  const userDataRef = useRef(null);
-  const isAdminUserRef = useRef(false);
-
-  // Redux state - use shallow equality check
+  // Redux state
   const { currentUser, isLoading: userLoading } = useSelector(
-    (state) => state.users,
-    (left, right) => left.currentUser?.id === right.currentUser?.id
+    (state) => state.users
   );
-
-  const { currentUser: authUser } = useSelector(
-    (state) => state.auth,
-    (left, right) => left.currentUser?.id === right.currentUser?.id
-  );
+  const { currentUser: authUser } = useSelector((state) => state.auth);
 
   // Use currentUser from userSlice first, fallback to authUser
   const userData = currentUser || authUser;
+  const currentUserRole = userData?.role?.name || "";
+  const isAdminUser = currentUserRole === "ADMIN";
 
-  // Update refs without causing re-renders
-  useEffect(() => {
-    if (userData) {
-      userDataRef.current = userData;
-      isAdminUserRef.current = (userData.role?.name || "") === "ADMIN";
-    }
-  }, [userData]);
-
-  // Form states - use ref for initial values
-  const initialProfileFormRef = useRef({
-    firstName: "",
-    lastName: "",
-    username: "",
-    phoneNumber: "",
-    email: "",
-  });
-
-  const [profileForm, setProfileForm] = useState(initialProfileFormRef.current);
-  const [credentialsForm, setCredentialsForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-    currentTransactionPin: "",
-    newTransactionPin: "",
-    confirmTransactionPin: "",
-  });
-  const [forgotPasswordForm, setForgotPasswordForm] = useState({
-    email: "",
-  });
-
-  // Stable input handlers
-  const handleProfileInputChange = useCallback((field, value) => {
-    setProfileForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  }, []);
-
-  const handleCredentialsInputChange = useCallback((field, value) => {
-    setCredentialsForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  }, []);
-
-  // Fetch user data only once on mount
+  // Fetch user data on component mount
   useEffect(() => {
     fetchUserProfile();
   }, []);
-
-  // Update form only when userData actually changes significantly
-  useEffect(() => {
-    if (userData && userData.id) {
-      const newFormData = {
-        firstName: userData.firstName || "",
-        lastName: userData.lastName || "",
-        username: userData.username || "",
-        phoneNumber: userData.phoneNumber || "",
-        email: userData.email || "",
-      };
-
-      // Deep comparison to avoid unnecessary updates
-      setProfileForm((prev) => {
-        if (JSON.stringify(prev) !== JSON.stringify(newFormData)) {
-          return newFormData;
-        }
-        return prev;
-      });
-
-      setForgotPasswordForm((prev) => ({
-        email: userData.email || "",
-      }));
-    }
-  }, [
-    userData?.id,
-    userData?.firstName,
-    userData?.lastName,
-    userData?.username,
-    userData?.phoneNumber,
-    userData?.email,
-  ]);
 
   const fetchUserProfile = async () => {
     try {
@@ -172,126 +62,6 @@ const UserProfilePage = ({ onClose }) => {
     }
   };
 
-  const handleProfileUpdate = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      setError(null);
-
-      const updateData = {
-        firstName: profileForm.firstName,
-        lastName: profileForm.lastName,
-        username: profileForm.username,
-        phoneNumber: profileForm.phoneNumber,
-        ...(isAdminUserRef.current &&
-        profileForm.email !== userDataRef.current?.email
-          ? { email: profileForm.email }
-          : {}),
-      };
-
-      await dispatch(updateProfile(userDataRef.current.id, updateData));
-      setEditMode(false);
-      setSuccess("Profile updated successfully!");
-
-      // Only refetch if absolutely necessary
-      setTimeout(() => {
-        fetchUserProfile();
-      }, 1000);
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCredentialsUpdate = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      setError(null);
-
-      if (
-        credentialsForm.newPassword &&
-        credentialsForm.newPassword !== credentialsForm.confirmPassword
-      ) {
-        setError("New passwords do not match");
-        return;
-      }
-
-      if (
-        credentialsForm.newTransactionPin &&
-        credentialsForm.newTransactionPin !==
-          credentialsForm.confirmTransactionPin
-      ) {
-        setError("New transaction PINs do not match");
-        return;
-      }
-
-      if (!credentialsForm.currentPassword) {
-        setError("Current password is required to make changes");
-        return;
-      }
-
-      const credentialsData = {
-        currentPassword: credentialsForm.currentPassword,
-        ...(credentialsForm.newPassword && {
-          newPassword: credentialsForm.newPassword,
-        }),
-        ...(credentialsForm.newTransactionPin && {
-          newTransactionPin: credentialsForm.newTransactionPin,
-          currentTransactionPin: credentialsForm.currentTransactionPin,
-        }),
-      };
-
-      await dispatch(
-        updateCredentials({
-          userId: userDataRef.current.id,
-          credentialsData,
-          currentUserId: userDataRef.current.id,
-        })
-      );
-
-      setCredentialsMode(false);
-      setSuccess("Credentials updated successfully!");
-      setCredentialsForm({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-        currentTransactionPin: "",
-        newTransactionPin: "",
-        confirmTransactionPin: "",
-      });
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      setError(null);
-
-      if (!forgotPasswordForm.email) {
-        setError("Email address is required");
-        return;
-      }
-
-      await dispatch(forgotPassword(forgotPasswordForm.email));
-
-      setForgotPasswordMode(false);
-      setSuccess(
-        "Password reset link sent to your email! Please check your inbox."
-      );
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleProfileImageUpdate = async (file) => {
     try {
       setLoading(true);
@@ -299,8 +69,43 @@ const UserProfilePage = ({ onClose }) => {
       const formData = new FormData();
       formData.append("profileImage", file);
 
-      await dispatch(updateUserProfileImage(userDataRef.current.id, formData));
+      await dispatch(updateUserProfileImage(userData.id, formData));
       setSuccess("Profile image updated successfully!");
+      await fetchUserProfile(); // Refresh data
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle success from modals
+  const handleProfileUpdateSuccess = () => {
+    setSuccess("Profile updated successfully!");
+    fetchUserProfile(); // Refresh data
+    setShowProfileModal(false);
+  };
+
+  const handleCredentialsUpdateSuccess = () => {
+    setSuccess("Credentials updated successfully!");
+    setShowCredentialsModal(false);
+  };
+
+  const handleForgotPassword = async (email) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!email) {
+        setError("Email address is required");
+        return;
+      }
+
+      await dispatch(forgotPassword(email));
+      setForgotPasswordMode(false);
+      setSuccess(
+        "Password reset link sent to your email! Please check your inbox."
+      );
     } catch (error) {
       setError(error.message);
     } finally {
@@ -319,8 +124,8 @@ const UserProfilePage = ({ onClose }) => {
     }
   }, [error, success]);
 
-  // Memoized helper functions
-  const getStatusBadge = useCallback((status) => {
+  // --- Status Badge Helper ---
+  const getStatusBadge = (status) => {
     const statusMap = {
       ACTIVE: { bg: "bg-green-100", text: "text-green-800", icon: CheckCircle },
       PENDING: { bg: "bg-yellow-100", text: "text-yellow-800", icon: Clock },
@@ -339,9 +144,9 @@ const UserProfilePage = ({ onClose }) => {
         {status || "Unknown"}
       </span>
     );
-  }, []);
+  };
 
-  const formatDate = useCallback((dateString) => {
+  const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-IN", {
       year: "numeric",
@@ -350,15 +155,15 @@ const UserProfilePage = ({ onClose }) => {
       hour: "2-digit",
       minute: "2-digit",
     });
-  }, []);
+  };
 
-  const formatCurrency = useCallback((amount) => {
+  const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
     }).format(amount || 0);
-  }, []);
+  };
 
   // --- Loading State ---
   if (loading || userLoading) {
@@ -479,212 +284,107 @@ const UserProfilePage = ({ onClose }) => {
           Profile Information
         </h2>
         <button
-          onClick={() => setEditMode(!editMode)}
+          onClick={() => setShowProfileModal(true)}
           className="flex items-center space-x-2 text-blue-600 hover:text-blue-700"
         >
           <Edit className="w-4 h-4" />
-          <span>{editMode ? "Cancel" : "Edit"}</span>
+          <span>Edit Profile</span>
         </button>
       </div>
 
       <div className="px-6 py-4">
-        {editMode ? (
-          <form onSubmit={handleProfileUpdate} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  First Name *
-                </label>
-                <DebouncedInput
-                  type="text"
-                  value={profileForm.firstName}
-                  onChange={(value) =>
-                    handleProfileInputChange("firstName", value)
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Last Name *
-                </label>
-                <DebouncedInput
-                  type="text"
-                  value={profileForm.lastName}
-                  onChange={(value) =>
-                    handleProfileInputChange("lastName", value)
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-            </div>
-
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Username *
+              <label className="block text-sm font-medium text-gray-500">
+                First Name
               </label>
-              <DebouncedInput
-                type="text"
-                value={profileForm.username}
-                onChange={(value) =>
-                  handleProfileInputChange("username", value)
-                }
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+              <p className="mt-1 text-sm text-gray-900 font-medium">
+                {userData.firstName}
+              </p>
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Phone Number *
+              <label className="block text-sm font-medium text-gray-500">
+                Last Name
               </label>
-              <DebouncedInput
-                type="tel"
-                value={profileForm.phoneNumber}
-                onChange={(value) =>
-                  handleProfileInputChange("phoneNumber", value)
-                }
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+              <p className="mt-1 text-sm text-gray-900 font-medium">
+                {userData.lastName}
+              </p>
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email *
+              <label className="block text-sm font-medium text-gray-500">
+                Username
               </label>
-              <DebouncedInput
-                type="email"
-                value={profileForm.email}
-                onChange={(value) => handleProfileInputChange("email", value)}
-                className={`mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                  !isAdminUserRef.current
-                    ? "bg-gray-100 cursor-not-allowed"
-                    : ""
-                }`}
-                required
-                disabled={!isAdminUserRef.current}
-              />
-              {!isAdminUserRef.current && (
-                <p className="text-sm text-gray-500 mt-1">
-                  Contact administrator to change email address
-                </p>
-              )}
-            </div>
-
-            <div className="flex space-x-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Updating..." : "Update Profile"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditMode(false)}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  First Name
-                </label>
-                <p className="mt-1 text-sm text-gray-900 font-medium">
-                  {userData.firstName}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  Last Name
-                </label>
-                <p className="mt-1 text-sm text-gray-900 font-medium">
-                  {userData.lastName}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  Username
-                </label>
-                <p className="mt-1 text-sm text-gray-900 font-medium">
-                  {userData.username}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  Phone Number
-                </label>
-                <p className="mt-1 text-sm text-gray-900 font-medium">
-                  {userData.phoneNumber}
-                </p>
-              </div>
+              <p className="mt-1 text-sm text-gray-900 font-medium">
+                {userData.username}
+              </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-500">
-                Email
+                Phone Number
               </label>
               <p className="mt-1 text-sm text-gray-900 font-medium">
-                {userData.email}
+                {userData.phoneNumber}
               </p>
-              {!isAdminUserRef.current && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Contact administrator to change email address
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200">
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  User ID
-                </label>
-                <p className="mt-1 text-sm text-gray-900 font-mono">
-                  {userData.id}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  Role
-                </label>
-                <p className="mt-1 text-sm text-gray-900 font-medium">
-                  {userData.role?.name} - {userData.role?.description}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  Created At
-                </label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {formatDate(userData.createdAt)}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-500">
-                  Last Updated
-                </label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {formatDate(userData.updatedAt)}
-                </p>
-              </div>
             </div>
           </div>
-        )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-500">
+              Email
+            </label>
+            <p className="mt-1 text-sm text-gray-900 font-medium">
+              {userData.email}
+            </p>
+            {!isAdminUser && (
+              <p className="text-xs text-gray-500 mt-1">
+                Contact administrator to change email address
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200">
+            <div>
+              <label className="block text-sm font-medium text-gray-500">
+                User ID
+              </label>
+              <p className="mt-1 text-sm text-gray-900 font-mono">
+                {userData.id}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-500">
+                Role
+              </label>
+              <p className="mt-1 text-sm text-gray-900 font-medium">
+                {userData.role?.name} - {userData.role?.description}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-500">
+                Created At
+              </label>
+              <p className="mt-1 text-sm text-gray-900">
+                {formatDate(userData.createdAt)}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-500">
+                Last Updated
+              </label>
+              <p className="mt-1 text-sm text-gray-900">
+                {formatDate(userData.updatedAt)}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -697,220 +397,75 @@ const UserProfilePage = ({ onClose }) => {
           <Lock className="w-5 h-5 mr-2 text-gray-600" />
           Security & Credentials
         </h2>
-        <button
-          onClick={() => setCredentialsMode(!credentialsMode)}
-          className="flex items-center space-x-2 text-blue-600 hover:text-blue-700"
-        >
-          <Edit className="w-4 h-4" />
-          <span>{credentialsMode ? "Cancel" : "Change Credentials"}</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowCredentialsModal(true)}
+            className="flex items-center space-x-2 text-blue-600 hover:text-blue-700"
+          >
+            <Edit className="w-4 h-4" />
+            <span>Change Credentials</span>
+          </button>
+        </div>
       </div>
 
       <div className="px-6 py-4">
-        {credentialsMode ? (
-          <form onSubmit={handleCredentialsUpdate} className="space-y-6">
-            {/* Password Change Section */}
-            <div className="border-b pb-6">
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
-                Change Password
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Current Password *
-                  </label>
-                  <DebouncedInput
-                    type="password"
-                    value={credentialsForm.currentPassword}
-                    onChange={(value) =>
-                      handleCredentialsInputChange("currentPassword", value)
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    New Password
-                  </label>
-                  <DebouncedInput
-                    type="password"
-                    value={credentialsForm.newPassword}
-                    onChange={(value) =>
-                      handleCredentialsInputChange("newPassword", value)
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Leave blank to keep current password"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Confirm New Password
-                  </label>
-                  <DebouncedInput
-                    type="password"
-                    value={credentialsForm.confirmPassword}
-                    onChange={(value) =>
-                      handleCredentialsInputChange("confirmPassword", value)
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Leave blank to keep current password"
-                  />
-                </div>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-md font-semibold text-gray-900 mb-4">
+              Password Management
+            </h3>
+            <div className="space-y-4">
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => setForgotPasswordMode(true)}
+                  className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Send Password Reset Link</span>
+                </button>
               </div>
-            </div>
-
-            {/* Transaction PIN Section */}
-            <div>
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
-                Change Transaction PIN
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Current Transaction PIN
-                  </label>
-                  <DebouncedInput
-                    type="password"
-                    inputMode="numeric"
-                    maxLength="4"
-                    value={credentialsForm.currentTransactionPin}
-                    onChange={(value) =>
-                      handleCredentialsInputChange(
-                        "currentTransactionPin",
-                        value.replace(/\D/g, "")
-                      )
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter current 4-digit PIN"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    New Transaction PIN
-                  </label>
-                  <DebouncedInput
-                    type="password"
-                    inputMode="numeric"
-                    maxLength="4"
-                    value={credentialsForm.newTransactionPin}
-                    onChange={(value) =>
-                      handleCredentialsInputChange(
-                        "newTransactionPin",
-                        value.replace(/\D/g, "")
-                      )
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter new 4-digit PIN"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Confirm New Transaction PIN
-                  </label>
-                  <DebouncedInput
-                    type="password"
-                    inputMode="numeric"
-                    maxLength="4"
-                    value={credentialsForm.confirmTransactionPin}
-                    onChange={(value) =>
-                      handleCredentialsInputChange(
-                        "confirmTransactionPin",
-                        value.replace(/\D/g, "")
-                      )
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Confirm new 4-digit PIN"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Updating..." : "Update Credentials"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCredentialsMode(false);
-                  setCredentialsForm({
-                    currentPassword: "",
-                    newPassword: "",
-                    confirmPassword: "",
-                    currentTransactionPin: "",
-                    newTransactionPin: "",
-                    confirmTransactionPin: "",
-                  });
-                }}
-                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
-                Password Management
-              </h3>
-              <div className="space-y-4">
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => setForgotPasswordMode(true)}
-                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span>Send Password Reset Link</span>
-                  </button>
-                </div>
-                <p className="text-sm text-gray-500">
-                  Use "Send Password Reset Link" to receive a reset token via
-                  email, then use "Reset Password with Token" to set a new
-                  password.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-md font-semibold text-gray-900 mb-4">
-                Transaction PIN
-              </h3>
-              <p className="text-sm text-gray-600">
-                Your 4-digit transaction PIN is used for secure financial
-                transactions. Keep it confidential and change it regularly for
-                security.
+              <p className="text-sm text-gray-500">
+                Use "Send Password Reset Link" to receive a reset token via
+                email, then use "Reset Password with Token" to set a new
+                password.
               </p>
             </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-              <h4 className="text-sm font-semibold text-yellow-800 mb-2">
-                Security Tips
-              </h4>
-              <ul className="text-sm text-yellow-700 space-y-1">
-                <li>
-                  • Use a strong, unique password with letters, numbers, and
-                  symbols
-                </li>
-                <li>• Never share your password or PIN with anyone</li>
-                <li>• Change your password regularly</li>
-                <li>• Use a different PIN than your other accounts</li>
-                <li>• Log out from shared devices</li>
-              </ul>
-            </div>
           </div>
-        )}
+
+          <div>
+            <h3 className="text-md font-semibold text-gray-900 mb-4">
+              Transaction PIN
+            </h3>
+            <p className="text-sm text-gray-600">
+              Your 4-digit transaction PIN is used for secure financial
+              transactions. Keep it confidential and change it regularly for
+              security.
+            </p>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <h4 className="text-sm font-semibold text-yellow-800 mb-2">
+              Security Tips
+            </h4>
+            <ul className="text-sm text-yellow-700 space-y-1">
+              <li>
+                • Use a strong, unique password with letters, numbers, and
+                symbols
+              </li>
+              <li>• Never share your password or PIN with anyone</li>
+              <li>• Change your password regularly</li>
+              <li>• Use a different PIN than your other accounts</li>
+              <li>• Log out from shared devices</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
 
+  // --- Main UI ---
   return (
-    <div className="bg-gray-50 w-full min-h-screen rounded-2xl py-8 px-8">
+    <div className="bg-gray-50 w-full min-h-screen rounded-2xl py-4 px-6">
       {/* Header */}
       <div className="mb-6 flex justify-between items-center">
         <div>
@@ -987,12 +542,31 @@ const UserProfilePage = ({ onClose }) => {
       </div>
 
       {/* Modals */}
+      {showProfileModal && (
+        <AddMember
+          onClose={() => setShowProfileModal(false)}
+          onSuccess={handleProfileUpdateSuccess}
+          editData={userData}
+          isAdmin={isAdminUser}
+          profileEdit={true}
+        />
+      )}
+
+      {showCredentialsModal && (
+        <EditCredentialsModal
+          userId={userData.id}
+          type="password" // or "pin" depending on what you want to update
+          onClose={() => setShowCredentialsModal(false)}
+          onSuccess={handleCredentialsUpdateSuccess}
+        />
+      )}
+
       {forgotPasswordMode && (
         <ForgotPasswordModal
           setForgotPasswordMode={setForgotPasswordMode}
           handleForgotPassword={handleForgotPassword}
-          forgotPasswordForm={forgotPasswordForm}
-          setForgotPasswordForm={setForgotPasswordForm}
+          forgotPasswordForm={{ email: userData.email || "" }}
+          setForgotPasswordForm={() => {}} // Not needed in this flow
           loading={loading}
           userData={userData}
         />
