@@ -943,7 +943,6 @@ const UserProfilePage = ({ onClose }) => {
           setForgotPasswordForm={setForgotPasswordForm}
           loading={loading}
           userData={userData}
-          isAdminUser={isAdminUser}
         />
       )}
     </div>
