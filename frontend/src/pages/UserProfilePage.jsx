@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   User,
@@ -20,6 +20,36 @@ import {
 import { updateCredentials, forgotPassword } from "../redux/slices/authSlice";
 import ForgotPasswordModal from "../components/forms/ForgotPasswordModal";
 
+const DebouncedInput = ({ value, onChange, delay = 300, ...props }) => {
+  const [internalValue, setInternalValue] = useState(value);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    setInternalValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const handleChange = (e) => {
+    const newValue = e.target.value;
+    setInternalValue(newValue);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      onChange(newValue);
+    }, delay);
+  };
+
+  return <input value={internalValue} onChange={handleChange} {...props} />;
+};
+
 const UserProfilePage = ({ onClose }) => {
   const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState("profile");
@@ -30,19 +60,34 @@ const UserProfilePage = ({ onClose }) => {
   const [credentialsMode, setCredentialsMode] = useState(false);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
 
-  // Redux state
+  // Use refs to prevent unnecessary re-renders
+  const userDataRef = useRef(null);
+  const isAdminUserRef = useRef(false);
+
+  // Redux state - use shallow equality check
   const { currentUser, isLoading: userLoading } = useSelector(
-    (state) => state.users
+    (state) => state.users,
+    (left, right) => left.currentUser?.id === right.currentUser?.id
   );
-  const { currentUser: authUser } = useSelector((state) => state.auth);
+
+  const { currentUser: authUser } = useSelector(
+    (state) => state.auth,
+    (left, right) => left.currentUser?.id === right.currentUser?.id
+  );
 
   // Use currentUser from userSlice first, fallback to authUser
   const userData = currentUser || authUser;
-  const currentUserRole = userData?.role?.name || "";
-  const isAdminUser = currentUserRole === "ADMIN";
 
-  // Form states
-  const [profileForm, setProfileForm] = useState({
+  // Update refs without causing re-renders
+  useEffect(() => {
+    if (userData) {
+      userDataRef.current = userData;
+      isAdminUserRef.current = (userData.role?.name || "") === "ADMIN";
+    }
+  }, [userData]);
+
+  // Form states - use ref for initial values
+  const initialProfileFormRef = useRef({
     firstName: "",
     lastName: "",
     username: "",
@@ -50,6 +95,7 @@ const UserProfilePage = ({ onClose }) => {
     email: "",
   });
 
+  const [profileForm, setProfileForm] = useState(initialProfileFormRef.current);
   const [credentialsForm, setCredentialsForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -58,31 +104,61 @@ const UserProfilePage = ({ onClose }) => {
     newTransactionPin: "",
     confirmTransactionPin: "",
   });
-
   const [forgotPasswordForm, setForgotPasswordForm] = useState({
     email: "",
   });
 
-  // Fetch user data on component mount
+  // Stable input handlers
+  const handleProfileInputChange = useCallback((field, value) => {
+    setProfileForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }, []);
+
+  const handleCredentialsInputChange = useCallback((field, value) => {
+    setCredentialsForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }, []);
+
+  // Fetch user data only once on mount
   useEffect(() => {
     fetchUserProfile();
   }, []);
 
-  // Update form when user data changes
+  // Update form only when userData actually changes significantly
   useEffect(() => {
-    if (userData) {
-      setProfileForm({
+    if (userData && userData.id) {
+      const newFormData = {
         firstName: userData.firstName || "",
         lastName: userData.lastName || "",
         username: userData.username || "",
         phoneNumber: userData.phoneNumber || "",
         email: userData.email || "",
+      };
+
+      // Deep comparison to avoid unnecessary updates
+      setProfileForm((prev) => {
+        if (JSON.stringify(prev) !== JSON.stringify(newFormData)) {
+          return newFormData;
+        }
+        return prev;
       });
-      setForgotPasswordForm({
+
+      setForgotPasswordForm((prev) => ({
         email: userData.email || "",
-      });
+      }));
     }
-  }, [userData]);
+  }, [
+    userData?.id,
+    userData?.firstName,
+    userData?.lastName,
+    userData?.username,
+    userData?.phoneNumber,
+    userData?.email,
+  ]);
 
   const fetchUserProfile = async () => {
     try {
@@ -102,22 +178,25 @@ const UserProfilePage = ({ onClose }) => {
       setLoading(true);
       setError(null);
 
-      // Prepare update data - only include fields that are allowed to be updated
       const updateData = {
         firstName: profileForm.firstName,
         lastName: profileForm.lastName,
         username: profileForm.username,
         phoneNumber: profileForm.phoneNumber,
-        // Only include email if user is admin and email is different
-        ...(isAdminUser && profileForm.email !== userData.email
+        ...(isAdminUserRef.current &&
+        profileForm.email !== userDataRef.current?.email
           ? { email: profileForm.email }
           : {}),
       };
 
-      await dispatch(updateProfile(userData.id, updateData));
+      await dispatch(updateProfile(userDataRef.current.id, updateData));
       setEditMode(false);
       setSuccess("Profile updated successfully!");
-      await fetchUserProfile(); // Refresh data
+
+      // Only refetch if absolutely necessary
+      setTimeout(() => {
+        fetchUserProfile();
+      }, 1000);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -131,7 +210,6 @@ const UserProfilePage = ({ onClose }) => {
       setLoading(true);
       setError(null);
 
-      // Validation
       if (
         credentialsForm.newPassword &&
         credentialsForm.newPassword !== credentialsForm.confirmPassword
@@ -167,9 +245,9 @@ const UserProfilePage = ({ onClose }) => {
 
       await dispatch(
         updateCredentials({
-          userId: userData.id,
+          userId: userDataRef.current.id,
           credentialsData,
-          currentUserId: userData.id,
+          currentUserId: userDataRef.current.id,
         })
       );
 
@@ -207,9 +285,6 @@ const UserProfilePage = ({ onClose }) => {
       setSuccess(
         "Password reset link sent to your email! Please check your inbox."
       );
-      setForgotPasswordForm({
-        email: userData.email || "",
-      });
     } catch (error) {
       setError(error.message);
     } finally {
@@ -224,9 +299,8 @@ const UserProfilePage = ({ onClose }) => {
       const formData = new FormData();
       formData.append("profileImage", file);
 
-      await dispatch(updateUserProfileImage(userData.id, formData));
+      await dispatch(updateUserProfileImage(userDataRef.current.id, formData));
       setSuccess("Profile image updated successfully!");
-      await fetchUserProfile(); // Refresh data
     } catch (error) {
       setError(error.message);
     } finally {
@@ -245,8 +319,8 @@ const UserProfilePage = ({ onClose }) => {
     }
   }, [error, success]);
 
-  // --- Status Badge Helper ---
-  const getStatusBadge = (status) => {
+  // Memoized helper functions
+  const getStatusBadge = useCallback((status) => {
     const statusMap = {
       ACTIVE: { bg: "bg-green-100", text: "text-green-800", icon: CheckCircle },
       PENDING: { bg: "bg-yellow-100", text: "text-yellow-800", icon: Clock },
@@ -265,9 +339,9 @@ const UserProfilePage = ({ onClose }) => {
         {status || "Unknown"}
       </span>
     );
-  };
+  }, []);
 
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-IN", {
       year: "numeric",
@@ -276,15 +350,15 @@ const UserProfilePage = ({ onClose }) => {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
+  }, []);
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = useCallback((amount) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
     }).format(amount || 0);
-  };
+  }, []);
 
   // --- Loading State ---
   if (loading || userLoading) {
@@ -421,14 +495,11 @@ const UserProfilePage = ({ onClose }) => {
                 <label className="block text-sm font-medium text-gray-700">
                   First Name *
                 </label>
-                <input
+                <DebouncedInput
                   type="text"
                   value={profileForm.firstName}
-                  onChange={(e) =>
-                    setProfileForm({
-                      ...profileForm,
-                      firstName: e.target.value,
-                    })
+                  onChange={(value) =>
+                    handleProfileInputChange("firstName", value)
                   }
                   className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
@@ -438,11 +509,11 @@ const UserProfilePage = ({ onClose }) => {
                 <label className="block text-sm font-medium text-gray-700">
                   Last Name *
                 </label>
-                <input
+                <DebouncedInput
                   type="text"
                   value={profileForm.lastName}
-                  onChange={(e) =>
-                    setProfileForm({ ...profileForm, lastName: e.target.value })
+                  onChange={(value) =>
+                    handleProfileInputChange("lastName", value)
                   }
                   className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
@@ -454,11 +525,11 @@ const UserProfilePage = ({ onClose }) => {
               <label className="block text-sm font-medium text-gray-700">
                 Username *
               </label>
-              <input
+              <DebouncedInput
                 type="text"
                 value={profileForm.username}
-                onChange={(e) =>
-                  setProfileForm({ ...profileForm, username: e.target.value })
+                onChange={(value) =>
+                  handleProfileInputChange("username", value)
                 }
                 className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -469,14 +540,11 @@ const UserProfilePage = ({ onClose }) => {
               <label className="block text-sm font-medium text-gray-700">
                 Phone Number *
               </label>
-              <input
+              <DebouncedInput
                 type="tel"
                 value={profileForm.phoneNumber}
-                onChange={(e) =>
-                  setProfileForm({
-                    ...profileForm,
-                    phoneNumber: e.target.value,
-                  })
+                onChange={(value) =>
+                  handleProfileInputChange("phoneNumber", value)
                 }
                 className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 required
@@ -487,19 +555,19 @@ const UserProfilePage = ({ onClose }) => {
               <label className="block text-sm font-medium text-gray-700">
                 Email *
               </label>
-              <input
+              <DebouncedInput
                 type="email"
                 value={profileForm.email}
-                onChange={(e) =>
-                  setProfileForm({ ...profileForm, email: e.target.value })
-                }
+                onChange={(value) => handleProfileInputChange("email", value)}
                 className={`mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                  !isAdminUser ? "bg-gray-100 cursor-not-allowed" : ""
+                  !isAdminUserRef.current
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
                 }`}
                 required
-                disabled={!isAdminUser}
+                disabled={!isAdminUserRef.current}
               />
-              {!isAdminUser && (
+              {!isAdminUserRef.current && (
                 <p className="text-sm text-gray-500 mt-1">
                   Contact administrator to change email address
                 </p>
@@ -571,7 +639,7 @@ const UserProfilePage = ({ onClose }) => {
               <p className="mt-1 text-sm text-gray-900 font-medium">
                 {userData.email}
               </p>
-              {!isAdminUser && (
+              {!isAdminUserRef.current && (
                 <p className="text-xs text-gray-500 mt-1">
                   Contact administrator to change email address
                 </p>
@@ -651,14 +719,11 @@ const UserProfilePage = ({ onClose }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     Current Password *
                   </label>
-                  <input
+                  <DebouncedInput
                     type="password"
                     value={credentialsForm.currentPassword}
-                    onChange={(e) =>
-                      setCredentialsForm({
-                        ...credentialsForm,
-                        currentPassword: e.target.value,
-                      })
+                    onChange={(value) =>
+                      handleCredentialsInputChange("currentPassword", value)
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
@@ -668,14 +733,11 @@ const UserProfilePage = ({ onClose }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     New Password
                   </label>
-                  <input
+                  <DebouncedInput
                     type="password"
                     value={credentialsForm.newPassword}
-                    onChange={(e) =>
-                      setCredentialsForm({
-                        ...credentialsForm,
-                        newPassword: e.target.value,
-                      })
+                    onChange={(value) =>
+                      handleCredentialsInputChange("newPassword", value)
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Leave blank to keep current password"
@@ -685,14 +747,11 @@ const UserProfilePage = ({ onClose }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     Confirm New Password
                   </label>
-                  <input
+                  <DebouncedInput
                     type="password"
                     value={credentialsForm.confirmPassword}
-                    onChange={(e) =>
-                      setCredentialsForm({
-                        ...credentialsForm,
-                        confirmPassword: e.target.value,
-                      })
+                    onChange={(value) =>
+                      handleCredentialsInputChange("confirmPassword", value)
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Leave blank to keep current password"
@@ -711,19 +770,16 @@ const UserProfilePage = ({ onClose }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     Current Transaction PIN
                   </label>
-                  <input
+                  <DebouncedInput
                     type="password"
                     inputMode="numeric"
                     maxLength="4"
                     value={credentialsForm.currentTransactionPin}
-                    onChange={(e) =>
-                      setCredentialsForm({
-                        ...credentialsForm,
-                        currentTransactionPin: e.target.value.replace(
-                          /\D/g,
-                          ""
-                        ),
-                      })
+                    onChange={(value) =>
+                      handleCredentialsInputChange(
+                        "currentTransactionPin",
+                        value.replace(/\D/g, "")
+                      )
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter current 4-digit PIN"
@@ -733,16 +789,16 @@ const UserProfilePage = ({ onClose }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     New Transaction PIN
                   </label>
-                  <input
+                  <DebouncedInput
                     type="password"
                     inputMode="numeric"
                     maxLength="4"
                     value={credentialsForm.newTransactionPin}
-                    onChange={(e) =>
-                      setCredentialsForm({
-                        ...credentialsForm,
-                        newTransactionPin: e.target.value.replace(/\D/g, ""),
-                      })
+                    onChange={(value) =>
+                      handleCredentialsInputChange(
+                        "newTransactionPin",
+                        value.replace(/\D/g, "")
+                      )
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Enter new 4-digit PIN"
@@ -752,19 +808,16 @@ const UserProfilePage = ({ onClose }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     Confirm New Transaction PIN
                   </label>
-                  <input
+                  <DebouncedInput
                     type="password"
                     inputMode="numeric"
                     maxLength="4"
                     value={credentialsForm.confirmTransactionPin}
-                    onChange={(e) =>
-                      setCredentialsForm({
-                        ...credentialsForm,
-                        confirmTransactionPin: e.target.value.replace(
-                          /\D/g,
-                          ""
-                        ),
-                      })
+                    onChange={(value) =>
+                      handleCredentialsInputChange(
+                        "confirmTransactionPin",
+                        value.replace(/\D/g, "")
+                      )
                     }
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     placeholder="Confirm new 4-digit PIN"
@@ -856,7 +909,6 @@ const UserProfilePage = ({ onClose }) => {
     </div>
   );
 
-  // --- Main UI ---
   return (
     <div className="bg-gray-50 w-full min-h-screen rounded-2xl py-8 px-8">
       {/* Header */}
