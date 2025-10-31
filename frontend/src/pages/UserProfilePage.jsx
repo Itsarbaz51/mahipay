@@ -11,6 +11,7 @@ import {
   Camera,
   Lock,
   Mail,
+  Key,
 } from "lucide-react";
 import {
   getCurrentUserProfile,
@@ -19,8 +20,8 @@ import {
 } from "../redux/slices/userSlice";
 import { updateCredentials, forgotPassword } from "../redux/slices/authSlice";
 import ForgotPasswordModal from "../components/forms/ForgotPasswordModal";
-import AddMember from "../components/forms/AddMember"; // Import AddMember component
-import EditCredentialsModal from "../components/forms/EditCredentialsModal"; // Import EditCredentialsModal component
+import AddMember from "../components/forms/AddMember";
+import EditCredentialsModal from "../components/forms/EditCredentialsModal";
 
 const UserProfilePage = ({ onClose }) => {
   const dispatch = useDispatch();
@@ -29,9 +30,10 @@ const UserProfilePage = ({ onClose }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Modal states
+  // Fixed modal states - separate for password and PIN
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
 
   // Redux state
@@ -88,7 +90,8 @@ const UserProfilePage = ({ onClose }) => {
 
   const handleCredentialsUpdateSuccess = () => {
     setSuccess("Credentials updated successfully!");
-    setShowCredentialsModal(false);
+    setShowPasswordModal(false);
+    setShowPinModal(false);
   };
 
   const handleForgotPassword = async (email) => {
@@ -397,28 +400,27 @@ const UserProfilePage = ({ onClose }) => {
           <Lock className="w-5 h-5 mr-2 text-gray-600" />
           Security & Credentials
         </h2>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setShowCredentialsModal(true)}
-            className="flex items-center space-x-2 text-blue-600 hover:text-blue-700"
-          >
-            <Edit className="w-4 h-4" />
-            <span>Change Credentials</span>
-          </button>
-        </div>
       </div>
 
       <div className="px-6 py-4">
         <div className="space-y-6">
           <div>
-            <h3 className="text-md font-semibold text-gray-900 mb-4">
+            <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+              <Lock className="w-4 h-4 mr-2" />
               Password Management
             </h3>
             <div className="space-y-4">
               <div className="flex space-x-4">
                 <button
+                  onClick={() => setShowPasswordModal(true)}
+                  className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Change Password</span>
+                </button>
+                <button
                   onClick={() => setForgotPasswordMode(true)}
-                  className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors"
+                  className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors border border-blue-600 px-4 py-2 rounded-md"
                 >
                   <Mail className="w-4 h-4" />
                   <span>Send Password Reset Link</span>
@@ -426,21 +428,30 @@ const UserProfilePage = ({ onClose }) => {
               </div>
               <p className="text-sm text-gray-500">
                 Use "Send Password Reset Link" to receive a reset token via
-                email, then use "Reset Password with Token" to set a new
-                password.
+                email, then use "Change Password" to set a new password.
               </p>
             </div>
           </div>
 
           <div>
-            <h3 className="text-md font-semibold text-gray-900 mb-4">
+            <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+              <Key className="w-4 h-4 mr-2" />
               Transaction PIN
             </h3>
-            <p className="text-sm text-gray-600">
-              Your 4-digit transaction PIN is used for secure financial
-              transactions. Keep it confidential and change it regularly for
-              security.
-            </p>
+            <div className="space-y-4">
+              <button
+                onClick={() => setShowPinModal(true)}
+                className="flex items-center space-x-2 bg-green-700 text-white px-4 py-2 rounded-md hover:bg-green-800 transition-colors"
+              >
+                <Edit className="w-4 h-4" />
+                <span>Change Transaction PIN</span>
+              </button>
+              <p className="text-sm text-gray-600">
+                Your 4-digit transaction PIN is used for secure financial
+                transactions. Keep it confidential and change it regularly for
+                security.
+              </p>
+            </div>
           </div>
 
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
@@ -552,11 +563,22 @@ const UserProfilePage = ({ onClose }) => {
         />
       )}
 
-      {showCredentialsModal && (
+      {/* Password Modal */}
+      {showPasswordModal && (
         <EditCredentialsModal
           userId={userData.id}
-          type="password" // or "pin" depending on what you want to update
-          onClose={() => setShowCredentialsModal(false)}
+          type="password"
+          onClose={() => setShowPasswordModal(false)}
+          onSuccess={handleCredentialsUpdateSuccess}
+        />
+      )}
+
+      {/* PIN Modal */}
+      {showPinModal && (
+        <EditCredentialsModal
+          userId={userData.id}
+          type="pin"
+          onClose={() => setShowPinModal(false)}
           onSuccess={handleCredentialsUpdateSuccess}
         />
       )}
