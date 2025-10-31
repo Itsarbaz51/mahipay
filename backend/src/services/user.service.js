@@ -316,6 +316,7 @@ class UserServices {
     if (isEmailChanged) {
       await this.regenerateCredentialsAndNotify(userId, email);
     }
+
     await Prisma.auditLog.create({
       data: {
         user: {

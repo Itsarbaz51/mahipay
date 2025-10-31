@@ -1,6 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { logout } from "./authSlice";
 
 const initialState = {
   users: [],
@@ -236,6 +237,8 @@ export const updateProfile = (userId, profileData) => async (dispatch) => {
     if (data.message) {
       toast.success(data.message || "Profile updated successfully!");
     }
+
+    dispatch(logout());
 
     return data;
   } catch (error) {

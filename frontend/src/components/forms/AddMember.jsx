@@ -461,9 +461,13 @@ export default function AddMember({
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading
-                  ? editData
+                  ? profileEdit
+                    ? "Updating Profile..."
+                    : editData
                     ? "Updating..."
                     : "Creating..."
+                  : profileEdit
+                  ? "Update Profile"
                   : editData
                   ? "Update Member"
                   : "Add Member"}
