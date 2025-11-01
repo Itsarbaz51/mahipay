@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { logout, updateCredentials } from "../../redux/slices/authSlice";
+import { updateCredentials } from "../../redux/slices/authSlice";
 
 const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -127,12 +127,6 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         payload.confirmNewTransactionPin = formData.confirmNewTransactionPin;
       }
 
-      console.log("Submitting credentials update:", {
-        userId,
-        type,
-        payload,
-      });
-
       const result = await dispatch(
         updateCredentials({
           userId: userId,
@@ -141,29 +135,24 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         })
       );
 
-      if (result.success) {
-        toast.success(result.message);
+      if (result?.success) {
+        toast.success(result?.message);
+
+        // ✅ Reset form
+        setFormData({
+          currentPassword: "",
+          newPassword: "",
+          confirmNewPassword: "",
+          currentTransactionPin: "",
+          newTransactionPin: "",
+          confirmNewTransactionPin: "",
+        });
+
+        onSuccess();
       }
-
-      // ✅ Reset form
-      setFormData({
-        currentPassword: "",
-        newPassword: "",
-        confirmNewPassword: "",
-        currentTransactionPin: "",
-        newTransactionPin: "",
-        confirmNewTransactionPin: "",
-      });
-
-      // ✅ ONLY call onSuccess when successful
-      onSuccess();
     } catch (error) {
-      console.error("Credentials update error:", error);
-
       const errorMsg = error.message || "Something went wrong";
       setApiError(errorMsg);
-
-      // ✅ ERROR SHOWS IN FORM, NO TOAST (already handled in slice)
     } finally {
       setLoading(false);
     }

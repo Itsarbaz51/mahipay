@@ -24,6 +24,7 @@ import EditCredentialsModal from "../components/forms/EditCredentialsModal";
 
 const UserProfilePage = ({ onClose }) => {
   const dispatch = useDispatch();
+
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -83,9 +84,13 @@ const UserProfilePage = ({ onClose }) => {
   };
 
   const handleCredentialsUpdateSuccess = () => {
-    setSuccess("Credentials updated successfully!");
+    setSuccess("Credentials updated successfully! Redirecting to login...");
     setShowPasswordModal(false);
     setShowPinModal(false);
+
+    setTimeout(() => {
+      dispatch(logout());
+    }, 1000);
   };
 
   const handleForgotPasswordAndPin = async (email) => {

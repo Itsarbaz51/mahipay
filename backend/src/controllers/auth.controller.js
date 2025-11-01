@@ -134,18 +134,10 @@ class AuthController {
     );
 
     const isUpdatingOwnAccount = currentUserId === userId;
-    const shouldLogout = credentialsData.newPassword && isUpdatingOwnAccount;
-
-    // Clear cookies ONLY if user is updating their own password
-    if (shouldLogout) {
-      res.clearCookie("accessToken", cookieOptions);
-      res.clearCookie("refreshToken", cookieOptions);
-    }
 
     return res.status(200).json(
       ApiResponse.success(
         {
-          logout: shouldLogout,
           isOwnUpdate: isUpdatingOwnAccount,
         },
         result.message,

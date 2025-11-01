@@ -155,7 +155,6 @@ export const login = (credentials) => async (dispatch) => {
       error?.response?.data?.message || error?.message || "Login failed";
     dispatch(setAuthentication(false));
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
@@ -174,7 +173,6 @@ export const logout = () => async (dispatch) => {
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
@@ -190,7 +188,6 @@ export const refreshToken = () => async (dispatch) => {
       error?.message ||
       "Token refresh failed";
     dispatch(setAuthentication(false));
-    throw new Error(errMsg);
   }
 };
 
@@ -243,7 +240,6 @@ export const updateCredentials =
 
       // ✅ Use credentialsUpdateFail instead of authFail
       dispatch(credentialsUpdateFail(errMsg));
-      throw new Error(errMsg);
     }
   };
 
@@ -260,7 +256,6 @@ export const passwordReset = (email) => async (dispatch) => {
       error?.message ||
       "Password reset failed";
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
@@ -279,7 +274,6 @@ export const verifyPasswordReset = (token) => async (dispatch) => {
       error?.message ||
       "Password reset failed";
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
@@ -296,7 +290,6 @@ export const verifyEmail = (token) => async (dispatch) => {
       error?.message ||
       "Email verification failed";
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
