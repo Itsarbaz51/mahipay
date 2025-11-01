@@ -204,7 +204,6 @@ export const verifyAuth = () => async (dispatch) => {
   } catch (error) {
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
-    throw new Error("Not authenticated");
   } finally {
     dispatch(setLoading(false));
   }
@@ -248,10 +247,10 @@ export const updateCredentials =
     }
   };
 
-export const forgotPassword = (email) => async (dispatch) => {
+export const passwordReset = (email) => async (dispatch) => {
   try {
     dispatch(authRequest());
-    const { data } = await axios.post(`/auth/forgot-password`, { email });
+    const { data } = await axios.post(`/auth/password-reset`, { email });
     dispatch(authSuccess(data));
     toast.success(data.message);
     return data;
@@ -265,13 +264,12 @@ export const forgotPassword = (email) => async (dispatch) => {
   }
 };
 
-export const resetPassword = (token, newPassword) => async (dispatch) => {
+export const verifyPasswordReset = (token) => async (dispatch) => {
   try {
     dispatch(authRequest());
-    const { data } = await axios.post(`/auth/reset-password`, {
-      token,
-      newPassword,
-    });
+    const { data } = await axios.get(
+      `/auth/verify-password-reset?token=${token}`
+    );
     dispatch(authSuccess(data));
     toast.success(data.message);
     return data;

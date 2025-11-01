@@ -15,11 +15,10 @@ import {
 } from "lucide-react";
 import {
   getCurrentUserProfile,
-  updateProfile,
   updateUserProfileImage,
 } from "../redux/slices/userSlice";
-import { updateCredentials, forgotPassword } from "../redux/slices/authSlice";
-import ForgotPasswordModal from "../components/forms/ForgotPasswordModal";
+import { logout, passwordReset } from "../redux/slices/authSlice";
+import ForgotCredentialsModal from "../components/forms/ForgotCredentialsModal";
 import AddMember from "../components/forms/AddMember";
 import EditCredentialsModal from "../components/forms/EditCredentialsModal";
 
@@ -30,24 +29,20 @@ const UserProfilePage = ({ onClose }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Fixed modal states - separate for password and PIN
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
 
-  // Redux state
   const { currentUser, isLoading: userLoading } = useSelector(
     (state) => state.users
   );
   const { currentUser: authUser } = useSelector((state) => state.auth);
 
-  // Use currentUser from userSlice first, fallback to authUser
   const userData = currentUser || authUser;
   const currentUserRole = userData?.role?.name || "";
   const isAdminUser = currentUserRole === "ADMIN";
 
-  // Fetch user data on component mount
   useEffect(() => {
     fetchUserProfile();
   }, []);
@@ -73,7 +68,7 @@ const UserProfilePage = ({ onClose }) => {
 
       await dispatch(updateUserProfileImage(userData.id, formData));
       setSuccess("Profile image updated successfully!");
-      await fetchUserProfile(); // Refresh data
+      await fetchUserProfile();
     } catch (error) {
       setError(error.message);
     } finally {
@@ -81,10 +76,9 @@ const UserProfilePage = ({ onClose }) => {
     }
   };
 
-  // Handle success from modals
   const handleProfileUpdateSuccess = () => {
     setSuccess("Profile updated successfully!");
-    fetchUserProfile(); // Refresh data
+    fetchUserProfile();
     setShowProfileModal(false);
   };
 
@@ -94,7 +88,7 @@ const UserProfilePage = ({ onClose }) => {
     setShowPinModal(false);
   };
 
-  const handleForgotPassword = async (email) => {
+  const handleForgotPasswordAndPin = async (email) => {
     try {
       setLoading(true);
       setError(null);
@@ -104,11 +98,13 @@ const UserProfilePage = ({ onClose }) => {
         return;
       }
 
-      await dispatch(forgotPassword(email));
+      await dispatch(passwordReset(email));
       setForgotPasswordMode(false);
       setSuccess(
         "Password reset link sent to your email! Please check your inbox."
       );
+
+      dispatch(logout());
     } catch (error) {
       setError(error.message);
     } finally {
@@ -116,7 +112,6 @@ const UserProfilePage = ({ onClose }) => {
     }
   };
 
-  // Clear messages after 5 seconds
   useEffect(() => {
     if (error || success) {
       const timer = setTimeout(() => {
@@ -127,7 +122,6 @@ const UserProfilePage = ({ onClose }) => {
     }
   }, [error, success]);
 
-  // --- Status Badge Helper ---
   const getStatusBadge = (status) => {
     const statusMap = {
       ACTIVE: { bg: "bg-green-100", text: "text-green-800", icon: CheckCircle },
@@ -168,7 +162,6 @@ const UserProfilePage = ({ onClose }) => {
     }).format(amount || 0);
   };
 
-  // --- Loading State ---
   if (loading || userLoading) {
     return (
       <div className="bg-gray-50 flex items-center justify-center min-h-screen">
@@ -180,7 +173,6 @@ const UserProfilePage = ({ onClose }) => {
     );
   }
 
-  // --- Error State ---
   if (error && !userData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -201,7 +193,6 @@ const UserProfilePage = ({ onClose }) => {
     );
   }
 
-  // --- No Data ---
   if (!userData) {
     return (
       <div className="flex justify-center items-center min-h-screen text-gray-500">
@@ -210,7 +201,6 @@ const UserProfilePage = ({ onClose }) => {
     );
   }
 
-  // --- Profile Image Section ---
   const ProfileImageSection = () => (
     <div className="bg-white shadow rounded-lg p-6 mb-6">
       <div className="flex items-center space-x-6">
@@ -251,7 +241,6 @@ const UserProfilePage = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-2xl font-bold text-blue-600">
@@ -278,7 +267,6 @@ const UserProfilePage = ({ onClose }) => {
     </div>
   );
 
-  // --- Profile Information Section ---
   const ProfileInformationSection = () => (
     <div className="bg-white shadow rounded-lg">
       <div className="px-6 py-4 border-b border-gray-300 flex justify-between items-center">
@@ -392,7 +380,6 @@ const UserProfilePage = ({ onClose }) => {
     </div>
   );
 
-  // --- Credentials Section ---
   const CredentialsSection = () => (
     <div className="bg-white shadow rounded-lg">
       <div className="px-6 py-4 border-b border-gray-300 flex justify-between items-center">
@@ -423,7 +410,7 @@ const UserProfilePage = ({ onClose }) => {
                   className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors border border-blue-600 px-4 py-2 rounded-md"
                 >
                   <Mail className="w-4 h-4" />
-                  <span>Send Password Reset Link</span>
+                  <span>Send Password and PIN Reset Links</span>
                 </button>
               </div>
               <p className="text-sm text-gray-500">
@@ -439,13 +426,15 @@ const UserProfilePage = ({ onClose }) => {
               Transaction PIN
             </h3>
             <div className="space-y-4">
-              <button
-                onClick={() => setShowPinModal(true)}
-                className="flex items-center space-x-2 bg-green-700 text-white px-4 py-2 rounded-md hover:bg-green-800 transition-colors"
-              >
-                <Edit className="w-4 h-4" />
-                <span>Change Transaction PIN</span>
-              </button>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => setShowPinModal(true)}
+                  className="flex items-center space-x-2 bg-green-700 text-white px-4 py-2 rounded-md hover:bg-green-800 transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Change Transaction PIN</span>
+                </button>
+              </div>
               <p className="text-sm text-gray-600">
                 Your 4-digit transaction PIN is used for secure financial
                 transactions. Keep it confidential and change it regularly for
@@ -474,10 +463,8 @@ const UserProfilePage = ({ onClose }) => {
     </div>
   );
 
-  // --- Main UI ---
   return (
     <div className="bg-gray-50 w-full min-h-screen rounded-2xl py-4 px-6">
-      {/* Header */}
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">User Profile</h1>
@@ -495,7 +482,6 @@ const UserProfilePage = ({ onClose }) => {
         )}
       </div>
 
-      {/* Success Message */}
       {success && (
         <div className="mb-6 bg-green-50 border border-green-200 rounded-md p-4">
           <div className="flex items-center space-x-2 text-green-800">
@@ -505,7 +491,6 @@ const UserProfilePage = ({ onClose }) => {
         </div>
       )}
 
-      {/* Error Display */}
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
           <div className="flex items-center space-x-2 text-red-800">
@@ -515,10 +500,8 @@ const UserProfilePage = ({ onClose }) => {
         </div>
       )}
 
-      {/* Profile Image and Quick Stats */}
       <ProfileImageSection />
 
-      {/* Navigation Tabs */}
       <div className="mb-6 border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
@@ -546,13 +529,11 @@ const UserProfilePage = ({ onClose }) => {
         </nav>
       </div>
 
-      {/* Tab Content */}
       <div>
         {activeTab === "profile" && <ProfileInformationSection />}
         {activeTab === "credentials" && <CredentialsSection />}
       </div>
 
-      {/* Modals */}
       {showProfileModal && (
         <AddMember
           onClose={() => setShowProfileModal(false)}
@@ -563,7 +544,6 @@ const UserProfilePage = ({ onClose }) => {
         />
       )}
 
-      {/* Password Modal */}
       {showPasswordModal && (
         <EditCredentialsModal
           userId={userData.id}
@@ -573,7 +553,6 @@ const UserProfilePage = ({ onClose }) => {
         />
       )}
 
-      {/* PIN Modal */}
       {showPinModal && (
         <EditCredentialsModal
           userId={userData.id}
@@ -584,13 +563,14 @@ const UserProfilePage = ({ onClose }) => {
       )}
 
       {forgotPasswordMode && (
-        <ForgotPasswordModal
-          setForgotPasswordMode={setForgotPasswordMode}
-          handleForgotPassword={handleForgotPassword}
-          forgotPasswordForm={{ email: userData.email || "" }}
-          setForgotPasswordForm={() => {}} // Not needed in this flow
+        <ForgotCredentialsModal
+          setForgotMode={setForgotPasswordMode}
+          handleForgotCredentials={handleForgotPasswordAndPin}
+          forgotForm={{ email: userData.email || "" }}
+          setForgotForm={() => {}}
           loading={loading}
           userData={userData}
+          type="password"
         />
       )}
     </div>

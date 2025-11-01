@@ -36,6 +36,7 @@ import TermsConditions from "../pages/landing/Terms&conditions";
 import BanksTable from "../components/tabels/BanksTable.jsx";
 import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";
 import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
+import VerifyResetPassword from "../pages/VerifyResetPassword.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -47,6 +48,11 @@ export const createRouter = () => {
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
           <Route path="login" element={<Login />} />
+          <Route
+            path="verify-reset-password"
+            element={<VerifyResetPassword />}
+          />{" "}
+          {/* Add this route */}
           <Route path="privacy-policy" element={<PrivacyPolicy />} />
           <Route path="terms-conditions" element={<TermsConditions />} />
         </Route>

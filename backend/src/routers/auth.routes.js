@@ -24,18 +24,12 @@ authRoutes.post(
   AuthController.refreshToken
 );
 authRoutes.post(
-  "/forgot-password",
+  "/password-reset",
   validateRequest(AuthValidationSchemas.forgotPassword),
   AuthController.requestPasswordReset
 );
 
-authRoutes.post(
-  "/reset-password",
-  AuthMiddleware.isAuthenticated,
-  validateRequest(AuthValidationSchemas.resetPassword),
-
-  AuthController.confirmPasswordReset
-);
+authRoutes.get("/verify-password-reset", AuthController.confirmPasswordReset);
 authRoutes.get("/verify-email", AuthController.verifyEmail);
 
 authRoutes.put(

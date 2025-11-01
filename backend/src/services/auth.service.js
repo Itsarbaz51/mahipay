@@ -3,6 +3,7 @@ import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
 import { CryptoService } from "../utils/cryptoService.js";
+import UserServices from "./user.service.js";
 
 class AuthServices {
   static async login(payload, req) {
@@ -201,7 +202,7 @@ class AuthServices {
     });
 
     if (!user) {
-      return { message: "If the email exists, a reset link has been sent." };
+      return { message: "User not found." };
     }
 
     const token = CryptoService.generateSecureToken(32);
@@ -218,7 +219,7 @@ class AuthServices {
 
     // Encrypt the token for URL safety
     const encryptedToken = CryptoService.encrypt(token);
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(encryptedToken)}&email=${encodeURIComponent(email)}`;
+    const resetUrl = `${process.env.CLIENT_URL}/verify-reset-password?token=${encodeURIComponent(encryptedToken)}&email=${encodeURIComponent(email)}`;
 
     const formattedFirstName = AuthServices.formatName(user.firstName);
 
@@ -234,10 +235,10 @@ class AuthServices {
 
     await Helper.sendEmail({ to: user.email, subject, text, html });
 
-    return { message: "If the email exists, a reset link has been sent." };
+    return { message: "Password reset link has been sent to your email." };
   }
 
-  static async confirmPasswordReset(encryptedToken, newPassword) {
+  static async confirmPasswordReset(encryptedToken) {
     try {
       const token = CryptoService.decrypt(encryptedToken);
       const tokenHash = CryptoService.hashData(token);
@@ -266,7 +267,10 @@ class AuthServices {
         throw ApiError.badRequest("Invalid or expired token");
       }
 
-      const hashedPassword = await Helper.hashPassword(newPassword);
+      const hashedPassword = await UserServices.regenerateCredentialsAndNotify(
+        user.id,
+        user.email
+      );
 
       await Prisma.user.update({
         where: { id: user.id },
@@ -278,16 +282,10 @@ class AuthServices {
         },
       });
 
-      const formattedFirstName = AuthServices.formatName(user.firstName);
-
-      await Helper.sendEmail({
-        to: user.email,
-        subject: "Your password has been changed",
-        text: `Hello ${formattedFirstName},\n\nYour password was successfully changed. If this wasn't you, please contact support immediately.`,
-        html: `<p>Hello ${formattedFirstName},</p><p>Your password was successfully changed. If this wasn't you, please <a href="mailto:support@example.com">contact support</a> immediately.</p>`,
-      });
-
-      return { message: "Password reset successful" };
+      return {
+        message:
+          "Password reset successfully, and your credentials have been sent to your email.",
+      };
     } catch (error) {
       if (error.message.includes("Decryption failed")) {
         throw ApiError.badRequest("Invalid or malformed token");

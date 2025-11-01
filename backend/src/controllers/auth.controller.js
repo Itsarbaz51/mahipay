@@ -82,6 +82,8 @@ class AuthController {
   static requestPasswordReset = asyncHandler(async (req, res) => {
     const { email } = req.body;
 
+    console.log(email);
+
     if (!email) {
       throw ApiError.badRequest("Email is required");
     }
@@ -92,13 +94,13 @@ class AuthController {
   });
 
   static confirmPasswordReset = asyncHandler(async (req, res) => {
-    const { token, newPassword } = req.body;
+    const { token } = req.query;
 
-    if (!token || !newPassword) {
-      throw ApiError.badRequest("Token and newPassword are required");
+    if (!token) {
+      throw ApiError.badRequest("Token is required");
     }
 
-    const result = await AuthServices.confirmPasswordReset(token, newPassword);
+    const result = await AuthServices.confirmPasswordReset(token);
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
