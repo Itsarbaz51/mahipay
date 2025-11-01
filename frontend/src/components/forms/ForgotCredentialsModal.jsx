@@ -2,7 +2,6 @@ import { Mail, X, Key, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function ForgotCredentialsModal({
-  type = "password",
   setForgotMode,
   handleForgotCredentials,
   forgotForm,
@@ -16,46 +15,13 @@ export default function ForgotCredentialsModal({
   const [buttonText, setButtonText] = useState("");
 
   useEffect(() => {
-    switch (type) {
-      case "pin":
-        setTitle("Forgot Transaction PIN");
-        setDescription(
-          "We'll send a PIN reset link to this email address. The link will expire in 5 minutes."
-        );
-        setIcon(<Key className="w-5 h-5 mr-2 text-green-600" />);
-        setButtonText("Send PIN Reset Link");
-        break;
-      case "password":
-      default:
-        setTitle("Forgot Password");
-        setDescription(
-          "We'll send a password reset link to this email address. The link will expire in 5 minutes."
-        );
-        setIcon(<Lock className="w-5 h-5 mr-2 text-blue-600" />);
-        setButtonText("Send Password Reset Link");
-        break;
-    }
-  }, [type]);
-
-  const getModalStyles = () => {
-    switch (type) {
-      case "pin":
-        return {
-          iconColor: "text-green-600",
-          buttonColor: "bg-green-600 hover:bg-green-700",
-          borderColor: "border-green-200",
-        };
-      case "password":
-      default:
-        return {
-          iconColor: "text-blue-600",
-          buttonColor: "bg-blue-600 hover:bg-blue-700",
-          borderColor: "border-blue-200",
-        };
-    }
-  };
-
-  const styles = getModalStyles();
+    setTitle("Forgot Password & PIN");
+    setDescription(
+      "We'll send reset links for both password and PIN to this email address. The links will expire in 2 minutes."
+    );
+    setIcon(<Lock className="w-5 h-5 mr-2 text-blue-600" />);
+    setButtonText("Send Reset Links");
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -85,24 +51,13 @@ export default function ForgotCredentialsModal({
           </button>
         </div>
 
-        <div
-          className={`mb-4 p-3 rounded-md bg-${
-            type === "pin" ? "green" : "blue"
-          }-50 border ${styles.borderColor}`}
-        >
-          <p
-            className={`text-sm text-${
-              type === "pin" ? "green" : "blue"
-            }-800 font-medium`}
-          >
-            {type === "pin"
-              ? "🔒 Secure PIN Reset"
-              : "🔐 Secure Password Reset"}
+        <div className="mb-4 p-3 rounded-md bg-blue-50 border border-blue-200">
+          <p className="text-sm text-blue-800 font-medium">
+            🔒 Secure Credentials Reset
           </p>
           <p className="text-xs text-gray-600 mt-1">
-            {type === "pin"
-              ? "Your transaction PIN ensures secure financial operations."
-              : "Keep your password strong and unique for maximum security."}
+            Reset both your password and transaction PIN for complete account
+            access.
           </p>
         </div>
 
@@ -123,11 +78,7 @@ export default function ForgotCredentialsModal({
               disabled={Boolean(userData)}
               className={`${
                 userData ? "cursor-not-allowed bg-gray-100" : ""
-              } mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                type === "pin"
-                  ? "focus:ring-green-500 focus:border-green-500"
-                  : "focus:ring-blue-500 focus:border-blue-500"
-              } transition-colors`}
+              } mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
               placeholder="Enter your email address"
               required
             />
@@ -136,10 +87,8 @@ export default function ForgotCredentialsModal({
 
           <div className="bg-gray-50 rounded-md p-3">
             <p className="text-xs text-gray-600">
-              <strong>Note:</strong>{" "}
-              {type === "pin"
-                ? "After reset, you will need to set a new 4-digit transaction PIN."
-                : "After reset, you will need to create a new strong password."}
+              <strong>Note:</strong> After reset, you will need to create a new
+              strong password and set a new 4-digit transaction PIN.
             </p>
           </div>
 
@@ -147,7 +96,7 @@ export default function ForgotCredentialsModal({
             <button
               type="submit"
               disabled={loading}
-              className={`flex-1 ${styles.buttonColor} text-white px-4 py-2 rounded-md disabled:opacity-50 transition-colors font-medium`}
+              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md disabled:opacity-50 transition-colors font-medium hover:bg-blue-700"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -170,9 +119,8 @@ export default function ForgotCredentialsModal({
 
         <div className="mt-4 pt-4 border-t border-gray-200">
           <p className="text-xs text-gray-500 text-center">
-            {type === "pin"
-              ? "Never share your PIN with anyone. Our team will never ask for it."
-              : "Use a combination of letters, numbers, and symbols for better security."}
+            Never share your credentials with anyone. Our team will never ask
+            for your password or PIN.
           </p>
         </div>
       </div>

@@ -571,11 +571,10 @@ const UserProfilePage = ({ onClose }) => {
         <ForgotCredentialsModal
           setForgotMode={setForgotPasswordMode}
           handleForgotCredentials={handleForgotPasswordAndPin}
-          forgotForm={{ email: userData.email || "" }}
+          forgotForm={{ email: userData?.email || "" }}
           setForgotForm={() => {}}
           loading={loading}
           userData={userData}
-          type="password"
         />
       )}
     </div>

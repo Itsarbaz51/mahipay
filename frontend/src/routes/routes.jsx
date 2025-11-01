@@ -48,15 +48,10 @@ export const createRouter = () => {
           <Route path="about" element={<About />} />
           <Route path="contact" element={<Contact />} />
           <Route path="login" element={<Login />} />
-          <Route
-            path="verify-reset-password"
-            element={<VerifyResetPassword />}
-          />{" "}
           {/* Add this route */}
           <Route path="privacy-policy" element={<PrivacyPolicy />} />
           <Route path="terms-conditions" element={<TermsConditions />} />
         </Route>
-
         {/* ---------------- PROTECTED ROUTES WITH MAIN LAYOUT ---------------- */}
         <Route
           path="/"
@@ -86,7 +81,6 @@ export const createRouter = () => {
           {/* Redirect root to dashboard */}
           <Route index element={<Navigate to="/dashboard" replace />} />
         </Route>
-
         {/* ---------------- STANDALONE PROTECTED ROUTES ---------------- */}
         <Route
           path="kyc-submit"
@@ -96,7 +90,6 @@ export const createRouter = () => {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="unauthorized"
           element={
@@ -105,6 +98,8 @@ export const createRouter = () => {
             </ProtectedRoute>
           }
         />
+
+        <Route path="verify-reset-password" element={<VerifyResetPassword />} />
 
         {/* ---------------- 404 / FALLBACK ---------------- */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

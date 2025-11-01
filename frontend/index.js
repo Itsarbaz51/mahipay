@@ -18,6 +18,7 @@ export const protectedRoute = [
   "/audit-logs",
   "/card-payout",
   "/bank-details",
+  "/verify-reset-password",
 ];
 
 import {
