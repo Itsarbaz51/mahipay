@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
-import { updateCredentials } from "../../redux/slices/authSlice";
+import { logout, updateCredentials } from "../../redux/slices/authSlice";
 
 const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -141,14 +141,9 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         })
       );
 
-      console.log("Update credentials success:", result);
-
-      // ✅ SUCCESS CASE ONLY
-      toast.success(
-        `${
-          type === "password" ? "Password" : "Transaction PIN"
-        } updated successfully!`
-      );
+      if (result.success) {
+        toast.success(result.message);
+      }
 
       // ✅ Reset form
       setFormData({
@@ -169,7 +164,6 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
       setApiError(errorMsg);
 
       // ✅ ERROR SHOWS IN FORM, NO TOAST (already handled in slice)
-      console.log("Redux error, modal staying open:", errorMsg);
     } finally {
       setLoading(false);
     }

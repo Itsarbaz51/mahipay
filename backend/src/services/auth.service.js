@@ -393,10 +393,9 @@ class AuthServices {
 
     const isOwnUpdate = requestedBy === userId;
 
-    const isPasswordValid = await Helper.comparePassword(
-      credentialsData.currentPassword,
-      user.password
-    );
+    const decryptedStoredPassword = CryptoService.decrypt(user.password);
+    const isPasswordValid =
+      decryptedStoredPassword === credentialsData.currentPassword;
 
     if (!isPasswordValid) {
       throw ApiError.unauthorized("User's current password is incorrect");
@@ -405,9 +404,7 @@ class AuthServices {
     const updateData = {};
 
     if (credentialsData.newPassword) {
-      updateData.password = await Helper.hashPassword(
-        credentialsData.newPassword
-      );
+      updateData.password = CryptoService.encrypt(credentialsData.newPassword);
       updateData.refreshToken = null;
     }
 
@@ -416,16 +413,15 @@ class AuthServices {
         throw ApiError.badRequest("Current transaction PIN is required");
       }
 
-      const isPinValid = await Helper.comparePassword(
-        credentialsData.currentTransactionPin,
-        user.transactionPin
-      );
+      const decryptedStoredPin = CryptoService.decrypt(user.transactionPin);
+      const isPinValid =
+        decryptedStoredPin === credentialsData.currentTransactionPin;
 
       if (!isPinValid) {
         throw ApiError.unauthorized("Current transaction PIN is incorrect");
       }
 
-      updateData.transactionPin = await Helper.hashPassword(
+      updateData.transactionPin = CryptoService.encrypt(
         credentialsData.newTransactionPin
       );
     }
