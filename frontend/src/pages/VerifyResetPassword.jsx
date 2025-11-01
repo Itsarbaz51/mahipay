@@ -32,6 +32,23 @@ export default function VerifyResetPassword() {
     setMessage("Click the button below to confirm and reset your password");
   }, [token]);
 
+  // Success के बाद automatically redirect के लिए
+  useEffect(() => {
+    if (verificationStatus === "success") {
+      const timer = setTimeout(() => {
+        navigate("/login", {
+          replace: true,
+          state: {
+            message:
+              "Password reset successful! Check your email for temporary password.",
+          },
+        });
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [verificationStatus, navigate]);
+
   const handleConfirmReset = async () => {
     if (!token) return;
 
@@ -39,16 +56,25 @@ export default function VerifyResetPassword() {
       setIsLoading(true);
       setVerificationStatus("processing");
 
-      const result = await dispatch(verifyPasswordReset(token));
+      // Redux action को properly dispatch करें
+      const resultAction = await dispatch(verifyPasswordReset(token));
 
-      setVerificationStatus("success");
-      setMessage(result.message || "Password reset successfully!");
+      // Check if the action was fulfilled
+      if (verifyPasswordReset.fulfilled.match(resultAction)) {
+        setVerificationStatus("success");
+        setMessage(
+          resultAction.payload?.message ||
+            "Password reset successfully! A temporary password has been sent to your email."
+        );
 
-      navigate("/login");
+        // यहाँ navigate नहीं करेंगे, useEffect automatic redirect कर देगा
+      } else {
+        throw new Error(resultAction.error?.message || "Password reset failed");
+      }
     } catch (error) {
+      console.error("Password reset error:", error);
       setVerificationStatus("error");
-      setMessage(error.message || "Password reset failed");
-      navigate("/login");
+      setMessage(error.message || "Password reset failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +85,15 @@ export default function VerifyResetPassword() {
   };
 
   const handleGoToLogin = () => {
-    navigate("/login");
+    navigate("/login", {
+      replace: true,
+      state: {
+        message:
+          verificationStatus === "success"
+            ? "Password reset successful! Check your email for temporary password."
+            : null,
+      },
+    });
   };
 
   const renderContent = () => {
@@ -106,7 +140,7 @@ export default function VerifyResetPassword() {
               <button
                 onClick={handleConfirmReset}
                 disabled={isLoading}
-                className="bg-orange-600 text-white px-6 py-2 rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50"
+                className="bg-orange-600 text-white px-6 py-2 rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <span className="flex items-center">
@@ -119,7 +153,8 @@ export default function VerifyResetPassword() {
               </button>
               <button
                 onClick={handleGoToLogin}
-                className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                disabled={isLoading}
+                className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>

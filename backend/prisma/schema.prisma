@@ -786,10 +786,10 @@ model AuditLog {
   id         String   @id @default(uuid())
   userId     String?
   user       User?    @relation(fields: [userId], references: [id])
-  action     String
-  entityType String? // e.g. "User", "Transaction", "Service"
-  entityId   String? // related entity record ID
-  ipAddress  String? // request origin
+  action     String   @db.VarChar(500) // or whatever length you need
+  entityType String?  @db.VarChar(100)
+  entityId   String?
+  ipAddress  String?  @db.VarChar(45) // IPv6 max length
   metadata   Json?
   createdAt  DateTime @default(now())
 
