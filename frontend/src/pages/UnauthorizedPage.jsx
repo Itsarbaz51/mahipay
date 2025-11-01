@@ -57,7 +57,7 @@ export default function UnauthorizedPage() {
               </p>
               <div className="space-y-2">
                 <a
-                  href="https://mail.google.com/mail/?view=cm&to=admin@example.com&su=Support%20Request&body=Hello%20Admin,%0D%0A%0D%0AI%20need%20assistance%20with%20..."
+                  href={`https://mail.google.com/mail/?view=cm&to=${import.meta.env.VITE_SMTP_USER}.com&su=Support%20Request&body=Hello%20Admin,%0D%0A%0D%0AI%20need%20assistance%20with%20...`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"

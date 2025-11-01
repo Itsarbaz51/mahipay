@@ -82,8 +82,6 @@ class AuthController {
   static requestPasswordReset = asyncHandler(async (req, res) => {
     const { email } = req.body;
 
-    console.log(email);
-
     if (!email) {
       throw ApiError.badRequest("Email is required");
     }

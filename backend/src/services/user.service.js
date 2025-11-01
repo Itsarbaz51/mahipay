@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
+import { sendCredentialsEmail } from "../utils/sendCredentialsEmail.js";
 
 class UserServices {
   static async register(payload) {
@@ -143,10 +144,12 @@ class UserServices {
         },
       });
 
-      await this.sendCredentialsEmail(
+      await sendCredentialsEmail(
         user,
         generatedPassword,
-        generatedTransactionPin
+        generatedTransactionPin,
+        "created",
+        "Your account has been successfully created. Here are your login credentials:"
       );
 
       const accessToken = Helper.generateAccessToken({
@@ -1462,110 +1465,6 @@ class UserServices {
     }
   }
 
-  static async sendCredentialsEmail(user, password, transactionPin) {
-    try {
-      const formattedFirstName = this.formatName(user.firstName);
-
-      const subject = "Your Account Credentials";
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: #4F46E5; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-                .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
-                .credentials { background: white; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #4F46E5; }
-                .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin: 15px 0; }
-                .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>Welcome to Our Platform!</h1>
-                </div>
-                <div class="content">
-                    <p>Hello <strong>${formattedFirstName}</strong>,</p>
-                    
-                    <p>Your account has been successfully created. Here are your login credentials:</p>
-                    
-                    <div class="credentials">
-                        <h3>Your Account Details:</h3>
-                        <p><strong>Username:</strong> ${user.username}</p>
-                        <p><strong>Email:</strong> ${user.email}</p>
-                        <p><strong>Password:</strong> ${password}</p>
-                        <p><strong>Transaction PIN:</strong> ${transactionPin}</p>
-                    </div>
-                    
-                    <div class="warning">
-                        <strong>Important Security Notice:</strong>
-                        <ul>
-                            <li>Keep your credentials secure and confidential</li>
-                            <li>Change your password after first login</li>
-                            <li>Do not share your Transaction PIN with anyone</li>
-                            <li>These credentials are for your use only</li>
-                        </ul>
-                    </div>
-                    
-                    <p>You can login to your account using the above credentials.</p>
-                    
-                    <p>If you have any questions, please contact our support team.</p>
-                    
-                    <p>Best regards,<br>Support Team</p>
-                </div>
-                <div class="footer">
-                    <p>This is an automated message. Please do not reply to this email.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-      `;
-
-      const text = `
-        Welcome to Our Platform!
-
-        Hello ${formattedFirstName},
-
-        Your account has been successfully created. Here are your login credentials:
-
-        Username: ${user.username}
-        Email: ${user.email}
-        Password: ${password}
-        Transaction PIN: ${transactionPin}
-
-        Important Security Notice:
-        - Keep your credentials secure and confidential
-        - Change your password after first login
-        - Do not share your Transaction PIN with anyone
-        - These credentials are for your use only
-
-        You can login to your account using the above credentials.
-
-        If you have any questions, please contact our support team.
-
-        Best regards,
-        Support Team
-
-        This is an automated message. Please do not reply to this email.
-      `;
-
-      await Helper.sendEmail({
-        to: user.email,
-        subject,
-        text,
-        html,
-      });
-    } catch (emailError) {
-      console.error("Failed to send credentials email:", {
-        userId: user.id,
-        email: user.email,
-        error: emailError.message,
-      });
-    }
-  }
-
   static async regenerateCredentialsAndNotify(userId, newEmail) {
     try {
       const newPassword = Helper.generatePassword();
@@ -1582,7 +1481,13 @@ class UserServices {
         },
       });
 
-      await this.sendCredentialsEmail(user, newPassword, newTransactionPin);
+      await sendCredentialsEmail(
+        user,
+        newPassword,
+        newTransactionPin,
+        "reset",
+        "Your credentials have been reset as requested. Here are your new login credentials:"
+      );
 
       await Prisma.auditLog.create({
         data: {

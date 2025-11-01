@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
 import { CryptoService } from "../utils/cryptoService.js";
 import UserServices from "./user.service.js";
+import EmailTemplates from "../emaiTemplates/emailTemplates.js";
 
 class AuthServices {
   static async login(payload, req) {
@@ -221,20 +222,20 @@ class AuthServices {
     const encryptedToken = CryptoService.encrypt(token);
     const resetUrl = `${process.env.CLIENT_URL}/verify-reset-password?token=${encodeURIComponent(encryptedToken)}&email=${encodeURIComponent(email)}`;
 
-    const formattedFirstName = AuthServices.formatName(user.firstName);
+    const emailContent = EmailTemplates.generatePasswordResetTemplate({
+      firstName: user.firstName,
+      resetUrl: resetUrl,
+      expiryMinutes: 2,
+      supportEmail: process.env.SMTP_USER,
+      customMessage: null,
+    });
 
-    const subject = "Password Reset Instructions";
-    const text = `Hello ${formattedFirstName},\n\nYou requested a password reset.\n\nClick the link to reset your password:\n${resetUrl}\n\nThis link expires in 2 minutes.`;
-    const html = `
-    <p>Hello ${formattedFirstName},</p>
-    <p>You requested a password reset.</p>
-    <p>Click the link below to reset your password:</p>
-    <p><a href="${resetUrl}">${resetUrl}</a></p>
-    <p>This link will expire in 2 minutes.</p>
-  `;
-
-    await Helper.sendEmail({ to: user.email, subject, text, html });
-
+    await Helper.sendEmail({
+      to: user.email,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
+    });
     return { message: "Password reset link has been sent to your email." };
   }
 
