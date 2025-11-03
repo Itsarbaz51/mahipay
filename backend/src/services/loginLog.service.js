@@ -19,10 +19,6 @@ export class LoginLogService {
       sortBy = "createdAt",
     } = payload;
 
-    console.log("=== DEBUG: Starting getAllLoginLogs ===");
-    console.log("Payload:", payload);
-    console.log("Current User:", currentUser);
-
     const skip = (page - 1) * limit;
 
     // SIMPLE FIX: Use direct approach
@@ -31,16 +27,10 @@ export class LoginLogService {
     // 1. First handle user access
     if (currentUser.role !== "ADMIN") {
       where.userId = currentUser.id;
-      console.log(
-        "DEBUG: Non-admin access - filtering by user ID:",
-        currentUser.id
-      );
     }
 
     // 2. Then handle role filter - SIMPLIFIED
     if (roleId && roleId !== "all") {
-      console.log("DEBUG: Applying role filter:", roleId);
-
       // Direct approach - use AND condition
       if (where.userId) {
         // If we already have userId filter, use AND
@@ -60,11 +50,6 @@ export class LoginLogService {
         };
       }
     }
-
-    console.log(
-      "DEBUG: Where clause after role filter:",
-      JSON.stringify(where, null, 2)
-    );
 
     // 3. Date range
     if (startDate || endDate) {
@@ -104,14 +89,10 @@ export class LoginLogService {
       }
     }
 
-    console.log("DEBUG: Final WHERE clause:", JSON.stringify(where, null, 2));
-
     // Build orderBy
     const orderBy = this.buildOrderByClause(sortBy, sort);
 
     try {
-      console.log("DEBUG: Executing Prisma query...");
-
       const [loginLogs, total] = await Promise.all([
         Prisma.loginLogs.findMany({
           where,
@@ -128,17 +109,6 @@ export class LoginLogService {
         }),
         Prisma.loginLogs.count({ where }),
       ]);
-
-      console.log("DEBUG: Query results -", {
-        logsFound: loginLogs.length,
-        totalCount: total,
-        roleFilterApplied: !!(roleId && roleId !== "all"),
-      });
-
-      // Check if we're getting any data
-      if (loginLogs.length > 0) {
-        console.log("DEBUG: First log user role:", loginLogs[0].user?.role);
-      }
 
       // Process logs
       const processedLogs = loginLogs.map((log) => {
@@ -189,12 +159,6 @@ export class LoginLogService {
           },
         },
       };
-
-      console.log("DEBUG: Final response summary:", {
-        dataCount: result.data.length,
-        totalLogs: result.pagination.totalItems,
-        roleIdFilter: result.metadata.appliedFilters.roleId,
-      });
 
       return this.safeJSONConvert(result);
     } catch (error) {

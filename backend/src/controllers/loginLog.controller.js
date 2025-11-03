@@ -7,10 +7,6 @@ class LoginLogController {
   static loginLogService = new LoginLogService();
 
   static index = asyncHandler(async (req, res) => {
-    console.log("=== ROUTE DEBUG: Request Body ===");
-    console.log("Full body:", req.body);
-    console.log("RoleId from body:", req.body.roleId);
-
     const payload = {
       page: req.body.page || 1,
       limit: req.body.limit || 10,
@@ -25,9 +21,6 @@ class LoginLogController {
       sort: req.body.sort || "desc",
       sortBy: req.body.sortBy || "createdAt",
     };
-
-    console.log("=== ROUTE DEBUG: Processed Payload ===");
-    console.log("Payload with roleId:", payload.roleId);
 
     // Current user info from auth middleware
     const currentUser = {
