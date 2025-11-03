@@ -149,8 +149,8 @@ async function main() {
   console.log("\n🏢 Creating service providers...");
 
   const serviceProviders = [
-    { type: "AEPS", code: "AEPS_BULKPE", name: "BulkPE AEPS" },
-    { type: "BBPS", code: "BBPS_PAYTM", name: "PayTM BBPS" },
+    { code: "AEPS_BULKPE", name: "BulkPE AEPS" },
+    { code: "BBPS_PAYTM", name: "PayTM BBPS" },
   ];
 
   for (const provider of serviceProviders) {
@@ -158,12 +158,12 @@ async function main() {
       where: { code: provider.code },
       update: {},
       create: {
-        type: provider.type,
-        code: provider.code,
         name: provider.name,
+        code: provider.code,
         isActive: true,
-        createdBy: admin.id,
-        config: {
+        hierarchyLevel: "0",
+        hierarchyPath: "0",
+        envConfig: {
           apiKey: "demo_key",
           baseUrl: "https://api.demo.com/v1",
           timeout: 30000,

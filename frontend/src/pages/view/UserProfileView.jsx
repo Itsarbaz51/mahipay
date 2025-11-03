@@ -26,9 +26,9 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
   const user = userData?.data?.user || userData?.user || userData;
 
   // --- Error State ---
-  if (!user || !user.id) {
-    alert("User not found");
-  }
+  // if (!user || !user?.id) {
+  //   alert("User not found");
+  // }
 
   // --- Utility Functions ---
   const formatDate = (dateString) => {
@@ -130,10 +130,10 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
               {/* Profile Image & Level Badge */}
               <div className="relative flex-shrink-0">
                 <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-gray-300 flex items-center justify-center border-4 border-white shadow-2xl">
-                  {user.profileImage ? (
+                  {user?.profileImage ? (
                     <img
-                      src={user.profileImage}
-                      alt={`${user.firstName} ${user.lastName}`}
+                      src={user?.profileImage}
+                      alt={`${user?.firstName} ${user?.lastName}`}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -141,22 +141,22 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                   )}
                 </div>
                 <div className="absolute bottom-0 right-0 transform translate-x-1/4 translate-y-1/4 bg-purple-600 text-white text-sm font-bold px-3 py-1 rounded-full shadow-lg border-2 border-white">
-                  Lvl {user.hierarchyLevel || "N/A"}
+                  Lvl {user?.hierarchyLevel || "N/A"}
                 </div>
               </div>
 
               {/* Name & Badges */}
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 mb-1 leading-tight">
-                  {user.firstName} {user.lastName}
+                  {user?.firstName} {user?.lastName}
                 </h2>
                 <p className="text-purple-600 text-xl font-mono mb-4">
-                  @{user.username}
+                  @{user?.username}
                 </p>
                 <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                  <StatusBadge status={user.status} />
+                  <StatusBadge status={user?.status} />
 
-                  {user.isKycVerified ? (
+                  {user?.isKycVerified ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold border border-blue-300 transition-all duration-200 hover:bg-blue-200">
                       <CheckCircle size={14} /> KYC Verified
                     </span>
@@ -166,7 +166,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                     </span>
                   )}
 
-                  {user.isAuthorized && (
+                  {user?.isAuthorized && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold border border-purple-300 transition-all duration-200 hover:bg-purple-200">
                       <Shield size={14} /> Authorized
                     </span>
@@ -181,32 +181,32 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
             <StatCard
               icon={Wallet}
               title="Current Balance"
-              value={formatCurrency(user.wallets?.[0]?.balance || 0)}
+              value={formatCurrency(user?.wallets?.[0]?.balance || 0)}
               color="green"
             />
             <StatCard
               icon={Users}
               title="Direct Children"
-              value={user.children?.length || 0}
+              value={user?.children?.length || 0}
               color="purple"
               subText="View list below"
             />
             <StatCard
               icon={Briefcase}
               title="Role Level"
-              value={user.role?.level || "N/A"}
+              value={user?.role?.level || "N/A"}
               color="orange"
             />
             <StatCard
               icon={Calendar}
               title="Member Since"
               value={
-                user.createdAt ? new Date(user.createdAt).getFullYear() : "N/A"
+                user?.createdAt ? new Date(user?.createdAt).getFullYear() : "N/A"
               }
               color="blue"
               subText={
-                user.createdAt
-                  ? new Date(user.createdAt).toLocaleDateString()
+                user?.createdAt
+                  ? new Date(user?.createdAt).toLocaleDateString()
                   : "N/A"
               }
             />
@@ -228,7 +228,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       <Hash size={14} /> Unique User ID
                     </label>
                     <p className="text-gray-900 mt-1 font-mono text-sm break-all font-semibold">
-                      {user.id}
+                      {user?.id}
                     </p>
                   </div>
                   {/* Username */}
@@ -237,7 +237,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Username
                     </label>
                     <p className="text-gray-900 mt-1 font-semibold text-lg">
-                      @{user.username}
+                      @{user?.username}
                     </p>
                   </div>
                   {/* First Name */}
@@ -246,7 +246,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       First Name
                     </label>
                     <p className="text-gray-900 mt-1 font-semibold text-base">
-                      {user.firstName}
+                      {user?.firstName}
                     </p>
                   </div>
                   {/* Last Name */}
@@ -255,7 +255,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Last Name
                     </label>
                     <p className="text-gray-900 mt-1 font-semibold text-base">
-                      {user.lastName}
+                      {user?.lastName}
                     </p>
                   </div>
                 </div>
@@ -278,21 +278,21 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                         Email Address
                       </label>
                       <p className="text-gray-900 font-semibold text-base break-all">
-                        {user.email}
+                        {user?.email}
                       </p>
                       <span
                         className={`text-xs font-semibold flex items-center gap-1 mt-0.5 ${
-                          user.emailVerifiedAt
+                          user?.emailVerifiedAt
                             ? "text-green-600"
                             : "text-orange-600"
                         }`}
                       >
-                        {user.emailVerifiedAt ? (
+                        {user?.emailVerifiedAt ? (
                           <CheckCircle size={12} />
                         ) : (
                           <XCircle size={12} />
                         )}
-                        {user.emailVerifiedAt ? "Verified" : "Not verified"}
+                        {user?.emailVerifiedAt ? "Verified" : "Not verified"}
                       </span>
                     </div>
                   </div>
@@ -306,7 +306,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                         Phone Number
                       </label>
                       <p className="text-gray-900 font-semibold text-base">
-                        {user.phoneNumber || "N/A"}
+                        {user?.phoneNumber || "N/A"}
                       </p>
                     </div>
                   </div>
@@ -341,7 +341,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                         </button>
                       </div>
                       <p className="text-gray-900 font-mono text-xs break-all cursor-text select-all">
-                        {showPassword ? user.password || "N/A" : "•••••••"}
+                        {showPassword ? user?.password || "N/A" : "•••••••"}
                       </p>
                     </div>
                     {/* Transaction PIN Hash */}
@@ -365,7 +365,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       </div>
                       <p className="text-gray-900 font-mono text-xs break-all cursor-text select-all">
                         {showTransactionPin
-                          ? user.transactionPin || "N/A"
+                          ? user?.transactionPin || "N/A"
                           : "•••••••"}
                       </p>
                     </div>
@@ -391,10 +391,10 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       <Users className="text-cyan-600" size={20} />
                       <div>
                         <p className="text-gray-900 font-semibold text-base">
-                          @{user.parent?.username || "N/A"}
+                          @{user?.parent?.username || "N/A"}
                         </p>
                         <p className="text-gray-600 text-xs font-mono">
-                          ID: {user.parentId || "No parent ID"}
+                          ID: {user?.parentId || "No parent ID"}
                         </p>
                       </div>
                     </div>
@@ -405,7 +405,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Hierarchy Path
                     </label>
                     <p className="text-gray-900 mt-1 font-mono text-xs bg-gray-50 px-3 py-2 rounded-lg break-all border border-gray-200 max-h-24 overflow-y-auto">
-                      {user.hierarchyPath || "N/A"}
+                      {user?.hierarchyPath || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -422,7 +422,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Role Name
                     </label>
                     <p className="text-gray-900 mt-1 font-bold text-lg p-2 bg-purple-50 rounded-md border border-purple-200">
-                      {user.role?.name || "N/A"}
+                      {user?.role?.name || "N/A"}
                     </p>
                   </div>
                   <div>
@@ -430,7 +430,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Role ID
                     </label>
                     <p className="text-gray-900 mt-1 font-mono text-sm bg-gray-50 px-3 py-2 rounded-lg break-all border border-gray-200">
-                      {user.role?.id || "N/A"}
+                      {user?.role?.id || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -447,7 +447,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Created At
                     </label>
                     <p className="text-gray-900 mt-1 text-sm font-medium">
-                      {formatDate(user.createdAt)}
+                      {formatDate(user?.createdAt)}
                     </p>
                   </div>
                   <div>
@@ -455,7 +455,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Last Updated
                     </label>
                     <p className="text-gray-900 mt-1 text-sm font-medium">
-                      {formatDate(user.updatedAt)}
+                      {formatDate(user?.updatedAt)}
                     </p>
                   </div>
                 </div>
@@ -464,14 +464,14 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
           </div>
 
           {/* Direct Children List - Full Width Section */}
-          {user.children && user.children.length > 0 && (
+          {user?.children && user?.children.length > 0 && (
             <div className={detailCard}>
               <h3 className={sectionTitleClass}>
                 <Users className="text-cyan-500" size={24} /> Direct Children (
-                {user.children.length})
+                {user?.children.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {user.children.map((child) => (
+                {user?.children.map((child) => (
                   <div
                     key={child.id}
                     className="p-4 border rounded-xl bg-cyan-50 hover:bg-cyan-100 transition-colors duration-200 shadow-sm"

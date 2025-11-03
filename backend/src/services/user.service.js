@@ -490,7 +490,6 @@ class UserServices {
               select: {
                 id: true,
                 name: true,
-                type: true,
                 code: true,
                 isActive: true,
               },

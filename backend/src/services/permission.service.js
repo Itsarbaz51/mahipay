@@ -72,7 +72,6 @@ export class RolePermissionService {
         service: {
           select: {
             id: true,
-            type: true,
             code: true,
             name: true,
             isActive: true,
@@ -184,7 +183,6 @@ export class UserPermissionService {
         service: {
           select: {
             id: true,
-            type: true,
             code: true,
             name: true,
             isActive: true,

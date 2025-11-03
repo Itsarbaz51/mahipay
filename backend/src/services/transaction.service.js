@@ -130,8 +130,6 @@ export class TransactionService {
         data: { balance: newBalance },
       });
 
-     
-
       return newTx;
     });
 
@@ -208,7 +206,6 @@ export class TransactionService {
         data: { status: "REFUNDED" },
       });
 
-      
       return {
         ...refundRecord,
         transactionReference: transaction.referenceId,
@@ -265,7 +262,7 @@ export class TransactionService {
     const transaction = await Prisma.transaction.findUnique({
       where: { id },
       include: {
-        service: { select: { name: true, code: true, type: true } },
+        service: { select: { name: true, code: true } },
         apiEntity: { select: { entityType: true, entityId: true } },
         user: {
           select: { firstName: true, lastName: true, phoneNumber: true },
@@ -371,8 +368,6 @@ export class TransactionService {
           data: { balance: runningBalance },
         });
       }
-
-      
 
       return txUpdate;
     });

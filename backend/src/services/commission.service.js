@@ -103,10 +103,7 @@ export class CommissionSettingService {
 
     const settings = await Prisma.commissionSetting.findMany({
       where: {
-        OR: [
-          { targetUserId: userId },
-          { scope: "ROLE", roleId: user.roleId },
-        ],
+        OR: [{ targetUserId: userId }, { scope: "ROLE", roleId: user.roleId }],
         isActive: true,
       },
       include: {
@@ -146,7 +143,6 @@ export class CommissionSettingService {
         service: {
           select: {
             id: true,
-            type: true,
             code: true,
             name: true,
             isActive: true,
@@ -310,7 +306,6 @@ export class CommissionEarningService {
         service: {
           select: {
             id: true,
-            type: true,
             code: true,
             name: true,
             isActive: true,
@@ -375,7 +370,6 @@ export class CommissionEarningService {
         service: {
           select: {
             id: true,
-            type: true,
             code: true,
             name: true,
             isActive: true,
@@ -425,7 +419,7 @@ export class CommissionEarningService {
         netAmount: true,
         commissionType: true,
         createdAt: true,
-        service: { select: { type: true, code: true } },
+        service: { select: { name: true, code: true } },
       },
       orderBy: { createdAt: "desc" },
     });

@@ -27,7 +27,7 @@ import AddProfileKYC from "../components/forms/AddProfileKYC";
 import Settings from "../components/Settings";
 import CommissionManagement from "../pages/CommissionManagement";
 import CardPayout from "../pages/services/CardPayout";
-import UserProfilePage from "../pages/view/UserProfileView.jsx";
+import UserProfilePage from "../pages/UserProfilePage.jsx";
 import PrivacyPolicy from "../pages/landing/Privacypolicy";
 import TermsConditions from "../pages/landing/Terms&conditions";
 import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";

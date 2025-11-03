@@ -85,12 +85,12 @@ function ApiIntegration() {
   const handleConnect = (api) => {
     setSelectedApi(api);
 
-    const count = Number(api.keyValueInputNumber) || 0;
+    const count = Number(api?.keyValueInputNumber) || 0;
 
     // agar envConfig pehle se hai to use, warna naya array banao
     const envVars =
-      api.envConfig && api.envConfig.length > 0
-        ? api.envConfig.map((env) => ({
+      api?.envConfig && api?.envConfig.length > 0
+        ? api?.envConfig.map((env) => ({
             ...env,
             showValue: false,
           }))
@@ -159,7 +159,7 @@ function ApiIntegration() {
 
     setIntegrations((prev) =>
       prev.map((int) =>
-        int.id === selectedApi.id
+        int.id === selectedApi?.id
           ? {
               ...int,
               connected: true,
@@ -206,16 +206,16 @@ function ApiIntegration() {
         <tbody className="divide-y divide-gray-200">
           {integrations.map((api) => (
             <tr
-              key={api.id}
+              key={api?.id}
               className="hover:bg-gray-50 transition-colors duration-150 group"
             >
               <td className="py-4 px-6">
                 <div className="flex items-center space-x-4">
                   <div className={`p-3 rounded-xl`}>
-                    {api.iconUrl ? (
+                    {api?.iconUrl ? (
                       <img
-                        src={api.iconUrl}
-                        alt={api.name}
+                        src={api?.iconUrl}
+                        alt={api?.name}
                         className="w-6 h-6"
                       />
                     ) : (
@@ -224,7 +224,7 @@ function ApiIntegration() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">
-                      {api.name}
+                      {api?.name}
                     </h3>
                   </div>
                 </div>
@@ -232,12 +232,12 @@ function ApiIntegration() {
 
               <td className="py-4 px-6">
                 <p className="text-sm text-gray-600 max-w-xs">
-                  {api.description || "No description provided"}
+                  {api?.description || "No description provided"}
                 </p>
               </td>
 
               <td className="py-4 px-6">
-                {api.apiIntegrationStatus ? (
+                {api?.apiIntegrationStatus ? (
                   <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-sm w-fit">
                     <Check className="w-4 h-4 text-white" />
                     <span className="text-xs font-bold text-white">
@@ -254,10 +254,10 @@ function ApiIntegration() {
               </td>
 
               <td className="py-4 px-6">
-                {api.apiIntegrationStatus &&
-                (api.envConfig ?? []).length > 0 ? (
+                {api?.apiIntegrationStatus &&
+                (api?.envConfig ?? []).length > 0 ? (
                   <div className="space-y-1">
-                    {(api.envConfig ?? []).slice(0, 2).map((env, idx) => (
+                    {(api?.envConfig ?? []).slice(0, 2).map((env, idx) => (
                       <div
                         key={idx}
                         className="flex items-center space-x-2 text-xs"
@@ -272,9 +272,9 @@ function ApiIntegration() {
                         </span>
                       </div>
                     ))}
-                    {(api.envConfig ?? []).length > 2 && (
+                    {(api?.envConfig ?? []).length > 2 && (
                       <div className="text-xs text-gray-500 font-medium">
-                        +{(api.envConfig ?? []).length - 2} more variables
+                        +{(api?.envConfig ?? []).length - 2} more variables
                       </div>
                     )}
                   </div>
@@ -284,14 +284,18 @@ function ApiIntegration() {
                       Required Variables:
                     </div>
                     <div className="space-y-1">
-                      {(api.envConfig ?? []).map((env, idx) => (
-                        <div key={idx} className="flex items-center space-x-2">
-                          <Key className="w-3 h-3 text-gray-400" />
-                          <span className="font-mono text-gray-600">
-                            {env.key}
-                          </span>
-                        </div>
-                      ))}
+                      {Array.isArray(api?.envConfig) &&
+                        api.envConfig.map((env, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center space-x-2"
+                          >
+                            <Key className="w-3 h-3 text-gray-400" />
+                            <span className="font-mono text-gray-600">
+                              {env.key}
+                            </span>
+                          </div>
+                        ))}
                     </div>
                   </div>
                 )}
@@ -299,7 +303,7 @@ function ApiIntegration() {
 
               <td className="py-4 px-6">
                 <div className="flex space-x-2">
-                  {api.connected ? (
+                  {api?.connected ? (
                     <>
                       <button
                         onClick={() => handleConnect(api)}
@@ -309,7 +313,7 @@ function ApiIntegration() {
                         Configure
                       </button>
                       <button
-                        onClick={() => handleDisconnect(api.id)}
+                        onClick={() => handleDisconnect(api?.id)}
                         className="px-4 py-2 border-2 border-red-200 rounded-lg text-red-600 hover:bg-red-50 hover:border-red-300 transition-all duration-200 font-semibold text-sm flex items-center"
                       >
                         <X className="w-4 h-4 mr-2" />
@@ -465,23 +469,23 @@ function ApiIntegration() {
             {/* Header with Gradient */}
             <div
               className={`p-6 bg-gradient-to-r ${
-                COLOR_CLASSES[selectedApi.color]?.gradient ||
+                COLOR_CLASSES[selectedApi?.color]?.gradient ||
                 "from-blue-500 to-indigo-600"
               } text-white`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="p-3 bg-white/20 backdrop-blur-lg rounded-2xl">
-                    {React.createElement(selectedApi.icon || Zap, {
+                    {React.createElement(selectedApi?.icon || Zap, {
                       className: "w-7 h-7 text-white",
                     })}
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">
-                      {selectedApi.name} Configuration
+                      {selectedApi?.name} Configuration
                     </h2>
                     <p className="text-white/80 text-sm mt-1">
-                      {selectedApi.description}
+                      {selectedApi?.description}
                     </p>
                   </div>
                 </div>
@@ -501,7 +505,7 @@ function ApiIntegration() {
                   Required Environment Variables
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Fill in the required credentials for {selectedApi.name}. All
+                  Fill in the required credentials for {selectedApi?.name}. All
                   sensitive data is encrypted.
                 </p>
               </div>
