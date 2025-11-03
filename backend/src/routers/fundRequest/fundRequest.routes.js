@@ -1,9 +1,9 @@
 import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
-import FundRequestController from "../controllers/FundRequestController.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
-import FundRequestValidationSchemas from "../validations/FundRequestValidation.schemas.js";
-import upload from "../middlewares/multer.middleware.js";
+import AuthMiddleware from "../../middlewares/auth.middleware.js";
+import { validateRequest } from "../../middlewares/validateRequest.js";
+import FundRequestController from "../../controllers/fundRequest/fundRequest.controller.js";
+import FundRequestValidationSchemas from "../../validations/fundRequest/fundRequestValidation.schema.js";
+import upload from "../../middlewares/multer.middleware.js";
 
 const fundRequestRoutes = Router();
 

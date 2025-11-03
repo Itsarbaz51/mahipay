@@ -16,13 +16,12 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { getbyId, getKycAll, verifyKyc } from "../../redux/slices/kycSlice";
 import StateCard from "../ui/StateCard";
-import PageHeader from "../ui/PageHeader";
 import ConfirmCard from "../ui/ConfirmCard";
 import Kyc from "../../pages/view/Kyc";
 import Pagination from "../ui/Pagination";
 import { useDebounce } from "use-debounce";
 
-const AllKycTable = () => {
+const ProfileTable = () => {
   const dispatch = useDispatch();
 
   // UI State
@@ -222,11 +221,6 @@ const AllKycTable = () => {
 
       {/* Header */}
       <div className="mb-8 space-y-3">
-        <PageHeader
-          breadcrumb={["Dashboard", "KYC Management"]}
-          title="KYC Profiles"
-          description="Review and manage customer verification documents"
-        />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statusCards.map((card, idx) => (
             <StateCard key={idx} {...card} />
@@ -460,4 +454,4 @@ const AllKycTable = () => {
   );
 };
 
-export default AllKycTable;
+export default ProfileTable;

@@ -1,4 +1,9 @@
-import { CreditCard, Settings as SettingsIcon, UserCog } from "lucide-react";
+import {
+  Cable,
+  CreditCard,
+  Settings as SettingsIcon,
+  UserCog,
+} from "lucide-react";
 import { useState } from "react";
 import { useSelector } from "react-redux";
 
@@ -7,6 +12,7 @@ import CompanyAccounts from "../pages/CompanyAccounts";
 import ManageServices from "../pages/ManageServices";
 import RoleManager from "./RoleManager";
 import PageHeader from "./ui/PageHeader";
+import ApiIntigration from "./ApiIntigration";
 
 const Settings = () => {
   const { currentUser = {} } = useSelector((state) => state.auth);
@@ -28,7 +34,12 @@ const Settings = () => {
     },
     { id: "services", label: "Services", icon: UserCog, adminOnly: true },
     { id: "role", label: "Roles Management", icon: UserCog, adminOnly: true },
-    // { id: "address", label: "Address Management", icon: UserCog, adminOnly: true },
+    {
+      id: "api-intigration",
+      label: "API Intigration",
+      icon: Cable,
+      adminOnly: true,
+    },
   ];
 
   const tabs =
@@ -48,8 +59,8 @@ const Settings = () => {
         return roleName === "ADMIN" ? <ManageServices /> : <NoAccess />;
       case "role":
         return roleName === "ADMIN" ? <RoleManager /> : <NoAccess />;
-      // case "address":
-      //   return <Address />;
+      case "api-intigration":
+        return roleName === "ADMIN" ? <ApiIntigration /> : <NoAccess />;
       default:
         return roleName === "ADMIN" ? <MainSettings /> : <NoAccess />;
     }

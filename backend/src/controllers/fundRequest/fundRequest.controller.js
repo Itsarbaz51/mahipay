@@ -1,7 +1,6 @@
-import asyncHandler from "../utils/asyncHandler.js";
-import ApiResponse from "../utils/ApiResponse.js";
-import ApiError from "../utils/ApiError.js";
-import FundRequestService from "../services/FundRequestService.js";
+import FundRequestService from "../../services/fundRequest/fundRequest.service.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
+import asyncHandler from "../../utils/AsyncHandler.js";
 
 class FundRequestController {
   // Get all fund requests (for admin) or user's own requests
@@ -12,7 +11,7 @@ class FundRequestController {
     );
     return res
       .status(200)
-      .json(new ApiResponse(200, "Fund requests fetched successfully", result));
+      .json(ApiResponse.success(200, "Fund requests fetched successfully"));
   });
 
   // Get single fund request details
@@ -21,10 +20,10 @@ class FundRequestController {
     const result = await FundRequestService.getFundRequestById(id, req.user);
     return res
       .status(200)
-      .json(new ApiResponse(200, "Fund request fetched successfully", result));
+      .json(ApiResponse.success(result, "Fund request fetched successfully"));
   });
 
-  // Create new fund request
+  // Create  fund request
   static store = asyncHandler(async (req, res) => {
     const result = await FundRequestService.createFundRequest(
       req.body,
@@ -33,7 +32,7 @@ class FundRequestController {
     );
     return res
       .status(201)
-      .json(new ApiResponse(201, "Fund request created successfully", result));
+      .json(ApiResponse.success(result, "Fund request created successfully"));
   });
 
   // Update fund request status (admin only)
@@ -46,7 +45,7 @@ class FundRequestController {
     );
     return res
       .status(200)
-      .json(new ApiResponse(200, "Fund request updated successfully", result));
+      .json(ApiResponse.success(result, "Fund request updated successfully"));
   });
 
   // Verify Razorpay payment
@@ -57,7 +56,7 @@ class FundRequestController {
     );
     return res
       .status(200)
-      .json(new ApiResponse(200, "Payment verified successfully", result));
+      .json(ApiResponse.success(result, "Payment verified successfully"));
   });
 
   // Delete fund request
@@ -66,7 +65,7 @@ class FundRequestController {
     await FundRequestService.deleteFundRequest(id, req.user);
     return res
       .status(200)
-      .json(new ApiResponse(200, "Fund request deleted successfully"));
+      .json(ApiResponse.success(result, "Fund request deleted successfully"));
   });
 
   // Get wallet balance
@@ -75,7 +74,11 @@ class FundRequestController {
     return res
       .status(200)
       .json(
-        new ApiResponse(200, "Wallet balance fetched successfully", result)
+        ApiResponse.success(
+          result,
+          "Wallet balance fetched successfully",
+          result
+        )
       );
   });
 
@@ -87,7 +90,7 @@ class FundRequestController {
     );
     return res
       .status(200)
-      .json(new ApiResponse(200, "Order created successfully", result));
+      .json(ApiResponse.success(result, "Order created successfully"));
   });
 
   // Get fund request statistics
@@ -95,7 +98,7 @@ class FundRequestController {
     const result = await FundRequestService.getFundRequestStats(req.user);
     return res
       .status(200)
-      .json(new ApiResponse(200, "Statistics fetched successfully", result));
+      .json(ApiResponse.success(result, "Statistics fetched successfully"));
   });
 
   // Reject and refund topup (admin only)
@@ -105,7 +108,7 @@ class FundRequestController {
     return res
       .status(200)
       .json(
-        new ApiResponse(200, "Topup rejected and refunded successfully", result)
+        ApiResponse.success(result, "Topup rejected and refunded successfully")
       );
   });
 }

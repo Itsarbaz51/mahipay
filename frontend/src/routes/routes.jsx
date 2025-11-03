@@ -27,23 +27,14 @@ import AddProfileKYC from "../components/forms/AddProfileKYC";
 import Settings from "../components/Settings";
 import CommissionManagement from "../pages/CommissionManagement";
 import CardPayout from "../pages/services/CardPayout";
-<<<<<<< HEAD
 import UserProfilePage from "../pages/view/UserProfileView.jsx";
-=======
-import UserProfilePage from "../pages/UserProfilePage.jsx";
-import AuditLogs from "../pages/AuditLogs";
-import LoginLogs from "../pages/LoginLogs.jsx";
->>>>>>> 6fe94f201b0436dd691306bfec7cb454d1ad3531
 import PrivacyPolicy from "../pages/landing/Privacypolicy";
 import TermsConditions from "../pages/landing/Terms&conditions";
 import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";
 import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
-<<<<<<< HEAD
 import RequestKYC from "../pages/RequestKYC.jsx";
 import Logs from "../pages/Logs.jsx";
-=======
 import VerifyResetPassword from "../pages/VerifyResetPassword.jsx";
->>>>>>> 6fe94f201b0436dd691306bfec7cb454d1ad3531
 
 export const createRouter = () => {
   return createBrowserRouter(

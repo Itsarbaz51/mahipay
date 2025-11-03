@@ -7,9 +7,9 @@ axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
 
 const initialState = {
-  logsList: [],
+  logsList: null,
   logDetail: null,
-  isLoading: false,
+  loading: false,
   error: null,
   success: null,
 };
@@ -19,29 +19,29 @@ const loginLogsSlice = createSlice({
   initialState,
   reducers: {
     logsRequest: (state) => {
-      state.isLoading = true;
+      state.loading = true;
       state.error = null;
       state.success = null;
     },
     logsListSuccess: (state, action) => {
-      state.isLoading = false;
-      state.logsList = action.payload?.data || [];
+      state.loading = false;
+      state.logsList = action.payload;
       state.success = action.payload?.message || null;
       state.error = null;
     },
     logDetailSuccess: (state, action) => {
-      state.isLoading = false;
+      state.loading = false;
       state.logDetail = action.payload?.data || null;
       state.success = action.payload?.message || null;
       state.error = null;
     },
     logsFail: (state, action) => {
-      state.isLoading = false;
+      state.loading = false;
       state.error = action.payload;
       if (action.payload) toast.error(action.payload);
     },
     resetLogs: (state) => {
-      state.isLoading = false;
+      state.loading = false;
       state.error = null;
       state.success = null;
       state.logDetail = null;
@@ -65,20 +65,48 @@ export const getLoginLogs =
   async (dispatch) => {
     try {
       dispatch(logsRequest());
-      const body = {
-        userId: params.userId || null,
+
+      const requestBody = {
         page: params.page || 1,
         limit: params.limit || 10,
-        sort: params.sort || "desc",
         search: params.search || "",
+        deviceType: params.deviceType || "all", // YEH LINE FIX KAREN
+        roleId: params.roleId || "",
+        sort: params.sort || "desc",
+        sortBy: params.sortBy || "createdAt",
+        userId: params.userId || undefined,
+        startDate: params.startDate || undefined,
+        endDate: params.endDate || undefined,
+        browser: params.browser || undefined,
+        os: params.os || undefined,
       };
 
-      const { data } = await axios.post("/login-logs", body);
+      // Remove undefined values but keep empty strings for roleId
+      Object.keys(requestBody).forEach((key) => {
+        if (requestBody[key] === undefined) {
+          delete requestBody[key];
+        }
+      });
+
+      console.log("=== FINAL REQUEST BODY ===");
+      console.log(requestBody);
+
+      const { data } = await axios.post("/login-logs", requestBody, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
       dispatch(logsListSuccess(data));
       return data;
     } catch (error) {
-      const errMsg = error?.response?.data?.message || error?.message;
+      console.error("API Error:", error.response?.data || error.message);
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch login logs";
       dispatch(logsFail(errMsg));
+      throw error;
     }
   };
 
@@ -86,26 +114,11 @@ export const getLoginLogs =
 export const getLoginLogById = (id) => async (dispatch) => {
   try {
     dispatch(logsRequest());
-    const { data } = await axios.get(`logs/login-log-detail/${id}`);
+    const { data } = await axios.get(`/api/logs/login-log-detail/${id}`);
     dispatch(logDetailSuccess(data));
     return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
     dispatch(logsFail(errMsg));
-  }
-};
-
-// ------------------ Optional: Delete a specific login log --------------------------
-export const deleteLoginLog = (id) => async (dispatch) => {
-  try {
-    dispatch(logsRequest());
-    const { data } = await axios.delete(`logs/delete-login-log/${id}`);
-    toast.success(data.message || "Login log deleted successfully");
-    dispatch(getLoginLogs());
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(logsFail(errMsg));
-    toast.error(errMsg);
   }
 };

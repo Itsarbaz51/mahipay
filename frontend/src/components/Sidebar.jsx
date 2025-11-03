@@ -15,6 +15,8 @@ import {
   BadgeIndianRupee,
   RedoDot,
   HandCoins,
+  Logs,
+  FileCode,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
@@ -91,13 +93,6 @@ const Sidebar = () => {
         "RETAILER",
       ],
     },
-    {
-      id: "Bank",
-      label: "Bank KYC",
-      icon: Landmark,
-      path: "/bank-details",
-      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
-    },
 
     // --- SERVICE ---
     {
@@ -115,10 +110,10 @@ const Sidebar = () => {
 
     // --- ADMIN ONLY ---
     {
-      id: "kyc",
-      label: "Profiles KYC",
+      id: "request-kyc",
+      label: "KYC Request",
       icon: Shield,
-      path: "/all-kyc",
+      path: "/kyc-request",
       permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
     },
     {
@@ -136,18 +131,17 @@ const Sidebar = () => {
       permissions: ["ADMIN"],
     },
     {
-      id: "login-logs",
-      label: "Login Logs",
-      icon: LogInIcon,
-      path: "/login-logs",
-      permissions: ["ADMIN"],
-    },
-    {
-      id: "audit-logs",
-      label: "Audit Logs",
-      icon: RedoDot,
-      path: "/audit-logs",
-      permissions: ["ADMIN"],
+      id: "logs",
+      label: "Logs",
+      icon: FileCode,
+      path: "/logs",
+      permissions: [
+        "ADMIN",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ],
     },
 
     // --- SYSTEM ---
@@ -188,12 +182,11 @@ const Sidebar = () => {
 
   const adminItems = filteredMenuItems.filter((item) =>
     [
-      "kyc",
+      "request-kyc",
       "employee-management",
       "reports",
       "permission",
-      "login-logs",
-      "audit-logs",
+      "logs",
       "Bank",
       "fund-request",
     ].includes(item.id)

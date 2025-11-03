@@ -11,6 +11,7 @@ import {
   ChevronUp,
   ChevronDown,
   RefreshCw,
+  User,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -18,11 +19,11 @@ import {
   verifyBank,
   getBankDetail,
 } from "../../redux/slices/bankSlice";
-import PageHeader from "../ui/PageHeader";
 import ConfirmCard from "../ui/ConfirmCard";
 import Bank from "../../pages/view/Bank";
 import Pagination from "../ui/Pagination";
 import { useDebounce } from "use-debounce";
+import StateCard from "../ui/StateCard";
 
 // Constants
 const TABLE_LIMIT = 10;
@@ -259,6 +260,45 @@ const BankTable = () => {
     });
   }, [bankData, isAdmin, handleActionClick, handleViewShow, getStatusConfig]);
 
+  const statusCounts = useMemo(() => {
+    return {
+      total: bankData.length,
+      verified: bankData.filter((p) => p.status === "VERIFIED").length,
+      pending: bankData.filter((p) => p.status === "PENDING").length,
+      rejected: bankData.filter((p) => p.status === "REJECT").length,
+    };
+  }, [bankData]);
+
+  const statusCards = [
+    {
+      title: "Total",
+      value: statusCounts.total,
+      icon: User,
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-600",
+    },
+    {
+      title: "Verified",
+      value: statusCounts.verified,
+      icon: Shield,
+      iconBg: "bg-emerald-100",
+      iconColor: "text-emerald-600",
+    },
+    {
+      title: "Pending",
+      value: statusCounts.pending,
+      icon: Clock,
+      iconBg: "bg-amber-100",
+      iconColor: "text-amber-600",
+    },
+    {
+      title: "Rejected",
+      value: statusCounts.rejected,
+      icon: AlertCircle,
+      iconBg: "bg-red-100",
+      iconColor: "text-red-600",
+    },
+  ];
   return (
     <div className="space-y-6">
       {/* Modals */}
@@ -290,12 +330,12 @@ const BankTable = () => {
       )}
 
       {/* Header */}
-      <div className="space-y-3">
-        <PageHeader
-          breadcrumb={["Dashboard", "Bank KYC"]}
-          title="Bank KYC"
-          description="Review customer Bank KYC and take necessary actions"
-        />
+      <div className="mb-8 space-y-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {statusCards.map((card, idx) => (
+            <StateCard key={idx} {...card} />
+          ))}
+        </div>
       </div>
 
       {/* Filter/Search Section */}

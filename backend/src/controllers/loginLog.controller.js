@@ -7,33 +7,41 @@ class LoginLogController {
   static loginLogService = new LoginLogService();
 
   static index = asyncHandler(async (req, res) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw ApiError.unauthorized("User not authenticated");
-    }
+    console.log("=== ROUTE DEBUG: Request Body ===");
+    console.log("Full body:", req.body);
+    console.log("RoleId from body:", req.body.roleId);
 
-    const { status, page, limit, sort, search } = req.body;
+    const payload = {
+      page: req.body.page || 1,
+      limit: req.body.limit || 10,
+      userId: req.body.userId,
+      roleId: req.body.roleId, // YEH LINE CHECK KAREN
+      startDate: req.body.startDate,
+      endDate: req.body.endDate,
+      search: req.body.search,
+      deviceType: req.body.deviceType,
+      browser: req.body.browser,
+      os: req.body.os,
+      sort: req.body.sort || "desc",
+      sortBy: req.body.sortBy || "createdAt",
+    };
 
-    const result = await LoginLogController.loginLogService.getAllLoginLogs({
-      userId,
-      status,
-      page,
-      limit,
-      sort,
-      search,
-    });
+    console.log("=== ROUTE DEBUG: Processed Payload ===");
+    console.log("Payload with roleId:", payload.roleId);
 
-    if (!result) {
-      throw ApiError.notFound("No login logs found");
-    }
+    // Current user info from auth middleware
+    const currentUser = {
+      id: req.user.id,
+      role: req.user.role,
+    };
 
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(result, "Login logs fetched successfully", 200)
-      );
+    const result = await LoginLogController.loginLogService.getAllLoginLogs(
+      payload,
+      currentUser
+    );
+
+    return res.status(200).json(result);
   });
-
   static show = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -41,6 +49,7 @@ class LoginLogController {
       throw ApiError.badRequest("Login log ID is required");
     }
 
+    // FIX: Use the static property
     const loginLog =
       await LoginLogController.loginLogService.getLoginLogById(id);
 
@@ -56,6 +65,7 @@ class LoginLogController {
   });
 
   static store = asyncHandler(async (req, res) => {
+    // FIX: Use the static property
     const loginLog = await LoginLogController.loginLogService.createLoginLog(
       req.body
     );
@@ -78,6 +88,7 @@ class LoginLogController {
       throw ApiError.badRequest("Login log ID is required");
     }
 
+    // FIX: Use the static property
     const existingLog =
       await LoginLogController.loginLogService.getLoginLogById(id);
 
@@ -85,6 +96,7 @@ class LoginLogController {
       throw ApiError.notFound("Login log not found");
     }
 
+    // FIX: Use the static property
     const result = await LoginLogController.loginLogService.deleteLoginLog(id);
 
     if (!result) {

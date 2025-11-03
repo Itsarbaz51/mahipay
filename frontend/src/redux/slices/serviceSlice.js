@@ -83,10 +83,10 @@ export const {
 } = serviceSlice.actions;
 
 // Get all service providers created by current user
-export const getServiceProvidersByUser = () => async (dispatch) => {
+export const allServices = () => async (dispatch) => {
   try {
     dispatch(serviceRequest());
-    const { data } = await axios.get(`/services/providers/my`);
+    const { data } = await axios.get(`/services/lists`);
     dispatch(setServiceProviders(data));
     return data;
   } catch (error) {
