@@ -546,8 +546,6 @@ class UserServices {
 
     const isCurrentUserAdmin = currentUser && currentUser.role === "ADMIN";
 
-    console.log(currentUser);
-
     if (isCurrentUserAdmin) {
       const serialized = Helper.serializeUser(transformedUser);
 
@@ -571,7 +569,10 @@ class UserServices {
 
       safeUser = serialized;
     } else {
-      safeUser = Helper.serializeUser(transformedUser);
+      const serialized = Helper.serializeUser(transformedUser);
+      const { password, transactionPin, refreshToken, ...safeData } =
+        serialized;
+      safeUser = safeData;
     }
 
     return safeUser;
@@ -782,7 +783,12 @@ class UserServices {
         return serialized;
       });
     } else {
-      safeUsers = users.map((user) => Helper.serializeUser(user));
+      safeUsers = users.map((user) => {
+        const serialized = Helper.serializeUser(user);
+        const { password, transactionPin, refreshToken, ...safeUser } =
+          serialized;
+        return safeUser;
+      });
     }
 
     return { users: safeUsers, total };

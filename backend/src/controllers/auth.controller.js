@@ -19,7 +19,10 @@ class AuthController {
       req
     );
 
-    const safeUser = Helper.serializeUser(user);
+    // Serialize and remove sensitive fields
+    const newUser = Helper.serializeUser(user);
+    const { __password, __transactionPin, __refreshToken, ...safeUser } =
+      newUser;
 
     return res
       .status(200)
