@@ -127,12 +127,6 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         payload.confirmNewTransactionPin = formData.confirmNewTransactionPin;
       }
 
-      console.log("Submitting credentials update:", {
-        userId,
-        type,
-        payload,
-      });
-
       const result = await dispatch(
         updateCredentials({
           userId: userId,
@@ -141,35 +135,24 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         })
       );
 
-      console.log("Update credentials success:", result);
+      if (result?.success) {
+        toast.success(result?.message);
 
-      // ✅ SUCCESS CASE ONLY
-      toast.success(
-        `${
-          type === "password" ? "Password" : "Transaction PIN"
-        } updated successfully!`
-      );
+        // ✅ Reset form
+        setFormData({
+          currentPassword: "",
+          newPassword: "",
+          confirmNewPassword: "",
+          currentTransactionPin: "",
+          newTransactionPin: "",
+          confirmNewTransactionPin: "",
+        });
 
-      // ✅ Reset form
-      setFormData({
-        currentPassword: "",
-        newPassword: "",
-        confirmNewPassword: "",
-        currentTransactionPin: "",
-        newTransactionPin: "",
-        confirmNewTransactionPin: "",
-      });
-
-      // ✅ ONLY call onSuccess when successful
-      onSuccess();
+        onSuccess();
+      }
     } catch (error) {
-      console.error("Credentials update error:", error);
-
       const errorMsg = error.message || "Something went wrong";
       setApiError(errorMsg);
-
-      // ✅ ERROR SHOWS IN FORM, NO TOAST (already handled in slice)
-      console.log("Redux error, modal staying open:", errorMsg);
     } finally {
       setLoading(false);
     }

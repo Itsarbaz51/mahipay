@@ -42,13 +42,18 @@ class UserController {
 
   static updateProfile = asyncHandler(async (req, res) => {
     const { userId } = req.params;
+    const currentUserId = req.user.id;
 
-    if (!userId) {
+    if (!currentUserId) {
       throw ApiError.unauthorized("User not authenticated");
     }
 
     const updateData = req.body;
-    const user = await UserServices.updateProfile(userId, updateData);
+    const user = await UserServices.updateProfile(
+      userId,
+      updateData,
+      currentUserId
+    );
 
     const safeUser = Helper.serializeUser(user);
 
@@ -100,9 +105,11 @@ class UserController {
     // Pass current user to the service function
     const user = await UserServices.getUserById(userId, currentUser);
 
+    const { password, transactionPin, refreshToken, ...safeUser } = user;
+
     return res
       .status(200)
-      .json(ApiResponse.success({ user }, "User fetched", 200));
+      .json(ApiResponse.success({ user: safeUser }, "User fetched", 200));
   });
 
   static getCurrentUser = asyncHandler(async (req, res) => {
@@ -112,15 +119,17 @@ class UserController {
       throw ApiError.unauthorized("User not authenticated");
     }
     try {
-      const user = await UserServices.getUserById(userId);
+      const safeUser = await UserServices.getUserById(userId);
 
-      if (!user) {
+      if (!safeUser) {
         throw ApiError.notFound("User not found");
       }
 
       return res
         .status(200)
-        .json(ApiResponse.success({ user }, "Current user fetched", 200));
+        .json(
+          ApiResponse.success({ user: safeUser }, "Current user fetched", 200)
+        );
     } catch (error) {
       console.error("Error fetching current user:", error);
       throw ApiError.internal("Failed to fetch user data");

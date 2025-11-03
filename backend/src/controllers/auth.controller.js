@@ -19,8 +19,10 @@ class AuthController {
       req
     );
 
-    const safeUser = Helper.serializeUser(user);
-
+    // Serialize and remove sensitive fields
+    const newUser = Helper.serializeUser(user);
+    const { __password, __transactionPin, __refreshToken, ...safeUser } =
+      newUser;
 
     return res
       .status(200)
@@ -69,7 +71,6 @@ class AuthController {
 
     const safeUser = Helper.serializeUser(user);
 
-
     return res
       .status(200)
       .json(
@@ -81,28 +82,26 @@ class AuthController {
       );
   });
 
-  static forgotPassword = asyncHandler(async (req, res) => {
+  static requestPasswordReset = asyncHandler(async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
       throw ApiError.badRequest("Email is required");
     }
 
-    const result = await AuthServices.forgotPassword(email);
-
+    const result = await AuthServices.requestPasswordReset(email);
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
 
-  static resetPassword = asyncHandler(async (req, res) => {
-    const { token, newPassword } = req.body;
+  static confirmPasswordReset = asyncHandler(async (req, res) => {
+    const { token } = req.query;
 
-    if (!token || !newPassword) {
-      throw ApiError.badRequest("token and newPassword required");
+    if (!token) {
+      throw ApiError.badRequest("Token is required");
     }
 
-    const result = await AuthServices.resetPassword(token, newPassword);
-
+    const result = await AuthServices.confirmPasswordReset(token);
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
@@ -116,49 +115,37 @@ class AuthController {
 
     const result = await AuthServices.verifyEmail(String(token));
 
-
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
 
-  static updateCredentials = asyncHandler(
-    async (req, res) => {
-      const { userId } = req.params;
-      const currentUserId = req.user?.id;
+  static updateCredentials = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const currentUserId = req.user?.id;
 
-      if (!currentUserId) {
-        throw ApiError.unauthorized("User not authenticated");
-      }
-
-      const credentialsData = req.body;
-
-
-      const result = await AuthServices.updateCredentials(
-        userId,
-        credentialsData,
-        currentUserId
-      );
-
-      const isUpdatingOwnAccount = currentUserId === userId;
-      const shouldLogout = credentialsData.newPassword && isUpdatingOwnAccount;
-
-      // Clear cookies ONLY if user is updating their own password
-      if (shouldLogout) {
-        res.clearCookie("accessToken", cookieOptions);
-        res.clearCookie("refreshToken", cookieOptions);
-      }
-
-      return res.status(200).json(
-        ApiResponse.success(
-          {
-            logout: shouldLogout,
-            isOwnUpdate: isUpdatingOwnAccount,
-          },
-          result.message,
-          200
-        )
-      );
+    if (!currentUserId) {
+      throw ApiError.unauthorized("User not authenticated");
     }
-  );
+
+    const credentialsData = req.body;
+
+    const result = await AuthServices.updateCredentials(
+      userId,
+      credentialsData,
+      currentUserId
+    );
+
+    const isUpdatingOwnAccount = currentUserId === userId;
+
+    return res.status(200).json(
+      ApiResponse.success(
+        {
+          isOwnUpdate: isUpdatingOwnAccount,
+        },
+        result.message,
+        200
+      )
+    );
+  });
 }
 
 export default AuthController;

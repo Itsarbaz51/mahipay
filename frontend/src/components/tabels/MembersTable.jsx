@@ -864,6 +864,7 @@ const MembersTable = () => {
             onClose={handleFormClose}
             onSuccess={handleFormSuccess}
             editData={selectedUser}
+            isAdmin={isAdminUser}
           />
         </div>
       )}

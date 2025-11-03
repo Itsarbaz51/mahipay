@@ -16,6 +16,7 @@ export const protectedRoute = [
   "/profile/:id",
   "/logs",
   "/card-payout",
+  "/verify-reset-password",
 ];
 
 import {

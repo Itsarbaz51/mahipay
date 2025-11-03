@@ -27,23 +27,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
 
   // --- Error State ---
   if (!user || !user.id) {
-    return (
-      <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50 p-4">
-        <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-in fade-in zoom-in duration-300">
-          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            User Not Found
-          </h2>
-          <p className="text-gray-600 mb-6">Unable to load user data.</p>
-          <button
-            onClick={onClose}
-            className="w-full px-6 py-3 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition shadow-lg"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
+    alert("User not found");
   }
 
   // --- Utility Functions ---

@@ -3,7 +3,13 @@ import { useDispatch, useSelector } from "react-redux";
 import { getAllRoles } from "../../redux/slices/roleSlice";
 import { register, updateProfile } from "../../redux/slices/userSlice";
 
-export default function AddMember({ onClose, onSuccess, editData }) {
+export default function AddMember({
+  isAdmin = false,
+  profileEdit = false,
+  onClose,
+  onSuccess,
+  editData,
+}) {
   const [formData, setFormData] = useState({
     username: "",
     firstName: "",
@@ -79,8 +85,8 @@ export default function AddMember({ onClose, onSuccess, editData }) {
     if (!formData.phoneNumber)
       newErrors.phoneNumber = "Phone number is required";
 
-    // ✅ Role validation for both new and edit modes
-    if (!formData.roleId) newErrors.roleId = "Role is required";
+    // Only validate role if not in profileEdit mode
+    if (!profileEdit && !formData.roleId) newErrors.roleId = "Role is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -105,14 +111,14 @@ export default function AddMember({ onClose, onSuccess, editData }) {
       let res;
 
       if (editData) {
-        // ✅ Edit case - include email and role in update data
+        // Edit case
         const submitData = {
           username: formData.username,
           firstName: formData.firstName,
           lastName: formData.lastName,
-          email: formData.email, // ✅ Email included for edit
+          email: formData.email,
           phoneNumber: formData.phoneNumber,
-          roleId: formData.roleId, // ✅ Role included for edit
+          roleId: formData.roleId,
         };
 
         // Remove undefined fields
@@ -126,9 +132,14 @@ export default function AddMember({ onClose, onSuccess, editData }) {
           }
         });
 
+        // If profileEdit is true, don't send roleId
+        if (profileEdit) {
+          delete submitData.roleId;
+        }
+
         res = await dispatch(updateProfile(editData.id, submitData));
       } else {
-        // New member case - always use FormData
+        // New member case
         const form = new FormData();
         Object.keys(formData).forEach((key) => {
           if (
@@ -142,7 +153,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         res = await dispatch(register(form));
       }
 
-      // ✅ Check for success using multiple patterns
+      // Check for success
       if (
         res?.success ||
         res?.status === "success" ||
@@ -159,8 +170,8 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         onSuccess();
         onClose();
       } else {
-        // ✅ Handle API error responses
-        const errorData = res?.error || res?.payload || res?.data;
+        // Handle other types of errors from dispatch
+        const errorData = res?.error || res?.payload || res?.data || {};
         const errorMessage = errorData?.message || "Operation failed";
 
         setMessage({
@@ -168,7 +179,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
           text: errorMessage,
         });
 
-        // ✅ Set field-specific errors if available
+        // Set field-specific errors if available
         if (errorData?.errors && Array.isArray(errorData.errors)) {
           const formattedErrors = {};
           errorData.errors.forEach((err) => {
@@ -178,16 +189,35 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         }
       }
     } catch (error) {
-      // ✅ Catch network or other errors
-      console.error("Form submission error:", error);
-      setMessage({
-        type: "error",
-        text: error?.message || "Something went wrong. Please try again.",
-      });
+      const errorData = error?.response?.data || error;
+
+      if (errorData.status === "fail" && Array.isArray(errorData.errors)) {
+        const formattedErrors = {};
+        errorData.errors.forEach((err) => {
+          formattedErrors[err.field] = err.message;
+        });
+        setErrors(formattedErrors);
+
+        setMessage(formattedErrors);
+      } else {
+        // Handle other errors
+        setMessage({
+          type: "error",
+          text:
+            errorData?.message ||
+            error?.message ||
+            "Something went wrong. Please try again.",
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Conditionally determine field visibility/state
+  const shouldDisableEmail = editData && !isAdmin;
+  const shouldHideRole = profileEdit;
+  const shouldHideProfileImage = profileEdit;
 
   return (
     <div className="fixed inset-0 bg-opacity-50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -196,12 +226,17 @@ export default function AddMember({ onClose, onSuccess, editData }) {
         <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">
-              {editData ? "Edit Member" : "Add New Member"}
+              {profileEdit
+                ? "Profile Update"
+                : editData
+                ? "Edit Member"
+                : "Add New Member"}
             </h2>
+
             <p className="text-blue-100 text-sm mt-1">
               {editData
-                ? "Update existing member details"
-                : "Create a new team member account"}
+                ? "Update existing user details"
+                : "Create a new team user account"}
             </p>
           </div>
           <button
@@ -251,7 +286,7 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                 )}
               </div>
 
-              {/* ✅ Email - Show for both new and edit modes */}
+              {/* ✅ Email - Conditionally disabled in edit mode if not admin */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Email *
@@ -261,15 +296,23 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  disabled={shouldDisableEmail}
                   className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
                     errors.email
                       ? "border-red-400 focus:ring-red-300 bg-red-50"
                       : "border-gray-300 focus:ring-blue-400"
+                  } ${
+                    shouldDisableEmail ? "bg-gray-100 cursor-not-allowed" : ""
                   }`}
                   placeholder="email@example.com"
                 />
                 {errors.email && (
                   <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                )}
+                {shouldDisableEmail && (
+                  <p className="text-gray-500 text-sm mt-1">
+                    Only admins can update email address
+                  </p>
                 )}
               </div>
 
@@ -350,60 +393,64 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                 )}
               </div>
 
-              {/* ✅ Role - Show for both new and edit modes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Role *
-                </label>
-                <select
-                  name="roleId"
-                  value={formData.roleId}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
-                    errors.roleId
-                      ? "border-red-400 focus:ring-red-300 bg-red-50"
-                      : "border-gray-300 focus:ring-blue-400"
-                  }`}
-                >
-                  <option value="">Select a role</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name || role.roleName}
-                    </option>
-                  ))}
-                </select>
-                {errors.roleId && (
-                  <p className="text-red-500 text-sm mt-1">{errors.roleId}</p>
-                )}
-              </div>
-
-              {/* Profile Image - Show for both new and edit modes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Profile Image
-                </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="w-full"
-                    disabled={loading}
-                  />
-                  {imagePreview && (
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-16 h-16 object-cover rounded-full border border-gray-300"
-                    />
+              {/* ✅ Role - Hidden in profileEdit mode */}
+              {!shouldHideRole && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Role *
+                  </label>
+                  <select
+                    name="roleId"
+                    value={formData.roleId}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none ${
+                      errors.roleId
+                        ? "border-red-400 focus:ring-red-300 bg-red-50"
+                        : "border-gray-300 focus:ring-blue-400"
+                    }`}
+                  >
+                    <option value="">Select a role</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name || role.roleName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.roleId && (
+                    <p className="text-red-500 text-sm mt-1">{errors.roleId}</p>
                   )}
                 </div>
-                {errors.profileImage && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.profileImage}
-                  </p>
-                )}
-              </div>
+              )}
+
+              {/* ✅ Profile Image - Completely hidden in profileEdit mode */}
+              {!shouldHideProfileImage && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Profile Image
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="w-full"
+                      disabled={loading}
+                    />
+                    {imagePreview && (
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-16 h-16 object-cover rounded-full border border-gray-300"
+                      />
+                    )}
+                  </div>
+                  {errors.profileImage && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.profileImage}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Submit */}
@@ -414,9 +461,13 @@ export default function AddMember({ onClose, onSuccess, editData }) {
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading
-                  ? editData
+                  ? profileEdit
+                    ? "Updating Profile..."
+                    : editData
                     ? "Updating..."
                     : "Creating..."
+                  : profileEdit
+                  ? "Update Profile"
                   : editData
                   ? "Update Member"
                   : "Add Member"}

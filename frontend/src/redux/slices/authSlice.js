@@ -155,7 +155,6 @@ export const login = (credentials) => async (dispatch) => {
       error?.response?.data?.message || error?.message || "Login failed";
     dispatch(setAuthentication(false));
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
@@ -174,7 +173,6 @@ export const logout = () => async (dispatch) => {
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
@@ -190,7 +188,6 @@ export const refreshToken = () => async (dispatch) => {
       error?.message ||
       "Token refresh failed";
     dispatch(setAuthentication(false));
-    throw new Error(errMsg);
   }
 };
 
@@ -204,7 +201,6 @@ export const verifyAuth = () => async (dispatch) => {
   } catch (error) {
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
-    throw new Error("Not authenticated");
   } finally {
     dispatch(setLoading(false));
   }
@@ -244,14 +240,13 @@ export const updateCredentials =
 
       // ✅ Use credentialsUpdateFail instead of authFail
       dispatch(credentialsUpdateFail(errMsg));
-      throw new Error(errMsg);
     }
   };
 
-export const forgotPassword = (email) => async (dispatch) => {
+export const passwordReset = (email) => async (dispatch) => {
   try {
     dispatch(authRequest());
-    const { data } = await axios.post(`/auth/forgot-password`, { email });
+    const { data } = await axios.post(`/auth/password-reset`, { email });
     dispatch(authSuccess(data));
     toast.success(data.message);
     return data;
@@ -261,17 +256,15 @@ export const forgotPassword = (email) => async (dispatch) => {
       error?.message ||
       "Password reset failed";
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
-export const resetPassword = (token, newPassword) => async (dispatch) => {
+export const verifyPasswordReset = (token) => async (dispatch) => {
   try {
     dispatch(authRequest());
-    const { data } = await axios.post(`/auth/reset-password`, {
-      token,
-      newPassword,
-    });
+    const { data } = await axios.get(
+      `/auth/verify-password-reset?token=${token}`
+    );
     dispatch(authSuccess(data));
     toast.success(data.message);
     return data;
@@ -281,7 +274,6 @@ export const resetPassword = (token, newPassword) => async (dispatch) => {
       error?.message ||
       "Password reset failed";
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 
@@ -298,7 +290,6 @@ export const verifyEmail = (token) => async (dispatch) => {
       error?.message ||
       "Email verification failed";
     dispatch(authFail(errMsg));
-    throw new Error(errMsg);
   }
 };
 

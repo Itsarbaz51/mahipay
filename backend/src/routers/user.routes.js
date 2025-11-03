@@ -24,6 +24,12 @@ userRoutes.post(
 userRoutes.put(
   "/:userId/profile",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   validateRequest(UserValidationSchemas.updateProfile),
   UserController.updateProfile
 );
@@ -31,6 +37,12 @@ userRoutes.put(
 userRoutes.put(
   "/:userId/profile-image",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   upload.single("profileImage"),
   validateRequest(UserValidationSchemas.updateProfileImage),
   UserController.updateProfileImage
@@ -39,42 +51,84 @@ userRoutes.put(
 userRoutes.get(
   "/me",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   UserController.getCurrentUser
 );
 
 userRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   UserController.getUserById
 );
 
 userRoutes.get(
   "/role/:roleId",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   UserController.getAllUsersByRole
 );
 
 userRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   UserController.getAllUsersByParentId
 );
 
 userRoutes.get(
   "/children/:userId",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   UserController.getAllUsersByChildrenId
 );
 
 userRoutes.get(
   "/count/parent/:parentId",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   UserController.getAllUsersCountByParentId
 );
 
 userRoutes.get(
   "/count/children/:userId",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
   UserController.getAllUsersCountByChildrenId
 );
 
