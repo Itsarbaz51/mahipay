@@ -75,7 +75,7 @@ export const navbarTitleConfig = {
     tagLine: "Analytics & insights",
     icon: BarChart3,
   },
-  "/all-kyc": {
+  "/kyc-request": {
     title: "KYC Verification",
     tagLine: "Verify your customers",
     icon: Shield,
@@ -95,20 +95,10 @@ export const navbarTitleConfig = {
     tagLine: "View and manage your profile",
     icon: User,
   },
-  "/login-logs": {
-    title: "Login logs",
-    tagLine: "View and manage your login logs",
-    icon: LogIn,
-  },
-  "/audit-logs": {
+  "/logs": {
     title: "Audit logs",
     tagLine: "View and manage your audit logs",
     icon: Activity,
-  },
-  "/bank-details": {
-    title: "Bank Verification",
-    tagLine: "View and manage your Users bank details",
-    icon: Landmark,
   },
 };
 
