@@ -10,14 +10,12 @@ export const protectedRoute = [
   "/settings",
   "/employee-management",
   "/wallet",
-  "/all-kyc",
+  "/kyc-request",
   "/request-fund",
   "/permission",
   "/profile/:id",
-  "/login-logs",
-  "/audit-logs",
+  "/logs",
   "/card-payout",
-  "/bank-details",
 ];
 
 import {

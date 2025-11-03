@@ -184,15 +184,12 @@ model User {
   hierarchyLevel Int    @map("hierarchy_level")
   hierarchyPath  String @map("hierarchy_path") @db.Text
 
-  // Status
   status        UserStatus @default(ACTIVE)
   isKycVerified Boolean    @default(false) @map("is_kyc_verified")
 
-  // Role
   roleId String @map("role_id")
   role   Role   @relation(fields: [roleId], references: [id])
 
-  // Auth tokens
   refreshToken                  String?   @map("refresh_token") @db.Text
   passwordResetToken            String?   @map("password_reset_token")
   passwordResetExpires          DateTime? @map("password_reset_expires")
@@ -200,42 +197,31 @@ model User {
   emailVerifiedAt               DateTime? @map("email_verified_at")
   emailVerificationTokenExpires DateTime? @map("email_verification_token_expires")
 
-  // Timestamps
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  // ========== REUSABLE RELATIONS ==========
-  // Core financial
   wallets      Wallet[]
   bankAccounts BankDetail[]
 
-  // Transactions (ALL modules will use this)
   transactions Transaction[]
 
-  // Commission system
   commissionTargets         CommissionSetting[] @relation("CommissionTargetUser")
   commissionSettingsCreated CommissionSetting[] @relation("CommissionSettingCreatedBy")
   commissionEarnings        CommissionEarning[] @relation("CommissionEarningToUser")
   commissionsGiven          CommissionEarning[] @relation("CommissionEarningFromUser")
   commissionEarningsCreated CommissionEarning[] @relation("CommissionEarningCreatedBy")
 
-  // Permissions
   userPermissions UserPermission[]
 
-  // KYC & Verification
   kycs        UserKyc[]
   piiConsents PiiConsent[]
 
-  // Audit & Logs
   auditLogs AuditLog[]
   loginLogs LoginLogs[]
 
-  // API Entities (ALL future modules)
-  apiEntities      ApiEntity[]
-  serviceProviders ServiceProvider[]
+  apiEntities ApiEntity[]
 
-  // Reverse relations for createdBy fields
   createdRoles   Role[]          @relation("RoleCreatedBy")
   systemSettings SystemSetting[]
 
@@ -543,18 +529,27 @@ model CommissionEarning {
 
 // ==================== SERVICE PROVIDERS & PERMISSIONS ====================
 model ServiceProvider {
-  id            String   @id @default(uuid())
-  type          String // "AEPS", "BBPS", "DMT", "RECHARGE", "CC_PAYOUT"
-  code          String   @unique
-  name          String?
-  isActive      Boolean  @default(true)
-  config        Json? // Provider-specific configuration
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  createdBy     String   @map("created_by")
-  createdByUser User     @relation(fields: [createdBy], references: [id])
+  id       String  @id @default(uuid())
+  name     String // "AEPS", "BBPS", "DMT", "RECHARGE", "CC_PAYOUT"
+  code     String  @unique
+  isActive Boolean @default(true)
 
-  // REUSABLE RELATIONS
+  iconUrl              String?
+  description          String?  @db.LongText
+  envConfig            Json?    @map("env_config")
+  keyValueInputNumber  String?  @map("key_value_input_number") // key value input number like api-key: api-value
+  apiIntegrationStatus Boolean? @map("api_integration_status")
+
+  parentId   String?           @map("parent_id")
+  parent     ServiceProvider?  @relation("ServiceProviderHierarchy", fields: [parentId], references: [id])
+  subService ServiceProvider[] @relation("ServiceProviderHierarchy")
+
+  hierarchyLevel String @map("hierarchy_level")
+  hierarchyPath  String @map("hierarchy_path") @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   Transaction       Transaction[]
   CommissionSetting CommissionSetting[]
   CommissionEarning CommissionEarning[]
@@ -701,14 +696,12 @@ model Transaction {
   // Metadata - FLEXIBLE FOR ALL MODULES
   requestPayload  Json?
   responsePayload Json?
-  metadata        Json?
+  // metadata        Json?
 
   // Timestamps
   initiatedAt DateTime  @default(now()) @map("initiated_at")
   processedAt DateTime? @map("processed_at")
   completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 
   // ========== REUSABLE RELATIONS - SAB MODULES YAHAN SE ACCESSIBLE ==========
   ledgerEntries      LedgerEntry[]
@@ -718,10 +711,10 @@ model Transaction {
 
   @@index([userId, status])
   @@index([idempotencyKey])
-  @@index([serviceId, createdAt])
+  @@index([serviceId, initiatedAt])
   @@index([externalRefId])
   @@index([providerReference])
-  @@index([status, createdAt])
+  @@index([status, initiatedAt])
   @@map("transactions")
 }
 

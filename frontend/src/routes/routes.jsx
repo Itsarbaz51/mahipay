@@ -19,7 +19,6 @@ import Login from "../pages/auth/Login";
 import Dashboard from "../pages/Dashboard";
 import TransactionHistory from "../components/tabels/TransactionHistory.jsx";
 import Reports from "../pages/Reports";
-import ProfileKYC from "../components/tabels/ProfileKYC";
 import PayoutTable from "../components/tabels/PayoutTable";
 import EmployeeTable from "../components/tabels/EmployeeTable";
 import MembersTable from "../components/tabels/MembersTable";
@@ -29,13 +28,12 @@ import Settings from "../components/Settings";
 import CommissionManagement from "../pages/CommissionManagement";
 import CardPayout from "../pages/services/CardPayout";
 import UserProfilePage from "../pages/view/UserProfileView.jsx";
-import AuditLogs from "../pages/AuditLogs";
-import LoginLogs from "../pages/LoginLogs.jsx";
 import PrivacyPolicy from "../pages/landing/Privacypolicy";
 import TermsConditions from "../pages/landing/Terms&conditions";
-import BanksTable from "../components/tabels/BanksTable.jsx";
 import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";
 import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
+import RequestKYC from "../pages/RequestKYC.jsx";
+import Logs from "../pages/Logs.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -66,16 +64,14 @@ export const createRouter = () => {
           <Route path="commission" element={<CommissionManagement />} />
           <Route path="reports" element={<Reports />} />
           <Route path="request-fund" element={<FundRequestTable />} />
-          <Route path="all-kyc" element={<ProfileKYC />} />
+          <Route path="kyc-request" element={<RequestKYC />} />
           <Route path="members" element={<MembersTable />} />
           <Route path="settings" element={<Settings />} />
           <Route path="employee-management" element={<EmployeeTable />} />
           <Route path="wallet" element={<WalletTable />} />
           <Route path="card-payout" element={<CardPayout />} />
           <Route path="profile/:id" element={<UserProfilePage />} />
-          <Route path="audit-logs" element={<AuditLogs />} />
-          <Route path="login-logs" element={<LoginLogs />} />
-          <Route path="bank-details" element={<BanksTable />} />
+          <Route path="logs" element={<Logs />} />
 
           {/* Redirect root to dashboard */}
           <Route index element={<Navigate to="/dashboard" replace />} />
