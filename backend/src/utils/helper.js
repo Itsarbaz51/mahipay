@@ -83,34 +83,46 @@ class Helper {
     return `${rupees}.${paise.toString().padStart(2, "0")}`;
   }
 
-  static serializeCommisssion(data) {
-    if (!data) return data;
-
+  static serializeCommission(data) {
     if (Array.isArray(data)) {
-      return data.map((item) => this.serializeCommisssion(item));
+      return data.map((item) => this.serializeCommissionItem(item));
     }
+    return this.serializeCommissionItem(data);
+  }
 
-    if (typeof data === "object" && data !== null) {
-      const serialized = {};
+  static serializeCommissionItem(item) {
+    if (!item) return item;
 
-      for (const key in data) {
-        const value = data[key];
+    const serialized = { ...item };
 
-        if (typeof value === "bigint") {
-          serialized[key] = value.toString();
-        } else if (value instanceof Decimal) {
-          serialized[key] = value.toNumber();
-        } else if (typeof value === "object" && value !== null) {
-          serialized[key] = this.serializeCommisssion(value);
-        } else {
-          serialized[key] = value;
-        }
+    const bigIntFields = [
+      "amount",
+      "commissionAmount",
+      "tdsAmount",
+      "gstAmount",
+      "netAmount",
+      "minAmount",
+      "maxAmount",
+      "balance",
+      "holdBalance",
+      "availableBalance",
+    ];
+
+    bigIntFields.forEach((field) => {
+      if (serialized[field] !== undefined && serialized[field] !== null) {
+        serialized[field] = Number(serialized[field]);
       }
+    });
 
-      return serialized;
-    }
+    // Convert Decimal to Number
+    const decimalFields = ["commissionValue", "tdsPercent", "gstPercent"];
+    decimalFields.forEach((field) => {
+      if (serialized[field] !== undefined && serialized[field] !== null) {
+        serialized[field] = Number(serialized[field]);
+      }
+    });
 
-    return data;
+    return serialized;
   }
 
   static async sendEmail({ to, subject, text, html }) {

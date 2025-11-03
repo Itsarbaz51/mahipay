@@ -21,6 +21,7 @@ export class CommissionSettingService {
       effectiveTo,
     } = data;
 
+    // Validation based on scope
     if (scope === "ROLE" && !roleId) {
       throw ApiError.badRequest("roleId is required for ROLE scope");
     }
@@ -28,6 +29,7 @@ export class CommissionSettingService {
       throw ApiError.badRequest("targetUserId is required for USER scope");
     }
 
+    // Verify referenced entities exist
     if (serviceId) {
       const service = await Prisma.serviceProvider.findUnique({
         where: { id: serviceId },
@@ -49,29 +51,30 @@ export class CommissionSettingService {
       if (!userExists) throw ApiError.notFound("Target user not found");
     }
 
+    // Check for existing active commission setting
     const existing = await Prisma.commissionSetting.findFirst({
       where: {
         scope,
-        roleId: roleId ?? null,
-        targetUserId: targetUserId ?? null,
-        serviceId: serviceId ?? null,
+        roleId: roleId || null,
+        targetUserId: targetUserId || null,
+        serviceId: serviceId || null,
         isActive: true,
       },
     });
 
     const payload = {
       scope,
-      roleId: roleId ?? null,
-      targetUserId: targetUserId ?? null,
-      serviceId: serviceId ?? null,
+      roleId: roleId || null,
+      targetUserId: targetUserId || null,
+      serviceId: serviceId || null,
       commissionType,
-      commissionValue,
+      commissionValue: commissionValue.toString(),
       minAmount: minAmount ? BigInt(minAmount) : null,
       maxAmount: maxAmount ? BigInt(maxAmount) : null,
-      applyTDS: applyTDS ?? false,
-      tdsPercent: tdsPercent ?? null,
-      applyGST: applyGST ?? false,
-      gstPercent: gstPercent ?? null,
+      applyTDS: applyTDS || false,
+      tdsPercent: tdsPercent ? tdsPercent.toString() : null,
+      applyGST: applyGST || false,
+      gstPercent: gstPercent ? gstPercent.toString() : null,
       effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
       effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
       createdBy,
@@ -88,7 +91,7 @@ export class CommissionSettingService {
       result = await Prisma.commissionSetting.create({ data: payload });
     }
 
-    return Helper.serializeCommisssion(result);
+    return Helper.serializeCommission(result);
   }
 
   static async getCommissionSettingsByRoleOrUser(userId) {
@@ -133,7 +136,7 @@ export class CommissionSettingService {
       orderBy: { updatedAt: "desc" },
     });
 
-    return Helper.serializeCommisssion(settings);
+    return Helper.serializeCommission(settings);
   }
 
   static async getCommissionSettingsByCreatedBy(userId) {
@@ -171,11 +174,15 @@ export class CommissionSettingService {
       orderBy: { createdAt: "desc" },
     });
 
-    return Helper.serializeCommisssion(settings);
+    return Helper.serializeCommission(settings);
   }
 
   static async getCommissionSettings(filters) {
     const { scope, roleId, targetUserId, serviceId, isActive = true } = filters;
+
+    // Convert string boolean to actual boolean
+    const isActiveBool =
+      typeof isActive === "string" ? isActive === "true" : isActive;
 
     const settings = await Prisma.commissionSetting.findMany({
       where: {
@@ -183,7 +190,7 @@ export class CommissionSettingService {
         ...(roleId ? { roleId } : {}),
         ...(targetUserId ? { targetUserId } : {}),
         ...(serviceId ? { serviceId } : {}),
-        isActive,
+        isActive: isActiveBool,
       },
       include: {
         service: {
@@ -212,7 +219,7 @@ export class CommissionSettingService {
       orderBy: { updatedAt: "desc" },
     });
 
-    return Helper.serializeCommisssion(settings);
+    return Helper.serializeCommission(settings);
   }
 
   static async deactivateCommissionSetting(id) {
@@ -221,7 +228,7 @@ export class CommissionSettingService {
     });
     if (!setting) throw ApiError.notFound("Commission setting not found");
 
-    return Prisma.commissionSetting.update({
+    return await Prisma.commissionSetting.update({
       where: { id },
       data: { isActive: false },
     });
@@ -245,6 +252,7 @@ export class CommissionEarningService {
       createdBy,
     } = data;
 
+    // Validate required references
     const [user, transaction, createdByUser] = await Promise.all([
       Prisma.user.findUnique({ where: { id: userId } }),
       Prisma.transaction.findUnique({ where: { id: transactionId } }),
@@ -255,6 +263,7 @@ export class CommissionEarningService {
     if (!transaction) throw ApiError.notFound("Transaction not found");
     if (!createdByUser) throw ApiError.notFound("Created by user not found");
 
+    // Validate optional references
     if (fromUserId) {
       const fromUser = await Prisma.user.findUnique({
         where: { id: fromUserId },
@@ -272,8 +281,8 @@ export class CommissionEarningService {
     const earning = await Prisma.commissionEarning.create({
       data: {
         userId,
-        fromUserId: fromUserId ?? null,
-        serviceId: serviceId ?? null,
+        fromUserId: fromUserId || null,
+        serviceId: serviceId || null,
         transactionId,
         amount: BigInt(amount),
         commissionAmount: BigInt(commissionAmount),
@@ -281,7 +290,7 @@ export class CommissionEarningService {
         tdsAmount: BigInt(tdsAmount),
         gstAmount: BigInt(gstAmount),
         netAmount: BigInt(netAmount),
-        metadata: metadata ?? null,
+        metadata: metadata || null,
         createdBy,
       },
       include: {
@@ -321,12 +330,18 @@ export class CommissionEarningService {
           },
         },
         transaction: {
-          select: { id: true, referenceId: true, amount: true, status: true },
+          select: {
+            id: true,
+            referenceId: true,
+            amount: true,
+            status: true,
+            initiatedAt: true,
+          },
         },
       },
     });
 
-    return Helper.serializeCommisssion(earning);
+    return Helper.serializeCommission(earning);
   }
 
   static async getCommissionEarnings(filters) {
@@ -340,6 +355,7 @@ export class CommissionEarningService {
       ...(transactionId ? { transactionId } : {}),
     };
 
+    // Date range filter - use initiatedAt for Transaction or createdAt for CommissionEarning
     if (startDate || endDate) {
       whereClause.createdAt = {};
       if (startDate) whereClause.createdAt.gte = new Date(startDate);
@@ -391,19 +407,21 @@ export class CommissionEarningService {
             amount: true,
             status: true,
             paymentType: true,
+            initiatedAt: true, // Use initiatedAt instead of createdAt
           },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return Helper.serializeCommisssion(earnings);
+    return Helper.serializeCommission(earnings);
   }
 
   static async getCommissionSummary(userId, period) {
     const whereClause = { userId };
 
-    if (period) {
+    // Apply date range if provided
+    if (period && period.startDate && period.endDate) {
       whereClause.createdAt = {
         gte: new Date(period.startDate),
         lte: new Date(period.endDate),
@@ -424,19 +442,36 @@ export class CommissionEarningService {
       orderBy: { createdAt: "desc" },
     });
 
+    // Calculate totals
     const totalCommission = earnings.reduce(
       (sum, e) => sum + Number(e.commissionAmount),
       0
     );
     const totalTDS = earnings.reduce(
-      (sum, e) => sum + Number(e.tdsAmount || BigInt(0)),
+      (sum, e) => sum + Number(e.tdsAmount || 0),
       0
     );
     const totalGST = earnings.reduce(
-      (sum, e) => sum + Number(e.gstAmount || BigInt(0)),
+      (sum, e) => sum + Number(e.gstAmount || 0),
       0
     );
     const totalNet = earnings.reduce((sum, e) => sum + Number(e.netAmount), 0);
+
+    // Group by service
+    const earningsByService = earnings.reduce((acc, e) => {
+      const serviceName = e.service?.name || "Unknown";
+      if (!acc[serviceName]) {
+        acc[serviceName] = {
+          totalCommission: 0,
+          totalNet: 0,
+          count: 0,
+        };
+      }
+      acc[serviceName].totalCommission += Number(e.commissionAmount);
+      acc[serviceName].totalNet += Number(e.netAmount);
+      acc[serviceName].count += 1;
+      return acc;
+    }, {});
 
     const summary = {
       totalCommission,
@@ -444,11 +479,7 @@ export class CommissionEarningService {
       totalGST,
       totalNet,
       transactionCount: earnings.length,
-      earningsByService: earnings.reduce((acc, e) => {
-        const serviceType = e.service?.type || "Unknown";
-        acc[serviceType] = (acc[serviceType] || 0) + Number(e.netAmount);
-        return acc;
-      }, {}),
+      earningsByService,
     };
 
     return summary;

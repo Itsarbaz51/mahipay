@@ -1,12 +1,11 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
 
-
 class RoleServices {
   static async index(options) {
     const { currentUserRoleLevel } = options;
 
-    const where= {};
+    const where = {};
 
     if (typeof currentUserRoleLevel === "number") {
       where.level = { gt: currentUserRoleLevel };
@@ -69,7 +68,6 @@ class RoleServices {
                 id: true,
                 name: true,
                 code: true,
-                type: true,
                 isActive: true,
               },
             },
@@ -105,9 +103,7 @@ class RoleServices {
     };
   }
 
-  static async store(
-    payload
-  ) {
+  static async store(payload) {
     let { name, description, level, createdBy } = payload;
 
     // Check if role with same name exists
@@ -188,10 +184,7 @@ class RoleServices {
     return dto;
   }
 
-  static async update(
-    id,
-    payload
-   ) {
+  static async update(id, payload) {
     const { name, description, level } = payload;
 
     // Check if role exists
@@ -293,10 +286,7 @@ class RoleServices {
   }
 
   // Additional method to check if user can manage this role
-  static async canUserManageRole(
-    userRoleLevel,
-    targetRoleLevel
-  ) {
+  static async canUserManageRole(userRoleLevel, targetRoleLevel) {
     return userRoleLevel < targetRoleLevel;
   }
 }

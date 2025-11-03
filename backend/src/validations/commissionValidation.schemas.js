@@ -3,11 +3,11 @@ import { z } from "zod";
 class CommissionValidationSchemas {
   static get createOrUpdateCommissionSettingSchema() {
     return z.object({
-      scope: z.enum(["ROLE", "USER", "GLOBAL"]),
+      scope: z.enum(["ROLE", "USER"]), // Removed "GLOBAL" as it's not in your enum
       roleId: z.string().uuid().optional(),
       targetUserId: z.string().uuid().optional(),
       serviceId: z.string().uuid().optional(),
-      commissionType: z.enum(["PERCENTAGE", "FIXED"]),
+      commissionType: z.enum(["FLAT", "PERCENTAGE"]), // Fixed enum values
       commissionValue: z.number().positive(),
       minAmount: z.number().nonnegative().optional(),
       maxAmount: z.number().nonnegative().optional(),
@@ -36,7 +36,7 @@ class CommissionValidationSchemas {
         .uuid({ message: "transactionId must be a valid UUID" }),
       amount: z.number().positive(),
       commissionAmount: z.number().positive(),
-      commissionType: z.enum(["PERCENTAGE", "FIXED"]),
+      commissionType: z.enum(["FLAT", "PERCENTAGE"]), // Fixed enum values
       tdsAmount: z.number().nonnegative().optional().default(0),
       gstAmount: z.number().nonnegative().optional().default(0),
       netAmount: z.number().positive(),

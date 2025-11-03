@@ -367,20 +367,21 @@ export class ServiceProviderService {
             id: true,
             code: true,
             name: true,
-            type: true,
             isActive: true,
             hierarchyLevel: true,
           },
         },
         Transaction: {
           take: 5,
-          orderBy: { createdAt: "desc" },
+          orderBy: {
+            initiatedAt: "desc", // FIXED: Use initiatedAt instead of createdAt
+          },
           select: {
             id: true,
             amount: true,
             status: true,
             paymentType: true,
-            createdAt: true,
+            initiatedAt: true, // FIXED: Use initiatedAt instead of createdAt
           },
         },
         CommissionSetting: {

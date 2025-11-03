@@ -246,7 +246,6 @@ class FundRequestService {
             id: true,
             code: true,
             name: true,
-            type: true,
           },
         },
         apiEntity: {
