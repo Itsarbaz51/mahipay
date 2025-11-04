@@ -591,7 +591,7 @@ export default function AddProfileKYC() {
     if (name !== "aadhaarFile" && !isImage) {
       return setErrors((prev) => ({
         ...prev,
-        [name]: "Only image files allowed (PNG/JPG)",
+        [name]: "Only image files allowed (PNG/JPG/JPEG/JPG/WEBP)",
       }));
     }
 
