@@ -12,6 +12,7 @@ import {
   Mail,
   User,
   AlertCircle,
+  UsersRound,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { getbyId, getKycAll, verifyKyc } from "../../redux/slices/kycSlice";
@@ -312,6 +313,10 @@ const ProfileTable = () => {
                             </div>
                             <div className="text-xs text-gray-500">
                               ID #{kyc.id}
+                            </div>
+                            <div className="flex items-center text-xs text-gray-500">
+                              <UsersRound className="w-3 h-3 mr-1" />
+                              Parent: {kyc.parent.username || ""}
                             </div>
                           </div>
                         </div>

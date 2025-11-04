@@ -50,7 +50,6 @@ class KycServices {
         data: [],
         meta: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 },
       };
-      await cacheUserKyc(`${userId}:${cacheKey}`, emptyResult, 300);
       return emptyResult;
     }
 
@@ -77,7 +76,17 @@ class KycServices {
       take: limitNum,
       orderBy: { createdAt: sortOrder },
       include: {
-        user: true,
+        user: {
+          include: {
+            parent: {
+              select: {
+                username: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
         address: {
           select: {
             address: true,
@@ -113,6 +122,12 @@ class KycServices {
           phone: kyc.user.phoneNumber,
           photo: kyc.photo || null,
         },
+        parent: {
+          username: kyc.user.parent?.username || "N/A",
+          name: kyc.user.parent
+            ? `${kyc.user.parent.firstName} ${kyc.user.parent.lastName}`
+            : "N/A",
+        },
         documents: pii,
         location: {
           city: kyc.address?.city?.cityName || "-",
@@ -139,16 +154,9 @@ class KycServices {
     return result;
   }
 
-  static async showUserKyc(id, userId, requestingUser) {
-    if (!id && !userId) {
-      throw ApiError.badRequest("Either KYC ID or User ID is required");
-    }
-    const whereClause = {};
-    if (id && id !== "undefined") whereClause.id = id;
-    else if (userId) whereClause.userId = userId;
-
+  static async showUserKyc(id, requestingUser) {
     const kyc = await Prisma.userKyc.findFirst({
-      where: whereClause,
+      where: { id },
       include: {
         address: {
           select: {
@@ -159,7 +167,24 @@ class KycServices {
             state: { select: { stateName: true } },
           },
         },
-        user: { select: { email: true, phoneNumber: true } },
+        user: {
+          select: {
+            email: true,
+            phoneNumber: true,
+            username: true,
+            parent: {
+              select: {
+                phoneNumber: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                hierarchyPath: true,
+                hierarchyLevel: true, // ✅ This should work now
+              },
+            },
+          },
+        },
         piiConsents: { select: { piiType: true, piiHash: true } },
       },
     });
@@ -213,6 +238,16 @@ class KycServices {
         fatherName: kyc.fatherName || "-",
         email: kyc.user.email || "-",
         phone: kyc.user.phoneNumber || "-",
+      },
+      parent: {
+        username: kyc.user.parent?.username || "N/A",
+        name: kyc.user.parent
+          ? `${kyc.user.parent.firstName} ${kyc.user.parent.lastName}`
+          : "N/A",
+        hierarchyLevel: kyc.user.parent?.hierarchyLevel || "N/A",
+        hierarchyPath: kyc.user.parent?.hierarchyPath || "N/A",
+        email: kyc.user.parent?.email || "N/A",
+        phone: kyc.user.parent?.phoneNumber || "N/A",
       },
       documents: pii,
       location: {

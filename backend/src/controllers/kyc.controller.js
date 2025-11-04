@@ -29,21 +29,16 @@ class UserKycController {
   });
 
   static show = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const userId = req.query.userId;
-
-    // Get the authenticated user's info including role
-    const requestingUser = req.user; // Assuming req.user has { id: string, role: string }
-
+    const requestingUser = req.user.id;
     if (!requestingUser) {
       throw ApiError.unauthorized("User not authenticated");
     }
 
-    const kyc = await KycServices.showUserKyc(
-      id,
-      userId,
-      requestingUser // Pass the requesting user object with role
-    );
+    const { id } = req.params;
+
+    if (!id) throw ApiError.badRequest("id is missing");
+
+    const kyc = await KycServices.showUserKyc(id, requestingUser);
 
     return res
       .status(200)
@@ -54,7 +49,7 @@ class UserKycController {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
-    const files = req.files
+    const files = req.files;
 
     const panFile = files.panFile?.[0];
     const aadhaarFile = files.aadhaarFile?.[0];
@@ -94,7 +89,7 @@ class UserKycController {
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("KYC ID is required in params");
 
-    const files = req.files
+    const files = req.files;
 
     const panFile = files.panFile?.[0];
     const aadhaarFile = files.aadhaarFile?.[0];

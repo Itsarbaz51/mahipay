@@ -9,6 +9,8 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
+  Users,
+  Shield,
 } from "lucide-react";
 
 function Kyc({ viewedKyc, onClose }) {
@@ -50,8 +52,8 @@ function Kyc({ viewedKyc, onClose }) {
 
     const images = [];
 
-    if (viewedKyc?.profile?.photo && !isPDF(viewedKyc.profile.photo)) {
-      images.push({ url: viewedKyc.profile.photo, label: "Profile Photo" });
+    if (viewedKyc?.files?.photo && !isPDF(viewedKyc.files.photo)) {
+      images.push({ url: viewedKyc.files.photo, label: "Profile Photo" });
     }
     if (viewedKyc?.files?.panFile && !isPDF(viewedKyc.files.panFile)) {
       images.push({ url: viewedKyc.files.panFile, label: "PAN Card" });
@@ -130,8 +132,9 @@ function Kyc({ viewedKyc, onClose }) {
 
           {/* Body */}
           <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-            {viewedKyc?.status && (
-              <div className="flex justify-end">
+            {/* Status and Reject Reason */}
+            <div className="flex justify-between items-center">
+              {viewedKyc?.status && (
                 <span
                   className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
                     viewedKyc.status
@@ -139,14 +142,23 @@ function Kyc({ viewedKyc, onClose }) {
                 >
                   {viewedKyc.status}
                 </span>
-              </div>
-            )}
+              )}
+              {viewedKyc?.rejectReason && (
+                <div className="text-right">
+                  <p className="text-sm text-red-600 font-medium">
+                    Rejection Reason:
+                  </p>
+                  <p className="text-sm text-gray-700 max-w-md">
+                    {viewedKyc.rejectReason}
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Profile */}
             <div className="bg-gray-50 rounded-xl p-6">
               <div className="flex items-start gap-6">
-                {viewedKyc?.files?.photo &&
-                !isPDF(viewedKyc.files.photo) ? (
+                {viewedKyc?.files?.photo && !isPDF(viewedKyc.files.photo) ? (
                   <img
                     src={viewedKyc.files.photo}
                     alt="Profile"
@@ -155,7 +167,7 @@ function Kyc({ viewedKyc, onClose }) {
                   />
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-3xl font-bold flex items-center justify-center shadow-lg">
-                    {viewedKyc?.profile?.name?.[0]?.toUpperCase() || "NAME"}
+                    {viewedKyc?.profile?.name?.[0]?.toUpperCase() || "U"}
                   </div>
                 )}
 
@@ -205,6 +217,60 @@ function Kyc({ viewedKyc, onClose }) {
                 </div>
               </div>
             </div>
+
+            {/* Parent Information */}
+            {viewedKyc?.parent && (
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Users size={20} className="text-green-600" />
+                  <h5 className="text-lg font-semibold text-gray-900">
+                    Parent Information
+                  </h5>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-gray-500">Parent Name</p>
+                      <p className="font-medium text-gray-900">
+                        {viewedKyc.parent.name}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Username</p>
+                      <p className="font-medium text-gray-900">
+                        {viewedKyc.parent.username}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Hierarchy Level</p>
+                      <p className="font-medium text-gray-900">
+                        {viewedKyc.parent.hierarchyLevel}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-gray-500">Email</p>
+                      <p className="font-medium text-gray-900">
+                        {viewedKyc.parent.email}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Phone</p>
+                      <p className="font-medium text-gray-900">
+                        {viewedKyc.parent.phone}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Hierarchy Path</p>
+                      <p className="font-medium text-gray-900">
+                        {viewedKyc.parent.hierarchyPath}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Documents */}
             <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -277,11 +343,18 @@ function Kyc({ viewedKyc, onClose }) {
                             className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer group"
                           >
                             {isPDF(viewedKyc.files[fileKey]) ? (
-                              <embed
-                                src={viewedKyc.files[fileKey]}
-                                type="application/pdf"
-                                className="w-full h-full object-contain"
-                              />
+                              <div className="w-full h-full flex flex-col items-center justify-center bg-red-50">
+                                <FileText
+                                  size={48}
+                                  className="text-red-500 mb-2"
+                                />
+                                <span className="text-sm font-medium text-red-700">
+                                  PDF Document
+                                </span>
+                                <span className="text-xs text-red-600 mt-1">
+                                  Click to view
+                                </span>
+                              </div>
                             ) : (
                               <img
                                 src={viewedKyc.files[fileKey]}
@@ -291,7 +364,9 @@ function Kyc({ viewedKyc, onClose }) {
                             )}
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <span className="text-white font-medium">
-                                View
+                                {isPDF(viewedKyc.files[fileKey])
+                                  ? "View PDF"
+                                  : "View"}
                               </span>
                             </div>
                           </div>

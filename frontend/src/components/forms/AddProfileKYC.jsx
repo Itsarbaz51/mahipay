@@ -27,6 +27,7 @@ import {
   updatekycSubmit,
 } from "../../redux/slices/kycSlice";
 import { toast } from "react-toastify";
+import { verifyAuth } from "../../redux/slices/authSlice";
 
 // ---------- InputField ----------
 const InputField = ({
@@ -354,17 +355,42 @@ export default function AddProfileKYC() {
 
   const { currentUser } = useSelector((state) => state.auth);
 
-  // Fetch KYC details and states & cities
   useEffect(() => {
-    if (
-      currentUser?.kycInfo?.currentStatus === "REJECT" ||
-      currentUser?.kycInfo?.currentStatus === "PENDING"
-    ) {
-      dispatch(getbyId());
+    const fetchKYCData = async () => {
+      try {
+        await dispatch(getAllEntities("state-list"));
+        await dispatch(getAllEntities("city-list"));
+
+        if (currentUser?.kycInfo?.currentStatus) {
+          await dispatch(getbyId(currentUser?.kycInfo?.latestKyc.id));
+        }
+      } catch (error) {
+        console.error("Failed to fetch KYC data:", error);
+      }
+    };
+
+    if (!currentUser?.kycInfo?.currentStatus) {
+      dispatch(verifyAuth());
+    } else {
+      fetchKYCData();
     }
-    dispatch(getAllEntities("state-list"));
-    dispatch(getAllEntities("city-list"));
-  }, [dispatch, currentUser]);
+  }, [dispatch, currentUser, currentUser?.kycInfo?.currentStatus]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      const fetchKYCIfNeeded = async () => {
+        if (currentUser?.kycInfo?.currentStatus) {
+          await dispatch(getbyId(currentUser?.kycInfo?.latestKyc.id));
+        }
+      };
+      fetchKYCIfNeeded();
+    }
+  }, [
+    dispatch,
+    currentUser?.id,
+    currentUser?.kycInfo?.currentStatus,
+    currentUser?.kycInfo?.latestKyc.id,
+  ]);
 
   const stateList = useMemo(
     () => addressState?.stateList?.filter((i) => i.stateName) || [],
