@@ -303,18 +303,14 @@ export const getAllUsersByRole = (roleId) => async (dispatch) => {
   }
 };
 
-// ✅ UPDATED: Changed from POST to GET with query parameters
-export const getAllUsersByParentId =
+export const getAllRoleTypeUsersByParentId =
   (filters = {}) =>
   async (dispatch) => {
     try {
       dispatch(userRequest());
       dispatch(setFilters(filters));
 
-      // Use query parameters instead of POST body
       const params = new URLSearchParams();
-
-      // Add all filter parameters
       Object.keys(filters).forEach((key) => {
         if (
           filters[key] !== undefined &&
@@ -325,7 +321,6 @@ export const getAllUsersByParentId =
         }
       });
 
-      // Ensure default parameters
       if (!filters.page) params.append("page", "1");
       if (!filters.limit) params.append("limit", "10");
       if (!filters.sort) params.append("sort", "desc");
@@ -351,10 +346,62 @@ export const getAllUsersByParentId =
       return data;
     } catch (error) {
       const errMsg =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to fetch users";
+        error?.response?.data?.message || "Failed to fetch role type users";
       dispatch(userFail(errMsg));
+      throw new Error(errMsg);
+    }
+  };
+
+export const getAllEmployeUsersByParentId =
+  (filters = {}) =>
+  async (dispatch) => {
+    try {
+      dispatch(userRequest());
+      dispatch(setFilters(filters));
+
+      const params = new URLSearchParams();
+
+      // Add all filter parameters with better validation
+      Object.keys(filters).forEach((key) => {
+        const value = filters[key];
+        if (value !== undefined && value !== null && value !== "") {
+          params.append(key, String(value));
+        }
+      });
+
+      if (!filters.page) params.append("page", "1");
+      if (!filters.limit) params.append("limit", "10");
+      if (!filters.sort) params.append("sort", "desc");
+      if (!filters.status) params.append("status", "ALL");
+
+      const { data } = await axios.get(`/users/employe?${params.toString()}`);
+
+      const requestedPage = parseInt(filters.page) || 1;
+      const requestedLimit = parseInt(filters.limit) || 10;
+
+      dispatch(
+        setUserData({
+          users: data.data.users || [],
+          total: data.data.total || 0,
+          page: data.data.page || requestedPage,
+          limit: data.data.limit || requestedLimit,
+          totalPages:
+            data.data.totalPages ||
+            Math.ceil((data.data.total || 0) / requestedLimit),
+        })
+      );
+
+      dispatch(userSuccess(data));
+      return data;
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message || "Failed to fetch employe users";
+      dispatch(userFail(errMsg));
+
+      if (error?.response?.status !== 401) {
+        toast.error(errMsg);
+      }
+
       throw new Error(errMsg);
     }
   };

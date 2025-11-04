@@ -81,13 +81,16 @@ export const {
 // Async action creators
 
 /**
- * Get all roles (with optional filtering based on current user's role level)
+ * Get all roles by type (employe/role)
  */
-export const getAllRoles = () => async (dispatch) => {
+export const getAllRolesByType = (type) => async (dispatch) => {
   try {
     dispatch(roleRequest());
-    const { data } = await axios.get(`/roles`);
-    dispatch(setRoles(data.data.roles || []));
+    const { data } = await axios.get(`/roles/type/${type}`);
+
+    // Backend returns { data: { roles: [], meta: {} }, message: "", success: true }
+    const roles = data.data?.roles || [];
+    dispatch(setRoles(roles));
     dispatch(roleSuccess(data));
     return data;
   } catch (error) {
@@ -101,12 +104,14 @@ export const getAllRoles = () => async (dispatch) => {
 };
 
 /**
- * Get role by ID (only for SUPER ADMIN)
+ * Get role by ID
  */
 export const getRoleById = (roleId) => async (dispatch) => {
   try {
     dispatch(roleRequest());
     const { data } = await axios.get(`/roles/${roleId}`);
+
+    // Backend returns { data: roleObject, message: "", success: true }
     dispatch(setCurrentRole(data.data));
     dispatch(roleSuccess(data));
     return data;
@@ -121,15 +126,19 @@ export const getRoleById = (roleId) => async (dispatch) => {
 };
 
 /**
- * Create new role (only for ADMIN)
+ * Create new role
  */
 export const createRole = (roleData) => async (dispatch) => {
   try {
     dispatch(roleRequest());
-    const { data } = await axios.post(`/roles/create`, roleData);
+    const { data } = await axios.post(`/roles`, roleData);
+
+    // Backend returns { data: roleObject, message: "", success: true }
     dispatch(addRole(data.data));
     dispatch(roleSuccess(data));
-    toast.success(data.message || "Role created successfully");
+
+    const roleType = roleData.type === "role" ? "Role" : "Employee role";
+    toast.success(data.message || `${roleType} created successfully`);
     return data;
   } catch (error) {
     const errMsg =
@@ -142,15 +151,19 @@ export const createRole = (roleData) => async (dispatch) => {
 };
 
 /**
- * Update role (only for ADMIN)
+ * Update role
  */
 export const updateRole = (roleId, roleData) => async (dispatch) => {
   try {
     dispatch(roleRequest());
     const { data } = await axios.put(`/roles/${roleId}`, roleData);
+
+    // Backend returns { data: roleObject, message: "", success: true }
     dispatch(updateRoleInList(data.data));
     dispatch(roleSuccess(data));
-    toast.success(data.message || "Role updated successfully");
+
+    const roleType = roleData.type === "role" ? "Role" : "Employee role";
+    toast.success(data.message || `${roleType} updated successfully`);
     return data;
   } catch (error) {
     const errMsg =
@@ -163,12 +176,13 @@ export const updateRole = (roleId, roleData) => async (dispatch) => {
 };
 
 /**
- * Delete role (only for ADMIN)
+ * Delete role
  */
 export const deleteRole = (roleId) => async (dispatch) => {
   try {
     dispatch(roleRequest());
     const { data } = await axios.delete(`/roles/${roleId}`);
+
     dispatch(removeRoleFromList(roleId));
     dispatch(roleSuccess(data));
     toast.success(data.message || "Role deleted successfully");
@@ -182,5 +196,29 @@ export const deleteRole = (roleId) => async (dispatch) => {
     throw new Error(errMsg);
   }
 };
+
+/**
+ * Get roles for current user based on their role level
+ */
+export const getRolesForCurrentUser =
+  (type = "employe") =>
+  async (dispatch) => {
+    try {
+      dispatch(roleRequest());
+      const { data } = await axios.get(`/roles/type/${type}`);
+
+      const roles = data.data?.roles || [];
+      dispatch(setRoles(roles));
+      dispatch(roleSuccess(data));
+      return data;
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch roles";
+      dispatch(roleFail(errMsg));
+      throw new Error(errMsg);
+    }
+  };
 
 export default roleSlice.reducer;

@@ -150,7 +150,7 @@ class UserController {
       .json(ApiResponse.success({ users }, "Users fetched successfully", 200));
   });
 
-  static getAllUsersByParentId = asyncHandler(async (req, res) => {
+  static getAllRoleTypeUsersByParentId = asyncHandler(async (req, res) => {
     const parentId = req.user?.id;
 
     if (!parentId) {
@@ -177,7 +177,7 @@ class UserController {
       ? upperStatus
       : "ALL";
 
-    const { users, total } = await UserServices.getAllUsersByParentId(
+    const { users, total } = await UserServices.getAllRoleTypeUsersByParentId(
       parentId,
       {
         page: parsedPage,
@@ -197,7 +197,60 @@ class UserController {
           limit: parsedLimit,
           totalPages: Math.ceil(total / parsedLimit),
         },
-        "Users fetched successfully",
+        "Role type users fetched successfully",
+        200
+      )
+    );
+  });
+
+  static getAllEmployeUsersByParentId = asyncHandler(async (req, res) => {
+    const parentId = req.user?.id;
+
+    if (!parentId) {
+      throw ApiError.unauthorized("User not authenticated");
+    }
+
+    const {
+      page = "1",
+      limit = "10",
+      sort = "desc",
+      status = "ALL",
+      search = "",
+    } = req.query;
+
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 10;
+    const parsedSort = sort.toLowerCase() === "asc" ? "asc" : "desc";
+
+    // Accept ALL but validate against real enum values
+    const allowedStatuses = ["ALL", "ACTIVE", "IN_ACTIVE", "DELETED"];
+    const upperStatus = (status || "ALL").toUpperCase();
+
+    const parsedStatus = allowedStatuses.includes(upperStatus)
+      ? upperStatus
+      : "ALL";
+
+    const { users, total } = await UserServices.getAllEmployeUsersByParentId(
+      parentId,
+      {
+        page: parsedPage,
+        limit: parsedLimit,
+        sort: parsedSort,
+        status: parsedStatus,
+        search: search,
+      }
+    );
+
+    return res.status(200).json(
+      ApiResponse.success(
+        {
+          users,
+          total,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(total / parsedLimit),
+        },
+        "Employe users fetched successfully",
         200
       )
     );

@@ -7,6 +7,90 @@ import UserValidationSchemas from "../validations/userValidation.schemas.js";
 
 const userRoutes = Router();
 
+// ✅ SPECIFIC ROUTES FIRST (before parameterized routes)
+
+userRoutes.get(
+  "/employe",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  UserController.getAllEmployeUsersByParentId
+);
+
+userRoutes.get(
+  "/me",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
+  UserController.getCurrentUser
+);
+
+userRoutes.get(
+  "/role/:roleId",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
+  UserController.getAllUsersByRole
+);
+
+userRoutes.get(
+  "/children/:userId",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
+  UserController.getAllUsersByChildrenId
+);
+
+userRoutes.get(
+  "/count/parent/:parentId",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
+  UserController.getAllUsersCountByParentId
+);
+
+userRoutes.get(
+  "/count/children/:userId",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
+  UserController.getAllUsersCountByChildrenId
+);
+
+// ✅ PARAMETERIZED ROUTES LAST
+
+userRoutes.get(
+  "/:id",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles([
+    "ADMIN",
+    "STATE HEAD",
+    "MASTER DISTRIBUTOR",
+    "DISTRIBUTOR",
+  ]),
+  UserController.getUserById
+);
+
+// Other routes remain the same...
 userRoutes.post(
   "/register",
   upload.single("profileImage"),
@@ -49,42 +133,6 @@ userRoutes.put(
 );
 
 userRoutes.get(
-  "/me",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-  ]),
-  UserController.getCurrentUser
-);
-
-userRoutes.get(
-  "/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-  ]),
-  UserController.getUserById
-);
-
-userRoutes.get(
-  "/role/:roleId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-  ]),
-  UserController.getAllUsersByRole
-);
-
-userRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles([
@@ -93,43 +141,7 @@ userRoutes.get(
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
   ]),
-  UserController.getAllUsersByParentId
-);
-
-userRoutes.get(
-  "/children/:userId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-  ]),
-  UserController.getAllUsersByChildrenId
-);
-
-userRoutes.get(
-  "/count/parent/:parentId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-  ]),
-  UserController.getAllUsersCountByParentId
-);
-
-userRoutes.get(
-  "/count/children/:userId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-  ]),
-  UserController.getAllUsersCountByChildrenId
+  UserController.getAllRoleTypeUsersByParentId
 );
 
 userRoutes.patch(

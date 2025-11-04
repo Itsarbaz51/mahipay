@@ -632,7 +632,7 @@ class UserServices {
     return safeUsers;
   }
 
-  static async getAllUsersByParentId(parentId, options = {}) {
+  static async getAllRoleTypeUsersByParentId(parentId, options = {}) {
     const parent = await Prisma.user.findUnique({
       where: { id: parentId },
       include: {
@@ -655,23 +655,32 @@ class UserServices {
     const skip = (page - 1) * limit;
     const isAll = status === "ALL";
 
-    const adminRole = await Prisma.role.findFirst({
-      where: { name: "ADMIN" },
-      select: { id: true },
+    // Get role type roles (type = "role") and exclude ADMIN role
+    const roleTypeRoles = await Prisma.role.findMany({
+      where: {
+        type: "role",
+        name: {
+          not: "ADMIN", // Exclude ADMIN role
+        },
+      },
+      select: { id: true, name: true }, // Include name for verification
     });
+
+    const roleTypeRoleIds = roleTypeRoles.map((role) => role.id);
 
     let queryWhere =
       parent.role?.name === "ADMIN"
         ? {
-            ...(adminRole && {
-              roleId: {
-                not: adminRole.id,
-              },
-            }),
+            roleId: {
+              in: roleTypeRoleIds, // Only role type roles (excluding ADMIN)
+            },
             ...(isAll ? {} : { status }),
           }
         : {
             parentId,
+            roleId: {
+              in: roleTypeRoleIds, // Only role type roles (excluding ADMIN)
+            },
             ...(isAll ? {} : { status }),
           };
 
@@ -719,7 +728,13 @@ class UserServices {
         where: queryWhere,
         include: {
           role: {
-            select: { id: true, name: true, level: true, description: true },
+            select: {
+              id: true,
+              name: true,
+              level: true,
+              description: true,
+              type: true,
+            },
           },
           wallets: true,
           parent: {
@@ -755,6 +770,180 @@ class UserServices {
         where: queryWhere,
       }),
     ]);
+
+    // Additional safety filter to ensure no ADMIN users are returned
+    const filteredUsers = users.filter((user) => user.role.name !== "ADMIN");
+
+    let safeUsers;
+
+    if (parent.role.name === "ADMIN") {
+      safeUsers = filteredUsers.map((user) => {
+        const serialized = Helper.serializeUser(user);
+
+        if (serialized.password) {
+          try {
+            serialized.password = CryptoService.decrypt(serialized.password);
+          } catch {
+            serialized.password = "Error decrypting";
+          }
+        }
+
+        if (serialized.transactionPin) {
+          try {
+            serialized.transactionPin = CryptoService.decrypt(
+              serialized.transactionPin
+            );
+          } catch {
+            serialized.transactionPin = "Error decrypting";
+          }
+        }
+
+        return serialized;
+      });
+    } else {
+      safeUsers = filteredUsers.map((user) => {
+        const serialized = Helper.serializeUser(user);
+        const { password, transactionPin, refreshToken, ...safeUser } =
+          serialized;
+        return safeUser;
+      });
+    }
+
+    return { users: safeUsers, total: filteredUsers.length };
+  }
+
+  static async getAllEmployeUsersByParentId(parentId, options = {}) {
+    const parent = await Prisma.user.findUnique({
+      where: { id: parentId },
+      include: {
+        role: true,
+      },
+    });
+
+    if (!parent) {
+      throw ApiError.notFound("Parent user not found");
+    }
+
+    const {
+      page = 1,
+      limit = 10,
+      sort = "desc",
+      status = "ACTIVE",
+      search = "",
+    } = options;
+
+    const skip = (page - 1) * limit;
+    const isAll = status === "ALL";
+
+    // Get employe role
+    const employeRole = await Prisma.role.findFirst({
+      where: { type: "employe" },
+      select: { id: true },
+    });
+
+    if (!employeRole) {
+      return { users: [], total: 0 };
+    }
+
+    let queryWhere =
+      parent.role?.name === "ADMIN"
+        ? {
+            roleId: employeRole.id, // Only employe type roles
+            ...(isAll ? {} : { status }),
+          }
+        : {
+            parentId,
+            roleId: employeRole.id, // Only employe type roles
+            ...(isAll ? {} : { status }),
+          };
+
+    if (search && search.trim() !== "") {
+      const searchTerm = search.toLowerCase();
+
+      const searchConditions = {
+        OR: [
+          {
+            username: {
+              contains: searchTerm,
+            },
+          },
+          {
+            firstName: {
+              contains: searchTerm,
+            },
+          },
+          {
+            lastName: {
+              contains: searchTerm,
+            },
+          },
+          {
+            email: {
+              contains: searchTerm,
+            },
+          },
+          {
+            phoneNumber: {
+              contains: searchTerm,
+            },
+          },
+        ],
+      };
+
+      queryWhere = {
+        ...queryWhere,
+        ...searchConditions,
+      };
+    }
+
+    const [users, total] = await Promise.all([
+      Prisma.user.findMany({
+        where: queryWhere,
+        include: {
+          role: {
+            select: {
+              id: true,
+              name: true,
+              level: true,
+              description: true,
+              type: true,
+            },
+          },
+          wallets: true,
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: sort },
+        skip,
+        take: limit,
+      }),
+      Prisma.user.count({
+        where: queryWhere,
+      }),
+    ]);
+
     let safeUsers;
 
     if (parent.role.name === "ADMIN") {

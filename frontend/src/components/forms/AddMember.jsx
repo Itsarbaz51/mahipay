@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getAllRoles } from "../../redux/slices/roleSlice";
+import { getAllRolesByType } from "../../redux/slices/roleSlice";
 import { register, updateProfile } from "../../redux/slices/userSlice";
 
 export default function AddMember({
@@ -9,6 +9,7 @@ export default function AddMember({
   onClose,
   onSuccess,
   editData,
+  type = "member", // Fixed typo from "memeber" to "member"
 }) {
   const [formData, setFormData] = useState({
     username: "",
@@ -27,9 +28,67 @@ export default function AddMember({
 
   const roles = useSelector((state) => state?.roles?.roles || []);
 
-  // Prefill form if editData exists
+  // Get display text based on type
+  const getDisplayText = () => {
+    if (type === "employe") {
+      return {
+        title: profileEdit
+          ? "Profile Update"
+          : editData
+          ? "Edit Employee"
+          : "Add New Employee",
+        description: editData
+          ? "Update existing employee details"
+          : "Create a new employee account",
+        button: profileEdit
+          ? "Update Profile"
+          : editData
+          ? "Update Employee"
+          : "Add Employee",
+        loading: profileEdit
+          ? "Updating Profile..."
+          : editData
+          ? "Updating..."
+          : "Creating...",
+        success: editData
+          ? "Employee updated successfully!"
+          : "Employee added successfully!",
+      };
+    } else {
+      // Default to member
+      return {
+        title: profileEdit
+          ? "Profile Update"
+          : editData
+          ? "Edit Member"
+          : "Add New Member",
+        description: editData
+          ? "Update existing user details"
+          : "Create a new team user account",
+        button: profileEdit
+          ? "Update Profile"
+          : editData
+          ? "Update Member"
+          : "Add Member",
+        loading: profileEdit
+          ? "Updating Profile..."
+          : editData
+          ? "Updating..."
+          : "Creating...",
+        success: editData
+          ? "Member updated successfully!"
+          : "Member added successfully!",
+      };
+    }
+  };
+
+  const displayText = getDisplayText();
+
   useEffect(() => {
-    dispatch(getAllRoles());
+    // Fetch roles based on type
+    const roleType = type === "employe" ? "employe" : "role";
+    dispatch(getAllRolesByType(roleType));
+
     if (editData) {
       setFormData({
         username: editData.username || "",
@@ -44,7 +103,7 @@ export default function AddMember({
         setImagePreview(editData.profileImage);
       }
     }
-  }, [editData, dispatch]);
+  }, [editData, dispatch, type]); // Added type to dependencies
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -162,9 +221,7 @@ export default function AddMember({
       ) {
         setMessage({
           type: "success",
-          text: editData
-            ? "Member updated successfully!"
-            : "Member added successfully!",
+          text: displayText.success,
         });
 
         onSuccess();
@@ -226,17 +283,11 @@ export default function AddMember({
         <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">
-              {profileEdit
-                ? "Profile Update"
-                : editData
-                ? "Edit Member"
-                : "Add New Member"}
+              {displayText.title}
             </h2>
 
             <p className="text-blue-100 text-sm mt-1">
-              {editData
-                ? "Update existing user details"
-                : "Create a new team user account"}
+              {displayText.description}
             </p>
           </div>
           <button
@@ -460,17 +511,7 @@ export default function AddMember({
                 disabled={loading}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading
-                  ? profileEdit
-                    ? "Updating Profile..."
-                    : editData
-                    ? "Updating..."
-                    : "Creating..."
-                  : profileEdit
-                  ? "Update Profile"
-                  : editData
-                  ? "Update Member"
-                  : "Add Member"}
+                {loading ? displayText.loading : displayText.button}
               </button>
             </div>
           </form>

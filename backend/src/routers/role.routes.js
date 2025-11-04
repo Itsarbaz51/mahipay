@@ -7,7 +7,7 @@ import RoleValidationSchemas from "../validations/roleValidation.schemas.js";
 const roleRoutes = Router();
 
 roleRoutes.get(
-  "/",
+  "/type/:type",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles([
     "ADMIN",
@@ -15,7 +15,7 @@ roleRoutes.get(
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
   ]),
-  RoleController.index
+  RoleController.getAllRolesByType
 );
 
 roleRoutes.get(
@@ -27,30 +27,30 @@ roleRoutes.get(
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
   ]),
-  RoleController.show
+  RoleController.getRolebyId
 );
 
 roleRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  validateRequest(RoleValidationSchemas.store),
-  RoleController.store
+  validateRequest(RoleValidationSchemas.createRole),
+  RoleController.createRole
 );
 
 roleRoutes.put(
   "/:id",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  validateRequest(RoleValidationSchemas.update),
-  RoleController.update
+  validateRequest(RoleValidationSchemas.updateRole),
+  RoleController.updateRole
 );
 
 roleRoutes.delete(
   "/:id",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  RoleController.destroy
+  RoleController.deleteRole
 );
 
 export default roleRoutes;

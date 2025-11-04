@@ -34,12 +34,12 @@ const Settings = () => {
     },
     { id: "services", label: "Services", icon: UserCog, adminOnly: true },
     { id: "role", label: "Roles Management", icon: UserCog, adminOnly: true },
-    {
-      id: "api-intigration",
-      label: "API Intigration",
-      icon: Cable,
-      adminOnly: true,
-    },
+    // {
+    //   id: "api-intigration",
+    //   label: "API Intigration",
+    //   icon: Cable,
+    //   adminOnly: true,
+    // },
   ];
 
   const tabs =

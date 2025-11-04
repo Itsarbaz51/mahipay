@@ -14,7 +14,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { useDebounce } from "use-debounce";
 import { getLoginLogs } from "../redux/slices/loginLogsSlice";
-import { getAllRoles } from "../redux/slices/roleSlice";
+import { getAllRolesByType } from "../redux/slices/roleSlice";
 
 const ITEMS_PER_PAGE = 10;
 const DEBOUNCE_DELAY = 400;
@@ -44,7 +44,7 @@ const LoginLogs = () => {
   const roles = useSelector((state) => state?.roles?.roles || []);
 
   useEffect(() => {
-    dispatch(getAllRoles());
+    dispatch(getAllRolesByType("role"));
   }, [dispatch]);
 
   // Fetch logs

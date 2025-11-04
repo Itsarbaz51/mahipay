@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Search } from "lucide-react";
 import { createOrUpdateCommissionSetting } from "../../redux/slices/commissionSlice";
-import { getAllRoles } from "../../redux/slices/roleSlice";
-import { getAllUsersByParentId } from "../../redux/slices/userSlice";
+import { getAllRolesByType } from "../../redux/slices/roleSlice";
+import { getAllRoleTypeUsersByParentId } from "../../redux/slices/userSlice";
 import { getServicesActive } from "../../redux/slices/serviceSlice";
 
 const scopes = ["ROLE", "USER"];
@@ -87,8 +87,8 @@ const AddCommissionModal = ({ onClose, onSuccess, editData }) => {
 
   // Fetch roles, users and services when component mounts
   useEffect(() => {
-    dispatch(getAllRoles());
-    dispatch(getAllUsersByParentId({ search: "", status: "ACTIVE" }));
+    dispatch(getAllRolesByType("role"));
+    dispatch(getAllRoleTypeUsersByParentId({ search: "", status: "ACTIVE" }));
     dispatch(getServicesActive());
   }, [dispatch]);
 

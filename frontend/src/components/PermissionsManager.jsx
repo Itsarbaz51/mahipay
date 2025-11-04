@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import AddPermission from "./forms/AddPermission";
 import { useDispatch, useSelector } from "react-redux";
-import { getAllRoles } from "../redux/slices/roleSlice";
-import { getAllUsersByParentId } from "../redux/slices/userSlice";
+import { getAllRolesByType } from "../redux/slices/roleSlice";
+import { getAllRoleTypeUsersByParentId } from "../redux/slices/userSlice";
 import {
   updatePermissionInList,
   removePermissionFromList,
@@ -30,7 +30,7 @@ const RolePermissionsManager = () => {
 
   // Load initial data
   useEffect(() => {
-    dispatch(getAllRoles());
+    dispatch(getAllRolesByType("role"));
     loadUsers(); // Load initial users
   }, [dispatch]);
 
@@ -54,7 +54,7 @@ const RolePermissionsManager = () => {
           params.refresh = true;
         }
 
-        await dispatch(getAllUsersByParentId(params));
+        await dispatch(getAllRoleTypeUsersByParentId(params));
       } catch (error) {
         console.error("Failed to load users:", error);
       }

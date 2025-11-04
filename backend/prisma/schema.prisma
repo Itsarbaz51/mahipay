@@ -150,6 +150,7 @@ enum ApiProvider {
 model Role {
   id            String   @id @default(uuid())
   name          String   @unique
+  type          String   @default("employe") // "employe" ya "role"
   level         Int      @unique
   description   String?  @db.LongText
   createdBy     String?  @map("created_by")
