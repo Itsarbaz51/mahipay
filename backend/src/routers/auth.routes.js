@@ -6,23 +6,21 @@ import AuthValidationSchemas from "../validations/authValidation.schemas.js";
 
 const authRoutes = Router();
 
+// Public routes
+
+authRoutes.get(
+  "/me",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
+  AuthController.getCurrentUser
+);
+
 authRoutes.post(
   "/login",
   validateRequest(AuthValidationSchemas.login),
   AuthController.login
 );
 
-authRoutes.post(
-  "/logout",
-  AuthMiddleware.isAuthenticated,
-  AuthController.logout
-);
-
-authRoutes.post(
-  "/refresh",
-  AuthMiddleware.isAuthenticated,
-  AuthController.refreshToken
-);
 authRoutes.post(
   "/password-reset",
   validateRequest(AuthValidationSchemas.forgotPassword),
@@ -31,6 +29,18 @@ authRoutes.post(
 
 authRoutes.get("/verify-password-reset", AuthController.confirmPasswordReset);
 authRoutes.get("/verify-email", AuthController.verifyEmail);
+
+// Protected routes
+authRoutes.post(
+  "/logout",
+  AuthMiddleware.isAuthenticated,
+  AuthController.logout
+);
+
+authRoutes.post(
+  "/refresh",
+  AuthController.refreshToken // Note: Refresh doesn't require full authentication
+);
 
 authRoutes.put(
   "/:userId/credentials",

@@ -1,10 +1,16 @@
 import { useState, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { updateUserProfileImage } from "../../redux/slices/userSlice";
+import { updateEmployeeProfileImage } from "../../redux/slices/employeeSlice";
 import { toast } from "react-toastify";
 import { User, Camera, X, Upload } from "lucide-react";
 
-const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
+const EditProfileImageModal = ({
+  user,
+  onClose,
+  onSuccess,
+  type = "business",
+}) => {
   const [profileImage, setProfileImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(user.profileImage || "");
   const [loading, setLoading] = useState(false);
@@ -64,30 +70,28 @@ const EditProfileImageModal = ({ user, onClose, onSuccess }) => {
       const formData = new FormData();
       formData.append("profileImage", profileImage);
 
-      // Use the new action with user ID
-      const res = await dispatch(updateUserProfileImage(user.id, formData));
+      let res;
 
-      // ✅ Check multiple success patterns
-      if (
-        res?.success === true ||
-        res?.data?.success === true ||
-        res?.payload?.success
-      ) {
-        toast.success("Profile image updated successfully!");
-        onSuccess(); // ✅ Only close on success
+      // Use the new action with user ID
+      if (type === "business") {
+        res = await dispatch(updateUserProfileImage(user.id, formData));
       } else {
-        // ✅ Handle error response
-        const errorMessage =
-          res?.error?.message ||
-          res?.payload?.message ||
-          "Failed to update profile image";
-        setError(errorMessage);
-        // ❌ Form band nahi hoga - error show hoga
+        res = await dispatch(updateEmployeeProfileImage(user.id, formData));
+      }
+
+      // ✅ Check multiple success patterns based on common Redux patterns
+      const isSuccess = res?.success === true || res?.statusCode === 200;
+
+      if (isSuccess) {
+        toast.success(res.message);
+        onSuccess();
+        onClose();
+      } else {
+        const errorMessage = res?.message || setError(errorMessage);
       }
     } catch (error) {
       console.error("Profile image update error:", error);
       setError(error.message || "Failed to update profile image");
-      // ❌ Form band nahi hoga - error show hoga
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,4 @@
+// RoleManager.js
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Plus } from "lucide-react";
@@ -7,7 +8,9 @@ import {
   createRole,
   deleteRole,
   updateRole,
-  getAllRoles,
+  getAllRolesByType,
+  clearRoleError,
+  clearRoleSuccess,
 } from "../redux/slices/roleSlice";
 import AddPermission from "./forms/AddPermission";
 import {
@@ -19,14 +22,24 @@ import { getServicesActive } from "../redux/slices/serviceSlice";
 export default function RoleManager() {
   const dispatch = useDispatch();
 
-  const roles = useSelector((state) => state?.roles?.roles || []);
-  const { isLoading, error, success } = useSelector((state) => state.roles);
+  // Use correct selectors based on active tab
+  const rolesState = useSelector((state) => state.roles);
+  const {
+    roles = [],
+    businessRoles = [],
+    employeeRoles = [],
+    isLoading,
+    error,
+    success,
+  } = rolesState;
+
   const services =
     useSelector((state) => state.services?.serviceProviders) || [];
   const { currentPermission } = useSelector((state) => state.permission);
 
   const [editRole, setEditRole] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("employee");
 
   // Permission Modal States
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -34,15 +47,45 @@ export default function RoleManager() {
   const [existingPermissions, setExistingPermissions] = useState(null);
   const [permissionMode, setPermissionMode] = useState("role");
 
+  // Fetch roles when component mounts and when tab changes
   useEffect(() => {
-    dispatch(getAllRoles());
-  }, [dispatch]);
+    const roleType = activeTab === "employee" ? "employee" : "business";
+    dispatch(getAllRolesByType(roleType));
+  }, [dispatch, activeTab]);
 
   useEffect(() => {
     if (showPermissionModal) {
       dispatch(getServicesActive());
     }
   }, [showPermissionModal, dispatch]);
+
+  // Clear errors/success messages when component unmounts
+  useEffect(() => {
+    return () => {
+      dispatch(clearRoleError());
+      dispatch(clearRoleSuccess());
+    };
+  }, [dispatch]);
+
+  // Auto-clear success message after 3 seconds
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        dispatch(clearRoleSuccess());
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success, dispatch]);
+
+  // Auto-clear error message after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        dispatch(clearRoleError());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, dispatch]);
 
   useEffect(() => {
     if (
@@ -63,32 +106,58 @@ export default function RoleManager() {
     }
   }, [dispatch, showPermissionModal, permissionRole]);
 
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    dispatch(clearRoleError());
+    dispatch(clearRoleSuccess());
+  };
+
   const handleAddOrUpdate = async (roleData) => {
     try {
+      // For both create and update, only send name and description
+      // Backend handles type, level, and createdBy automatically
+      const submitData = {
+        name: roleData.name,
+        description: roleData.description,
+        type: "employee", // Force type to employee as per backend
+      };
+
       if (editRole) {
-        await dispatch(updateRole(editRole.id, roleData)).unwrap();
+        await dispatch(updateRole(editRole.id, submitData)).unwrap();
         setEditRole(null);
       } else {
-        await dispatch(createRole(roleData)).unwrap();
+        await dispatch(createRole(submitData)).unwrap();
       }
       setIsModalOpen(false);
-      dispatch(getAllRoles());
+
+      // Refresh the correct role list
+      const roleType = activeTab === "employee" ? "employee" : "business";
+      dispatch(getAllRolesByType(roleType));
     } catch (error) {
       console.error("Operation failed:", error);
     }
   };
 
   const handleEdit = (role) => {
-    setEditRole(role);
-    setIsModalOpen(true);
+    // Only allow editing for employee roles
+    if (activeTab === "employee") {
+      setEditRole(role);
+      setIsModalOpen(true);
+    }
   };
 
   const handleDelete = async (role) => {
-    if (confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
-      try {
-        await dispatch(deleteRole(role.id)).unwrap();
-      } catch (error) {
-        console.error("Delete failed:", error);
+    // Only allow deleting for employee roles
+    if (activeTab === "employee") {
+      if (confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
+        try {
+          await dispatch(deleteRole(role.id)).unwrap();
+          // Refresh the correct role list
+          const roleType = activeTab === "employee" ? "employee" : "business";
+          dispatch(getAllRolesByType(roleType));
+        } catch (error) {
+          console.error("Delete failed:", error);
+        }
       }
     }
   };
@@ -97,11 +166,8 @@ export default function RoleManager() {
     setPermissionRole(role);
     setShowPermissionModal(true);
     setPermissionMode("role");
-
-    // ✅ Clear permissions immediately to prevent old data flash
     setExistingPermissions(null);
 
-    // ✅ Then fetch new permissions
     if (role.id) {
       dispatch(getPermissionRoleById(role.id));
     }
@@ -111,7 +177,9 @@ export default function RoleManager() {
     try {
       await dispatch(upsertRolePermission(permissionData)).unwrap();
       handleClosePermissionModal();
-      dispatch(getAllRoles());
+      // Refresh the correct role list
+      const roleType = activeTab === "employee" ? "employee" : "business";
+      dispatch(getAllRolesByType(roleType));
     } catch (error) {
       console.error("Permission update failed:", error);
     }
@@ -124,91 +192,146 @@ export default function RoleManager() {
     setPermissionMode("role");
   };
 
-  // const handleCancel = () => {
-  //   setEditRole(null);
-  //   setIsModalOpen(false);
-  // };
+  const handleCancel = () => {
+    setEditRole(null);
+    setIsModalOpen(false);
+    dispatch(clearRoleError());
+  };
 
   const handleAddNew = () => {
     setEditRole(null);
     setIsModalOpen(true);
   };
 
+  // Use the correct roles based on active tab
+  const getFilteredRoles = () => {
+    if (activeTab === "employee") {
+      return employeeRoles;
+    } else {
+      return businessRoles;
+    }
+  };
+
+  const filteredRoles = getFilteredRoles();
+
   return (
     <div className="bg-white rounded-xl border border-gray-300 p-6 shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Team Roles</h2>
-          <p className="text-gray-600 text-sm mt-1">
-            Manage and monitor your roles
-          </p>
+      {/* Header with gradient background */}
+      <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 rounded-xl p-6 mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold text-white">
+              {activeTab === "employee" ? "Employee Roles" : "Business Roles"}
+            </h2>
+            <p className="text-blue-100 text-sm mt-1">
+              Manage and monitor your{" "}
+              {activeTab === "employee" ? "employee" : "business"} roles
+            </p>
+          </div>
+
+          {activeTab === "employee" && (
+            <button
+              onClick={handleAddNew}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-6 py-2.5 bg-white/20 backdrop-blur-sm text-white font-semibold rounded-lg hover:bg-white/30 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed border border-white/30"
+            >
+              <Plus size={20} />
+              {isLoading ? "Loading..." : "Create Employee Role"}
+            </button>
+          )}
         </div>
-        {/* <button
-          onClick={handleAddNew}
-          disabled={isLoading}
-          className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white font-semibold rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus size={20} />
-          {isLoading ? "Loading..." : "Add Role"}
-        </button> */}
+
+        {/* Tabs */}
+        <div className="mt-4">
+          <nav className="flex space-x-4">
+            <button
+              onClick={() => handleTabChange("employee")}
+              className={`py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
+                activeTab === "employee"
+                  ? "bg-white text-cyan-700 shadow-sm"
+                  : "text-white/80 hover:text-white hover:bg-white/20"
+              }`}
+            >
+              Employee Roles
+            </button>
+            <button
+              onClick={() => handleTabChange("business")}
+              className={`py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
+                activeTab === "business"
+                  ? "bg-white text-cyan-700 shadow-sm"
+                  : "text-white/80 hover:text-white hover:bg-white/20"
+              }`}
+            >
+              Business Roles
+            </button>
+          </nav>
+        </div>
       </div>
 
-      {isLoading && !roles.length && (
+      {isLoading && !filteredRoles.length && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600 mx-auto"></div>
-          <p className="text-gray-600 mt-2">Loading roles...</p>
+          <p className="text-gray-600 mt-2">
+            Loading {activeTab === "employee" ? "employee" : "business"}{" "}
+            roles...
+          </p>
         </div>
       )}
 
       {error && !isLoading && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <p className="text-red-700 text-sm">{error}</p>
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+          <p className="text-red-700 text-sm font-medium">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-          <p className="text-green-700 text-sm">{success}</p>
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg mb-4">
+          <p className="text-green-700 text-sm font-medium">{success}</p>
         </div>
       )}
 
-      {!isLoading && roles.length > 0 && (
+      {!isLoading && filteredRoles.length > 0 && (
         <RoleList
-          roles={roles}
+          roles={filteredRoles}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onPermission={handlePermission}
-          isLoading={isLoading}
+          type={activeTab}
         />
       )}
 
-      {!isLoading && roles.length === 0 && (
-        <div className="text-center py-12">
+      {!isLoading && filteredRoles.length === 0 && (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
           <div className="text-gray-400 mb-4">
             <Plus size={48} className="mx-auto" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            No roles found
+            No {activeTab === "employee" ? "employee" : "business"} roles found
           </h3>
           <p className="text-gray-600 mb-4">
-            Get started by creating your first role.
+            {activeTab === "employee"
+              ? "Get started by creating your first employee role."
+              : "Business roles are managed automatically."}
           </p>
-          <button
-            onClick={handleAddNew}
-            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"
-          >
-            Create Role
-          </button>
+          {activeTab === "employee" && (
+            <button
+              onClick={handleAddNew}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              Create Employee Role
+            </button>
+          )}
         </div>
       )}
 
-      {/* <RoleFormModal
+      <RoleFormModal
         isOpen={isModalOpen}
         onClose={handleCancel}
         onSubmit={handleAddOrUpdate}
         editData={editRole}
         isLoading={isLoading}
-      /> */}
+        type={activeTab}
+      />
 
       {showPermissionModal && permissionRole && (
         <AddPermission

@@ -2,54 +2,122 @@ import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
 
 class RoleServices {
-  static async index(options) {
-    const { currentUserRoleLevel } = options;
+  static getAllRoles = async (options = {}) => {
+    const { currentUserRoleLevel, excludeAdmin = false } = options;
 
     const where = {};
+
+    if (excludeAdmin) {
+      where.name = { not: "ADMIN" };
+    }
 
     if (typeof currentUserRoleLevel === "number") {
       where.level = { gt: currentUserRoleLevel };
     }
 
+    // Query using Prisma
     const roles = await Prisma.role.findMany({
       where,
       orderBy: { level: "asc" },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        _count: {
-          select: {
-            users: true,
-            rolePermissions: true,
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        level: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
-    const roleDTOs = roles.map((role) => ({
-      id: role.id,
-      name: role.name,
-      level: role.level,
-      description: role.description,
-      createdBy: role.createdBy || "",
-      createdAt: role.createdAt,
-      updatedAt: role.updatedAt,
-      userCount: role._count.users,
-      permissionCount: role._count.rolePermissions,
-    }));
+    return roles;
+  };
 
-    return {
-      roles: roleDTOs,
+  static async getAllRolesByType(options) {
+    const { currentUserRoleLevel, type } = options;
+
+    // Validate input parameters
+    if (!type) {
+      throw new Error("Type parameter is required");
+    }
+
+    if (!["employee", "business"].includes(type)) {
+      throw new Error(
+        "Invalid type parameter. Must be 'employee' or 'business'"
+      );
+    }
+
+    const where = {
+      type: type,
     };
+
+    // Add role level filter if currentUserRoleLevel is provided
+    if (typeof currentUserRoleLevel === "number") {
+      where.level = { gt: currentUserRoleLevel };
+    }
+
+    try {
+      const roles = await Prisma.role.findMany({
+        where,
+        orderBy: { level: "asc" },
+        include: {
+          createdByUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          _count: {
+            select: {
+              users: true,
+              rolePermissions: true,
+            },
+          },
+        },
+      });
+
+      // Transform roles to DTO
+      const roleDTOs = roles.map((role) => ({
+        id: role.id,
+        name: role.name,
+        type: role.type,
+        level: role.level,
+        description: role.description,
+        createdBy: role.createdByUser
+          ? `${role.createdByUser.firstName} ${role.createdByUser.lastName}`
+          : "System",
+        createdByUser: role.createdByUser
+          ? {
+              id: role.createdByUser.id,
+              firstName: role.createdByUser.firstName,
+              lastName: role.createdByUser.lastName,
+              email: role.createdByUser.email,
+            }
+          : null,
+        createdAt: role.createdAt,
+        updatedAt: role.updatedAt,
+        userCount: role._count.users,
+        permissionCount: role._count.rolePermissions,
+        isActive: role.isActive !== undefined ? role.isActive : true,
+      }));
+
+      return {
+        roles: roleDTOs,
+        meta: {
+          total: roleDTOs.length,
+          type: type,
+          filteredByLevel: typeof currentUserRoleLevel === "number",
+        },
+      };
+    } catch (error) {
+      console.error("Error in getAllRolesByType:", error);
+      throw new Error(`Failed to fetch ${type} roles: ${error.message}`);
+    }
   }
 
-  static async show(id) {
+  static async getRolebyId(id) {
     const role = await Prisma.role.findUnique({
       where: { id },
       include: {
@@ -86,6 +154,7 @@ class RoleServices {
     return {
       id: role.id,
       name: role.name,
+      type: role.type,
       level: role.level,
       description: role.description,
       createdBy: role.createdBy || "",
@@ -103,10 +172,14 @@ class RoleServices {
     };
   }
 
-  static async store(payload) {
-    let { name, description, level, createdBy } = payload;
+  static async createRole(payload) {
+    let { name, description, type = "employee", createdBy } = payload;
 
-    // Check if role with same name exists
+    // TYPE VALIDATION: Only allow creating 'employee' type roles
+    if (type !== "employee") {
+      throw ApiError.badRequest("Only 'employee' type roles can be created");
+    }
+
     const existingByName = await Prisma.role.findUnique({
       where: { name },
     });
@@ -114,25 +187,16 @@ class RoleServices {
       throw ApiError.conflict("Role with this name already exists");
     }
 
-    // Check if level is provided and unique
-    if (level !== undefined) {
-      const existingByLevel = await Prisma.role.findUnique({
-        where: { level },
-      });
-      if (existingByLevel) {
-        throw ApiError.conflict("Role with this level already exists");
-      }
-    } else {
-      // Auto-determine level if not provided
-      const maxLevelRole = await Prisma.role.findFirst({
-        orderBy: { level: "desc" },
-      });
-      level = maxLevelRole ? maxLevelRole.level + 1 : 1;
-    }
+    // Auto-determine level for employee roles - start from level 5 since 0-4 are taken by business roles
+    const maxLevelRole = await Prisma.role.findFirst({
+      orderBy: { level: "desc" },
+    });
+    const level = maxLevelRole ? maxLevelRole.level + 1 : 5;
 
     const role = await Prisma.role.create({
       data: {
         name,
+        type: "employee", // Force type to be 'employee'
         level,
         description: description ?? null,
         createdBy,
@@ -174,6 +238,7 @@ class RoleServices {
     const dto = {
       id: role.id,
       name: role.name,
+      type: role.type,
       level: role.level,
       description: role.description,
       createdBy,
@@ -184,14 +249,19 @@ class RoleServices {
     return dto;
   }
 
-  static async update(id, payload) {
-    const { name, description, level } = payload;
+  static async updateRole(id, payload) {
+    const { name, description, level, type } = payload;
 
     // Check if role exists
     const existingRole = await Prisma.role.findUnique({
       where: { id },
     });
     if (!existingRole) return null;
+
+    // TYPE CHECK: Only allow updating 'employee' type roles
+    if (existingRole.type !== "employee") {
+      throw ApiError.forbidden("Cannot update non-employee type roles");
+    }
 
     // Check for name conflict with other roles
     if (name && name !== existingRole.name) {
@@ -213,10 +283,16 @@ class RoleServices {
       }
     }
 
+    // Prevent changing type to 'business'
+    if (type && type !== "employee") {
+      throw ApiError.badRequest("Cannot change role type to non-employee");
+    }
+
     const updateData = {};
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (level !== undefined) updateData.level = level;
+    updateData.type = "employee"; // Force type to remain 'employee'
 
     const role = await Prisma.role.update({
       where: { id },
@@ -236,6 +312,7 @@ class RoleServices {
     const dto = {
       id: role.id,
       name: role.name,
+      type: role.type,
       level: role.level,
       description: role.description,
       createdBy: role.createdBy || "",
@@ -246,7 +323,7 @@ class RoleServices {
     return dto;
   }
 
-  static async destroy(id) {
+  static async deleteRole(id) {
     // Check if role exists
     const existingRole = await Prisma.role.findUnique({
       where: { id },
@@ -258,6 +335,11 @@ class RoleServices {
     });
 
     if (!existingRole) return false;
+
+    // TYPE CHECK: Only allow deleting 'employee' type roles
+    if (existingRole.type !== "employee") {
+      throw ApiError.forbidden("Cannot delete non-employee type roles");
+    }
 
     // Check if role is assigned to any users
     if (existingRole.users.length > 0) {
@@ -288,6 +370,49 @@ class RoleServices {
   // Additional method to check if user can manage this role
   static async canUserManageRole(userRoleLevel, targetRoleLevel) {
     return userRoleLevel < targetRoleLevel;
+  }
+
+  // Get business roles for user registration
+  static async getBusinessRolesForUser(currentUserRoleLevel) {
+    const where = {
+      type: "business",
+    };
+
+    // Add role level filter if currentUserRoleLevel is provided
+    if (typeof currentUserRoleLevel === "number") {
+      where.level = { gt: currentUserRoleLevel };
+    }
+
+    const roles = await Prisma.role.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        description: true,
+      },
+      orderBy: { level: "asc" },
+    });
+
+    return roles;
+  }
+
+  // Get employee roles for employee registration
+  static async getEmployeeRolesForAdmin() {
+    const roles = await Prisma.role.findMany({
+      where: {
+        type: "employee",
+      },
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        description: true,
+      },
+      orderBy: { level: "asc" },
+    });
+
+    return roles;
   }
 }
 

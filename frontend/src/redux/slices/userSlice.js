@@ -1,10 +1,11 @@
+// userSlice.js
 import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { logout } from "./authSlice";
 
 const initialState = {
-  users: [],
+  users: [], // Business users
   currentUser: null,
   usersByRole: [],
   childrenUsers: [],
@@ -154,8 +155,10 @@ export const {
   clearFilters,
 } = userSlice.actions;
 
-// Async Actions
-export const register = (userData) => async (dispatch) => {
+// Async Actions - BUSINESS USERS ONLY
+
+// Register business user
+export const registerUser = (userData) => async (dispatch) => {
   try {
     dispatch(userSubmitRequest());
     const config =
@@ -170,7 +173,7 @@ export const register = (userData) => async (dispatch) => {
     dispatch(userSuccess(data));
 
     if (data.message) {
-      toast.success(data.message || "User registered successfully!");
+      toast.success(data.message || "Business user registered successfully!");
     }
 
     return data;
@@ -182,6 +185,7 @@ export const register = (userData) => async (dispatch) => {
   }
 };
 
+// Update business user profile image
 export const updateUserProfileImage =
   (userId, formData) => async (dispatch) => {
     try {
@@ -197,7 +201,6 @@ export const updateUserProfileImage =
       dispatch(userSuccess(data));
       dispatch(updateUserInList(data.data.user));
 
-      // SINGLE TOAST
       if (data.message) {
         toast.success(data.message || "Profile image updated successfully!");
       }
@@ -209,14 +212,13 @@ export const updateUserProfileImage =
         error?.message ||
         "Profile image update failed";
       dispatch(userFail(errMsg));
-
-      // SINGLE TOAST
       toast.error(errMsg);
       throw new Error(errMsg);
     }
   };
 
-export const updateProfile = (userId, profileData) => async (dispatch) => {
+// Update business user profile
+export const updateUserProfile = (userId, profileData) => async (dispatch) => {
   try {
     dispatch(userSubmitRequest());
 
@@ -238,17 +240,15 @@ export const updateProfile = (userId, profileData) => async (dispatch) => {
       toast.success(data.message || "Profile updated successfully!");
     }
 
-    dispatch(logout());
-
     return data;
   } catch (error) {
     const errorResponse = error?.response?.data;
     dispatch(userFail(errorResponse || error.message));
-
     throw error;
   }
 };
 
+// Get business user by ID
 export const getUserById = (userId) => async (dispatch) => {
   try {
     dispatch(userRequest());
@@ -267,6 +267,7 @@ export const getUserById = (userId) => async (dispatch) => {
   }
 };
 
+// Get current business user profile
 export const getCurrentUserProfile = () => async (dispatch) => {
   try {
     dispatch(userRequest());
@@ -285,6 +286,7 @@ export const getCurrentUserProfile = () => async (dispatch) => {
   }
 };
 
+// Get all business users by role
 export const getAllUsersByRole = (roleId) => async (dispatch) => {
   try {
     dispatch(userRequest());
@@ -303,18 +305,15 @@ export const getAllUsersByRole = (roleId) => async (dispatch) => {
   }
 };
 
-// ✅ UPDATED: Changed from POST to GET with query parameters
-export const getAllUsersByParentId =
+// Get all business users by parent ID
+export const getAllBusinessUsersByParentId =
   (filters = {}) =>
   async (dispatch) => {
     try {
       dispatch(userRequest());
       dispatch(setFilters(filters));
 
-      // Use query parameters instead of POST body
       const params = new URLSearchParams();
-
-      // Add all filter parameters
       Object.keys(filters).forEach((key) => {
         if (
           filters[key] !== undefined &&
@@ -325,7 +324,6 @@ export const getAllUsersByParentId =
         }
       });
 
-      // Ensure default parameters
       if (!filters.page) params.append("page", "1");
       if (!filters.limit) params.append("limit", "10");
       if (!filters.sort) params.append("sort", "desc");
@@ -351,14 +349,13 @@ export const getAllUsersByParentId =
       return data;
     } catch (error) {
       const errMsg =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to fetch users";
+        error?.response?.data?.message || "Failed to fetch business users";
       dispatch(userFail(errMsg));
       throw new Error(errMsg);
     }
   };
 
+// Get all business users by children ID
 export const getAllUsersByChildrenId = (userId) => async (dispatch) => {
   try {
     dispatch(userRequest());
@@ -377,13 +374,13 @@ export const getAllUsersByChildrenId = (userId) => async (dispatch) => {
   }
 };
 
+// Deactivate business user
 export const deactivateUser =
   ({ userId, reason }) =>
   async (dispatch) => {
     try {
       dispatch(userSubmitRequest());
 
-      // Ensure reason is always a string
       const finalReason = reason || "Deactivated by admin";
 
       const { data } = await axios.patch(`/users/${userId}/deactivate`, {
@@ -409,13 +406,13 @@ export const deactivateUser =
     }
   };
 
+// Reactivate business user
 export const reactivateUser =
   ({ userId, reason }) =>
   async (dispatch) => {
     try {
       dispatch(userSubmitRequest());
 
-      // Ensure reason is always a string
       const finalReason = reason || "Reactivated by admin";
 
       const { data } = await axios.patch(`/users/${userId}/reactivate`, {
@@ -441,6 +438,7 @@ export const reactivateUser =
     }
   };
 
+// Delete business user (soft delete)
 export const deleteUser =
   ({ userId, reason }) =>
   async (dispatch) => {
@@ -450,7 +448,7 @@ export const deleteUser =
       const finalReason = reason || "Deleted by admin";
 
       const { data } = await axios.delete(`/users/${userId}/delete`, {
-        data: { reason: finalReason }, // Send as request body
+        data: { reason: finalReason },
       });
 
       dispatch(userSuccess(data));

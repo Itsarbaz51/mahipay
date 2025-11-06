@@ -11,23 +11,17 @@ const serviceRoutes = Router();
 serviceRoutes.post(
   "/create",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   upload.single("icon"),
   validateRequest(ServiceValidationSchemas.createServiceProvider),
   ServiceProviderController.create
 );
 
-// Get all service providers (ADMIN sees all, users see assigned)
+// Get all service providers (ADMIN sees all, business users see assigned)
 serviceRoutes.get(
   "/lists",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "RETAILER",
-  ]),
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   ServiceProviderController.getAll
 );
 

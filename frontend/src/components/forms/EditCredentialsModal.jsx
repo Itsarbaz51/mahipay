@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { updateCredentials } from "../../redux/slices/authSlice";
+import ZodErrorCatch from "../../layouts/ZodErrorCatch";
 
 const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -127,13 +128,9 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         payload.confirmNewTransactionPin = formData.confirmNewTransactionPin;
       }
 
-      const result = await dispatch(
-        updateCredentials({
-          userId: userId,
-          credentialsData: payload,
-          currentUserId: currentUser?.id,
-        })
-      );
+      const result = await dispatch(updateCredentials(userId, payload));
+
+      console.log(result);
 
       if (result?.success) {
         toast.success(result?.message);
@@ -151,8 +148,9 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
         onSuccess();
       }
     } catch (error) {
-      const errorMsg = error.message || "Something went wrong";
-      setApiError(errorMsg);
+      const finalError = ZodErrorCatch(error);
+
+      setApiError(finalError);
     } finally {
       setLoading(false);
     }

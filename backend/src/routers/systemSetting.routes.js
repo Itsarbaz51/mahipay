@@ -7,30 +7,35 @@ import SystemSettingValidationSchemas from "../validations/systemSettingValidati
 
 const systemSettingRoutes = Router();
 
-// Get system setting by ID
+// Get system setting by ID (ADMIN only)
 systemSettingRoutes.get(
   "/show",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   SystemSettingController.show
 );
 
-// List all system settings with pagination
+// List all system settings with pagination (ADMIN only)
 systemSettingRoutes.get(
   "/list",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   SystemSettingController.index
 );
 
-// Delete system setting
+// Delete system setting (ADMIN only)
 systemSettingRoutes.delete(
   "/delete/:id",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   SystemSettingController.delete
 );
 
+// Upsert system setting (ADMIN only)
 systemSettingRoutes.post(
   "/upsert",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   upload.fields([
     { name: "companyLogo", maxCount: 1 },
     { name: "favIcon", maxCount: 1 },

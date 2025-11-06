@@ -1,7 +1,13 @@
+// AddMember.js
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { getAllRoles } from "../../redux/slices/roleSlice";
-import { register, updateProfile } from "../../redux/slices/userSlice";
+import { getAllRolesByType } from "../../redux/slices/roleSlice";
+import { registerUser, updateUserProfile } from "../../redux/slices/userSlice";
+// ✅ FIXED: Import employee actions
+import {
+  registerEmployee,
+  updateEmployeeProfile,
+} from "../../redux/slices/employeeSlice";
 
 export default function AddMember({
   isAdmin = false,
@@ -9,6 +15,7 @@ export default function AddMember({
   onClose,
   onSuccess,
   editData,
+  type = "business",
 }) {
   const [formData, setFormData] = useState({
     username: "",
@@ -27,9 +34,71 @@ export default function AddMember({
 
   const roles = useSelector((state) => state?.roles?.roles || []);
 
-  // Prefill form if editData exists
+  // Get display text based on type
+  const getDisplayText = () => {
+    if (type === "employee") {
+      return {
+        title: profileEdit
+          ? "Profile Update"
+          : editData
+          ? "Edit Employee"
+          : "Add New Employee",
+        description: editData
+          ? "Update existing employee details"
+          : "Create a new employee account",
+        button: profileEdit
+          ? "Update Profile"
+          : editData
+          ? "Update Employee"
+          : "Add Employee",
+        loading: profileEdit
+          ? "Updating Profile..."
+          : editData
+          ? "Updating..."
+          : "Creating...",
+        success: editData
+          ? "Employee updated successfully!"
+          : "Employee added successfully!",
+      };
+    } else {
+      return {
+        title: profileEdit
+          ? "Profile Update"
+          : editData
+          ? "Edit Member"
+          : "Add New Member",
+        description: editData
+          ? "Update existing user details"
+          : "Create a new team user account",
+        button: profileEdit
+          ? "Update Profile"
+          : editData
+          ? "Update Member"
+          : "Add Member",
+        loading: profileEdit
+          ? "Updating Profile..."
+          : editData
+          ? "Updating..."
+          : "Creating...",
+        success: editData
+          ? "Member updated successfully!"
+          : "Member added successfully!",
+      };
+    }
+  };
+
+  const displayText = getDisplayText();
+
   useEffect(() => {
-    dispatch(getAllRoles());
+    // Fetch roles based on type
+    let roleType = "";
+    if (type === "employee") roleType = "employee";
+    if (type === "business") roleType = "business";
+
+    if (roleType) {
+      dispatch(getAllRolesByType(roleType));
+    }
+
     if (editData) {
       setFormData({
         username: editData.username || "",
@@ -44,7 +113,7 @@ export default function AddMember({
         setImagePreview(editData.profileImage);
       }
     }
-  }, [editData, dispatch]);
+  }, [editData, dispatch, type]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -60,7 +129,7 @@ export default function AddMember({
     }
 
     if (errors[name]) setErrors({ ...errors, [name]: "" });
-    if (message.text) setMessage({ type: "", text: "" }); // Clear message on change
+    if (message.text) setMessage({ type: "", text: "" });
   };
 
   const handleFileChange = (e) => {
@@ -92,20 +161,21 @@ export default function AddMember({
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ FIXED: Handle form submission based on type
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
       setMessage({
         type: "error",
-        text: "Please fill the details before proceed",
+        text: "Please fill the required details before proceeding",
       });
       return;
     }
 
     setLoading(true);
     setMessage({ type: "", text: "" });
-    setErrors({}); // Clear previous errors
+    setErrors({});
 
     try {
       let res;
@@ -137,7 +207,12 @@ export default function AddMember({
           delete submitData.roleId;
         }
 
-        res = await dispatch(updateProfile(editData.id, submitData));
+        // ✅ FIXED: Use appropriate update function based on type
+        if (type === "employee") {
+          res = await dispatch(updateEmployeeProfile(editData.id, submitData));
+        } else {
+          res = await dispatch(updateUserProfile(editData.id, submitData));
+        }
       } else {
         // New member case
         const form = new FormData();
@@ -150,7 +225,13 @@ export default function AddMember({
             form.append(key, formData[key]);
           }
         });
-        res = await dispatch(register(form));
+
+        // ✅ FIXED: Use appropriate register function based on type
+        if (type === "employee") {
+          res = await dispatch(registerEmployee(form));
+        } else {
+          res = await dispatch(registerUser(form));
+        }
       }
 
       // Check for success
@@ -162,15 +243,13 @@ export default function AddMember({
       ) {
         setMessage({
           type: "success",
-          text: editData
-            ? "Member updated successfully!"
-            : "Member added successfully!",
+          text: displayText.success,
         });
 
         onSuccess();
         onClose();
       } else {
-        // Handle other types of errors from dispatch
+        // Handle errors
         const errorData = res?.error || res?.payload || res?.data || {};
         const errorMessage = errorData?.message || "Operation failed";
 
@@ -200,7 +279,6 @@ export default function AddMember({
 
         setMessage(formattedErrors);
       } else {
-        // Handle other errors
         setMessage({
           type: "error",
           text:
@@ -226,17 +304,11 @@ export default function AddMember({
         <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 px-6 py-5 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">
-              {profileEdit
-                ? "Profile Update"
-                : editData
-                ? "Edit Member"
-                : "Add New Member"}
+              {displayText.title}
             </h2>
 
             <p className="text-blue-100 text-sm mt-1">
-              {editData
-                ? "Update existing user details"
-                : "Create a new team user account"}
+              {displayText.description}
             </p>
           </div>
           <button
@@ -460,17 +532,7 @@ export default function AddMember({
                 disabled={loading}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading
-                  ? profileEdit
-                    ? "Updating Profile..."
-                    : editData
-                    ? "Updating..."
-                    : "Creating..."
-                  : profileEdit
-                  ? "Update Profile"
-                  : editData
-                  ? "Update Member"
-                  : "Add Member"}
+                {loading ? displayText.loading : displayText.button}
               </button>
             </div>
           </form>

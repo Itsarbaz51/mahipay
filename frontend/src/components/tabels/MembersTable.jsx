@@ -1,3 +1,4 @@
+// MembersTable.js
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Search,
@@ -18,7 +19,7 @@ import { toast } from "react-toastify";
 import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  getAllUsersByParentId,
+  getAllBusinessUsersByParentId,
   getUserById,
   setCurrentUser,
   clearUserError,
@@ -76,7 +77,7 @@ const MembersTable = () => {
   // ✅ CURRENT LOGGED-IN USER ka data get karo
   const authState = useSelector((state) => state.auth || {});
   const currentLoggedInUser = authState.currentUser || {};
-  const currentUserRole = currentLoggedInUser.role?.name || "";
+  const currentUserRole = currentLoggedInUser?.role?.name || "";
 
   const {
     users = [],
@@ -103,9 +104,9 @@ const MembersTable = () => {
   // ✅ Check if current user is ADMIN
   const isAdminUser = currentUserRole === "ADMIN";
 
-  // ✅ FIXED: Simplified loadUsers function without currentPage dependency
+  // ✅ FIXED: Correct loadUsers function
   const loadUsers = useCallback(
-    async (page = currentPage, searchTerm = search, forceRefresh = false) => {
+    async (page = 1, searchTerm = "", forceRefresh = false) => {
       try {
         const params = {
           page,
@@ -122,7 +123,7 @@ const MembersTable = () => {
           params.timestamp = Date.now();
         }
 
-        await dispatch(getAllUsersByParentId(params));
+        await dispatch(getAllBusinessUsersByParentId(params));
       } catch (error) {
         console.error("Failed to load users:", error);
         toast.error(error.message || "Failed to load users");
@@ -143,9 +144,9 @@ const MembersTable = () => {
 
   // ✅ FIXED: Manual refresh
   const handleManualRefresh = useCallback(() => {
-    loadUsers(currentPage, search, true);
+    loadUsers(1, search, true);
     toast.info("Refreshing data...");
-  }, [loadUsers, currentPage, search]);
+  }, [loadUsers, search]);
 
   // Toast handling
   useEffect(() => {
@@ -180,7 +181,7 @@ const MembersTable = () => {
     }
   }, [loadUsers]);
 
-  // ✅ FIXED: Search with debouncing - directly dispatch instead of using loadUsers
+  // ✅ FIXED: Search with debouncing
   useEffect(() => {
     if (!initialLoadRef.current) return;
 
@@ -189,17 +190,7 @@ const MembersTable = () => {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      // Direct dispatch for search to avoid dependency issues
-      dispatch(
-        getAllUsersByParentId({
-          page: 1, // Reset to page 1 when searching
-          limit,
-          sort: "desc",
-          status: "ALL",
-          search,
-          timestamp: Date.now(),
-        })
-      );
+      loadUsers(1, search);
     }, 500);
 
     return () => {
@@ -207,12 +198,12 @@ const MembersTable = () => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [search, dispatch, limit]);
+  }, [search, loadUsers]);
 
   // Permission effect
   useEffect(() => {
     if (showPermissionModal && permissionUser?.id) {
-      dispatch(getPermissionById(permissionUser.id))
+      dispatch(getPermissionById(permissionUser?.id))
         .then((result) => {
           if (result?.data) {
             setExistingPermissions(result.data);
@@ -236,7 +227,7 @@ const MembersTable = () => {
     setPermissionUser(user);
 
     try {
-      const result = await dispatch(getPermissionById(user.id));
+      const result = await dispatch(getPermissionById(user?.id));
       if (
         result?.data &&
         Array.isArray(result.data) &&
@@ -261,7 +252,7 @@ const MembersTable = () => {
     if (!permissionUser) return;
 
     const finalData = {
-      userId: permissionUser.id,
+      userId: permissionUser?.id,
       ...permissionData,
     };
 
@@ -348,9 +339,9 @@ const MembersTable = () => {
 
     try {
       await dispatch(
-        login({ emailOrUsername: user.email, password: user.password })
+        login({ emailOrUsername: user?.email, password: user?.password })
       );
-      toast.success(`Logged in as ${user.username}`);
+      toast.success(`Logged in as ${user?.username}`);
     } catch (err) {
       console.error("Login failed:", err);
       toast.error("Login failed!");
@@ -365,21 +356,21 @@ const MembersTable = () => {
         if (actionType === "Deactivate") {
           await dispatch(
             deactivateUser({
-              userId: selectedUser.id,
+              userId: selectedUser?.id,
               reason: finalReason,
             })
           );
         } else if (actionType === "Activate") {
           await dispatch(
             reactivateUser({
-              userId: selectedUser.id,
+              userId: selectedUser?.id,
               reason: finalReason,
             })
           );
         } else if (actionType === "Delete") {
           await dispatch(
             deleteUser({
-              userId: selectedUser.id,
+              userId: selectedUser?.id,
               reason: finalReason,
             })
           );
@@ -405,7 +396,7 @@ const MembersTable = () => {
   // View user
   const handleViewUser = async (user) => {
     try {
-      await dispatch(getUserById(user.id));
+      await dispatch(getUserById(user?.id));
       setShowViewProfile(true);
       setOpenMenuId(null);
     } catch (error) {
@@ -450,10 +441,10 @@ const MembersTable = () => {
   const filteredUsers = Array.isArray(users)
     ? users.filter(
         (user) =>
-          user.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-          user.lastName?.toLowerCase().includes(search.toLowerCase()) ||
-          user.email?.toLowerCase().includes(search.toLowerCase()) ||
-          user.phoneNumber?.toLowerCase().includes(search.toLowerCase())
+          user?.firstName?.toLowerCase().includes(search.toLowerCase()) ||
+          user?.lastName?.toLowerCase().includes(search.toLowerCase()) ||
+          user?.email?.toLowerCase().includes(search.toLowerCase()) ||
+          user?.phoneNumber?.toLowerCase().includes(search.toLowerCase())
       )
     : [];
 
@@ -503,8 +494,6 @@ const MembersTable = () => {
               />
               {isLoading ? "Refreshing..." : "Refresh"}
             </button>
-
-            {/* ✅ Add Member button bhi sirf ADMIN ke liye show karo */}
 
             <ButtonField
               name="Add Member"
@@ -556,7 +545,6 @@ const MembersTable = () => {
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Status
               </th>
-              {/* ✅ Actions column header bhi sirf ADMIN ke liye show karo */}
               <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
                 Actions
               </th>
@@ -565,12 +553,23 @@ const MembersTable = () => {
 
           <tbody className="divide-y divide-gray-100">
             {isLoading ? (
-              <EmptyState type="loading" />
+              <tr>
+                <td colSpan={currentUserRole === "ADMIN" ? 10 : 8}>
+                  <EmptyState type="loading" />
+                </td>
+              </tr>
             ) : filteredUsers.length === 0 ? (
-              <EmptyState type={search ? "search" : "empty"} search={search} />
+              <tr>
+                <td colSpan={currentUserRole === "ADMIN" ? 10 : 8}>
+                  <EmptyState
+                    type={search ? "search" : "empty"}
+                    search={search}
+                  />
+                </td>
+              </tr>
             ) : (
               filteredUsers.map((user, index) => (
-                <tr key={user.id} className="hover:bg-blue-50 transition-all">
+                <tr key={user?.id} className="hover:bg-blue-50 transition-all">
                   <td className="px-6 py-5">
                     {(currentPage - 1) * limit + index + 1}
                   </td>
@@ -580,15 +579,18 @@ const MembersTable = () => {
                       <div
                         className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center cursor-pointer hover:scale-105 transition-transform"
                         onClick={() =>
-                          user.profileImage &&
-                          setPreviewImage(user.profileImage)
+                          user?.profileImage &&
+                          setPreviewImage(user?.profileImage)
                         }
                       >
-                        {user.profileImage ? (
+                        {user?.profileImage ? (
                           <img
-                            src={user.profileImage}
-                            alt={user.firstName || "User"}
+                            src={user?.profileImage}
+                            alt={user?.firstName || "User"}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                            }}
                           />
                         ) : (
                           <User className="w-6 h-6 text-gray-600" />
@@ -597,17 +599,17 @@ const MembersTable = () => {
 
                       <div>
                         <p className="text-sm font-semibold text-gray-900 mb-1">
-                          {`${user.firstName || ""} ${
-                            user.lastName || ""
+                          {`${user?.firstName || ""} ${
+                            user?.lastName || ""
                           }`.trim()}
                         </p>
                         <div className="flex items-center text-xs text-gray-500">
                           <Mail className="w-3 h-3 mr-1" />
-                          {user.email || "No email"}
+                          {user?.email || "No email"}
                         </div>
                         <div className="flex items-center text-xs text-gray-500">
                           <UsersRound className="w-3 h-3 mr-1" />
-                          Parent: {user.parent.username || ""}
+                          Parent: {user?.parent?.username || ""}
                         </div>
                       </div>
                     </div>
@@ -616,42 +618,41 @@ const MembersTable = () => {
                   <td className="px-6 py-5 text-sm text-gray-700">
                     <div className="flex items-center">
                       <UserRound className="w-4 h-4 mr-2 text-gray-400" />
-                      {user.username || "No phone"}
+                      {user?.username || "No phone"}
                     </div>
                   </td>
                   <td className="px-6 py-5 text-sm text-gray-700">
                     <div className="flex items-center">
                       <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                      {user.phoneNumber || "No phone"}
+                      {user?.phoneNumber || "No phone"}
                     </div>
                   </td>
 
                   <td className="px-6 py-5">
                     <span
                       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getRoleColor(
-                        user.role?.name
+                        user?.role?.name
                       )}`}
                     >
-                      {getRoleDisplayName(user.role?.name)}
+                      {getRoleDisplayName(user?.role?.name)}
                     </span>
                   </td>
 
                   {currentUserRole === "ADMIN" && (
                     <>
-                      {/* Password Column */}
                       <td className="px-6 py-5">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-mono">
-                            {showPasswords[user.id]
-                              ? user.password
+                            {showPasswords[user?.id]
+                              ? user?.password
                               : "••••••••"}
                           </span>
                           <button
-                            onClick={() => togglePasswordVisibility(user.id)}
+                            onClick={() => togglePasswordVisibility(user?.id)}
                             className="text-gray-500 hover:text-gray-700 transition-colors"
-                            title={showPasswords[user.id] ? "Hide" : "Show"}
+                            title={showPasswords[user?.id] ? "Hide" : "Show"}
                           >
-                            {showPasswords[user.id] ? (
+                            {showPasswords[user?.id] ? (
                               <EyeOff size={14} />
                             ) : (
                               <Eye size={14} />
@@ -660,18 +661,19 @@ const MembersTable = () => {
                         </div>
                       </td>
 
-                      {/* Transaction PIN Column */}
                       <td className="px-6 py-5">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-mono">
-                            {showPins[user.id] ? user.transactionPin : "••••••"}
+                            {showPins[user?.id]
+                              ? user?.transactionPin
+                              : "••••••"}
                           </span>
                           <button
-                            onClick={() => togglePinVisibility(user.id)}
+                            onClick={() => togglePinVisibility(user?.id)}
                             className="text-gray-500 hover:text-gray-700 transition-colors"
-                            title={showPins[user.id] ? "Hide" : "Show"}
+                            title={showPins[user?.id] ? "Hide" : "Show"}
                           >
-                            {showPins[user.id] ? (
+                            {showPins[user?.id] ? (
                               <EyeOff size={14} />
                             ) : (
                               <Eye size={14} />
@@ -687,13 +689,13 @@ const MembersTable = () => {
                       <Wallet className="w-4 h-4 text-gray-400" />
                       <span
                         className={`text-sm font-semibold ${
-                          (user.wallets?.[0]?.balance || 0) > 0
+                          (user?.wallets?.[0]?.balance || 0) > 0
                             ? "text-green-600"
                             : "text-red-500"
                         }`}
                       >
                         ₹
-                        {(user.wallets?.[0]?.balance || 0).toLocaleString() ||
+                        {(user?.wallets?.[0]?.balance || 0).toLocaleString() ||
                           0}
                       </span>
                     </div>
@@ -702,22 +704,22 @@ const MembersTable = () => {
                   <td className="px-6 py-5">
                     <span
                       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
-                        user.status === "IN_ACTIVE"
+                        user?.status === "IN_ACTIVE"
                           ? "bg-red-100 text-red-800 border-red-300"
-                          : user.status === "ACTIVE"
+                          : user?.status === "ACTIVE"
                           ? "bg-green-100 text-green-800 border-green-300"
-                          : user.status === "DELETE"
+                          : user?.status === "DELETE"
                           ? "bg-gray-100 text-gray-800 border-gray-300"
                           : "bg-yellow-100 text-yellow-800 border-yellow-300"
                       }`}
                     >
-                      {user.status === "IN_ACTIVE"
+                      {user?.status === "IN_ACTIVE"
                         ? "Inactive"
-                        : user.status === "ACTIVE"
+                        : user?.status === "ACTIVE"
                         ? "Active"
-                        : user.status === "DELETE"
+                        : user?.status === "DELETE"
                         ? "Deleted"
-                        : user.status || "Unknown"}
+                        : user?.status || "Unknown"}
                     </span>
                   </td>
 
@@ -726,20 +728,22 @@ const MembersTable = () => {
                       <button
                         className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                         onClick={() =>
-                          setOpenMenuId(openMenuId === user.id ? null : user.id)
+                          setOpenMenuId(
+                            openMenuId === user?.id ? null : user?.id
+                          )
                         }
                       >
-                        {openMenuId === user.id ? (
+                        {openMenuId === user?.id ? (
                           <X className="w-5 h-5 text-gray-600" />
                         ) : (
                           <MoreVertical className="w-5 h-5 text-gray-600" />
                         )}
                       </button>
 
-                      {openMenuId === user.id && (
+                      {openMenuId === user?.id && (
                         <ActionsMenu
                           user={user}
-                          isAdminUser={isAdminUser} // 🆕 Add this prop
+                          isAdminUser={isAdminUser}
                           onView={handleViewUser}
                           onEdit={(user) => {
                             setSelectedUser(user);
@@ -767,7 +771,7 @@ const MembersTable = () => {
                           }}
                           onToggleStatus={(user) => {
                             setActionType(
-                              user.status === "IN_ACTIVE"
+                              user?.status === "IN_ACTIVE"
                                 ? "Activate"
                                 : "Deactivate"
                             );
@@ -812,6 +816,7 @@ const MembersTable = () => {
             setShowViewProfile(false);
             dispatch(setCurrentUser(null));
           }}
+          type={"business"}
         />
       )}
 
@@ -865,6 +870,7 @@ const MembersTable = () => {
             onSuccess={handleFormSuccess}
             editData={selectedUser}
             isAdmin={isAdminUser}
+            type={"business"}
           />
         </div>
       )}
@@ -878,13 +884,14 @@ const MembersTable = () => {
             setSelectedUser(null);
           }}
           onSuccess={handleEditProfileSuccess}
+          type="business"
         />
       )}
 
       {/* Edit Password Modal */}
       {showEditPassword && selectedUser && (
         <EditCredentialsModal
-          userId={selectedUser.id}
+          userId={selectedUser?.id}
           type="password"
           onClose={() => {
             setShowEditPassword(false);
@@ -897,7 +904,7 @@ const MembersTable = () => {
       {/* Edit PIN Modal */}
       {showEditPin && selectedUser && (
         <EditCredentialsModal
-          userId={selectedUser.id}
+          userId={selectedUser?.id}
           type="pin"
           onClose={() => {
             setShowEditPin(false);

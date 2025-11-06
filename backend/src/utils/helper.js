@@ -4,7 +4,6 @@ import nodemailer from "nodemailer";
 import axios from "axios";
 import crypto from "crypto";
 import fs from "fs";
-import { Decimal } from "@prisma/client/runtime/library";
 
 class Helper {
   static generateAccessToken(payload) {
@@ -142,30 +141,6 @@ class Helper {
     });
   }
 
-  static async getGeoLocation(ip) {
-    try {
-      if (!ip) return {};
-
-      const response = await axios.get(`http://ip-api.com/json/${ip}`);
-      const data = response.data;
-
-      if (data.status === "success") {
-        const location = `${data.city}, ${data.regionName}, ${data.country}`;
-        return {
-          location,
-          latitude: data.lat,
-          longitude: data.lon,
-        };
-      } else {
-        console.warn(`IP Geolocation failed: ${data.message}`);
-      }
-    } catch (error) {
-      console.error("IP geolocation failed", error);
-    }
-
-    return {};
-  }
-
   static getClientIP(req) {
     const forwarded = req.headers["x-forwarded-for"];
 
@@ -192,6 +167,26 @@ class Helper {
     }
 
     return ip;
+  }
+
+  static async reverseGeocode(lat, lon) {
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+        { timeout: 5000 }
+      );
+
+      const data = response.data;
+      if (data.address) {
+        const address = data.display_name;
+        return { address };
+      }
+    } catch (error) {
+      console.error("Reverse geocoding failed:", error.message);
+      throw error;
+    }
+
+    return { address: `${lat}, ${lon}` };
   }
 
   static hashData(data) {

@@ -1,11 +1,15 @@
+// authSlice.js
 import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-axios.defaults.withCredentials = true;
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-axios.defaults.baseURL = baseURL;
+// Configure axios once
+if (!axios.defaults.baseURL) {
+  axios.defaults.withCredentials = true;
+  const baseURL = import.meta.env.VITE_API_BASE_URL;
+  axios.defaults.baseURL = baseURL;
+}
 
 const initialState = {
   currentUser: null,
@@ -13,6 +17,7 @@ const initialState = {
   error: null,
   success: null,
   isAuthenticated: false,
+  userType: null, // 'business' or 'employee'
 };
 
 const authSlice = createSlice({
@@ -30,6 +35,7 @@ const authSlice = createSlice({
 
       if (userData) {
         state.currentUser = userData;
+        state.userType = userData.roleType || userData.role?.type || "business";
       }
 
       state.success =
@@ -57,6 +63,7 @@ const authSlice = createSlice({
         // Real auth error → logout user
         state.isAuthenticated = false;
         state.currentUser = null;
+        state.userType = null;
       } else {
         // Stay logged in for normal business logic errors
         state.isAuthenticated = true;
@@ -66,9 +73,7 @@ const authSlice = createSlice({
         toast.error(action.payload);
       }
     },
-    // ✅ CREDENTIAL UPDATE SPECIFIC REDUCERS
     credentialsUpdateRequest: (state) => {
-      // Don't set isLoading=true for credential updates
       state.error = null;
       state.success = null;
     },
@@ -76,12 +81,10 @@ const authSlice = createSlice({
       state.success =
         action.payload?.message || "Credentials updated successfully";
       state.error = null;
-      // Don't touch isLoading or isAuthenticated
     },
     credentialsUpdateFail: (state, action) => {
       state.error = action.payload;
       state.success = null;
-      // Don't touch isLoading or isAuthenticated
 
       if (action.payload) {
         toast.error(action.payload);
@@ -93,6 +96,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.success = null;
       state.error = null;
+      state.userType = null;
     },
     clearError: (state) => {
       state.error = null;
@@ -109,6 +113,7 @@ const authSlice = createSlice({
       state.isAuthenticated = action.payload;
       if (!action.payload) {
         state.currentUser = null;
+        state.userType = null;
       }
     },
     setLoading: (state, action) => {
@@ -120,6 +125,10 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.success = null;
       state.error = null;
+      state.userType = null;
+    },
+    setUserType: (state, action) => {
+      state.userType = action.payload;
     },
   },
 });
@@ -128,8 +137,8 @@ export const {
   authRequest,
   authSuccess,
   authFail,
-  credentialsUpdateRequest, // ✅ NEW
-  credentialsUpdateSuccess, // ✅ NEW
+  credentialsUpdateRequest,
+  credentialsUpdateSuccess,
   credentialsUpdateFail,
   logoutUser,
   clearError,
@@ -138,6 +147,7 @@ export const {
   setAuthentication,
   setLoading,
   clearAuthState,
+  setUserType,
 } = authSlice.actions;
 
 // Async Actions
@@ -148,25 +158,25 @@ export const login = (credentials) => async (dispatch) => {
 
     dispatch(setAuthentication(true));
     dispatch(authSuccess(data));
-    toast.success(data.message);
+    toast.success("Login successful");
     return data;
   } catch (error) {
     const errMsg =
       error?.response?.data?.message || error?.message || "Login failed";
     dispatch(setAuthentication(false));
     dispatch(authFail(errMsg));
+    throw error;
   }
 };
 
 export const logout = () => async (dispatch) => {
   try {
     dispatch(authRequest());
-    const { data } = await axios.post(`/auth/logout`);
+    await axios.post(`/auth/logout`);
 
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
-    toast.success(data.message);
-    return data;
+    toast.success("Logout successful");
   } catch (error) {
     const errMsg =
       error?.response?.data?.message || error?.message || "Logout failed";
@@ -179,8 +189,8 @@ export const logout = () => async (dispatch) => {
 export const refreshToken = () => async (dispatch) => {
   try {
     const { data } = await axios.post(`/auth/refresh`);
-
     dispatch(setAuthentication(true));
+    dispatch(authSuccess(data));
     return data;
   } catch (error) {
     const errMsg =
@@ -188,13 +198,14 @@ export const refreshToken = () => async (dispatch) => {
       error?.message ||
       "Token refresh failed";
     dispatch(setAuthentication(false));
+    throw error;
   }
 };
 
 export const verifyAuth = () => async (dispatch) => {
   dispatch(setLoading(true));
   try {
-    const { data } = await axios.get(`/users/me`);
+    const { data } = await axios.get(`/auth/me`);
     dispatch(setAuthentication(true));
     dispatch(authSuccess(data));
     return data;
@@ -206,12 +217,9 @@ export const verifyAuth = () => async (dispatch) => {
   }
 };
 
-// ✅ FIXED: updateCredentials - No authRequest, only credential specific actions
 export const updateCredentials =
-  ({ userId, credentialsData, currentUserId }) =>
-  async (dispatch) => {
+  (userId, credentialsData) => async (dispatch) => {
     try {
-      // ✅ Use credentialsUpdateRequest instead of authRequest
       dispatch(credentialsUpdateRequest());
 
       const { data } = await axios.put(
@@ -219,27 +227,16 @@ export const updateCredentials =
         credentialsData
       );
 
-      const isUpdatingOwnAccount = userId === currentUserId;
-
-      if (credentialsData.newPassword && isUpdatingOwnAccount) {
-        // ✅ User updated own password → stay logged in
-        toast.success("Password updated successfully!");
-        dispatch(credentialsUpdateSuccess(data));
-        return { ...data, logout: false };
-      } else {
-        // ✅ Admin updated someone else's password
-        dispatch(credentialsUpdateSuccess(data));
-        toast.success(data.message);
-        return { ...data, logout: false };
-      }
+      dispatch(credentialsUpdateSuccess(data));
+      toast.success("Credentials updated successfully");
+      return data;
     } catch (error) {
       const errMsg =
         error?.response?.data?.message ||
         error?.message ||
         "Credentials update failed";
-
-      // ✅ Use credentialsUpdateFail instead of authFail
       dispatch(credentialsUpdateFail(errMsg));
+      throw error;
     }
   };
 
@@ -248,7 +245,7 @@ export const passwordReset = (email) => async (dispatch) => {
     dispatch(authRequest());
     const { data } = await axios.post(`/auth/password-reset`, { email });
     dispatch(authSuccess(data));
-    toast.success(data.message);
+    toast.success(data.message || "Password reset email sent");
     return data;
   } catch (error) {
     const errMsg =
@@ -256,6 +253,7 @@ export const passwordReset = (email) => async (dispatch) => {
       error?.message ||
       "Password reset failed";
     dispatch(authFail(errMsg));
+    throw error;
   }
 };
 
@@ -266,7 +264,7 @@ export const verifyPasswordReset = (token) => async (dispatch) => {
       `/auth/verify-password-reset?token=${token}`
     );
     dispatch(authSuccess(data));
-    toast.success(data.message);
+    toast.success(data.message || "Password reset successful");
     return data;
   } catch (error) {
     const errMsg =
@@ -274,6 +272,7 @@ export const verifyPasswordReset = (token) => async (dispatch) => {
       error?.message ||
       "Password reset failed";
     dispatch(authFail(errMsg));
+    throw error;
   }
 };
 
@@ -282,7 +281,7 @@ export const verifyEmail = (token) => async (dispatch) => {
     dispatch(authRequest());
     const { data } = await axios.get(`/auth/verify-email?token=${token}`);
     dispatch(authSuccess(data));
-    toast.success(data.message);
+    toast.success(data.message || "Email verified successfully");
     return data;
   } catch (error) {
     const errMsg =
@@ -290,6 +289,7 @@ export const verifyEmail = (token) => async (dispatch) => {
       error?.message ||
       "Email verification failed";
     dispatch(authFail(errMsg));
+    throw error;
   }
 };
 

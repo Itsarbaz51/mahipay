@@ -7,11 +7,11 @@ import upload from "../middlewares/multer.middleware.js";
 
 const kycRoutes = Router();
 
-// users kyc routes
+// List KYC applications (Business users - hierarchy access)
 kycRoutes.post(
   "/list-kyc",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -21,15 +21,19 @@ kycRoutes.post(
   UserKycController.index
 );
 
+// Get KYC by ID (Users can see their own, business users can see their hierarchy)
 kycRoutes.get(
   "/user-kyc-show/:id",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   UserKycController.show
 );
 
+// Submit KYC (Business users only)
 kycRoutes.post(
   "/user-kyc-store",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   upload.fields([
     { name: "panFile", maxCount: 1 },
     { name: "aadhaarFile", maxCount: 1 },
@@ -40,18 +44,20 @@ kycRoutes.post(
   UserKycController.store
 );
 
+// Verify KYC (ADMIN only)
 kycRoutes.put(
   "/user-verify",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(KycValidationSchemas.VerificationKycSchema),
   UserKycController.verification
 );
 
+// Update KYC (Business users can update their own)
 kycRoutes.put(
   "/user-kyc-update/:id",
   AuthMiddleware.isAuthenticated,
-  // AuthMiddleware.authorizeRoles(["ADMIN", "SUPER ADMIN"]),
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   upload.fields([
     { name: "panFile", maxCount: 1 },
     { name: "aadhaarFile", maxCount: 1 },

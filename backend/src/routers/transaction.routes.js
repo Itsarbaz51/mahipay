@@ -7,43 +7,46 @@ import idempotencyMiddleware from "../middlewares/idempotency.middleware.js";
 
 const transactionRoutes = Router();
 
-// Create transaction with idempotency
+// Create transaction with idempotency (Business users only)
 transactionRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(TransactionValidationSchemas.createTransactionSchema),
   TransactionController.createTransaction
 );
 
-// Refund transaction
+// Refund transaction (ADMIN only)
 transactionRoutes.post(
   "/refund",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(TransactionValidationSchemas.refundTransactionSchema),
   TransactionController.refundTransaction
 );
 
-// Get transactions (with query params)
+// Get transactions (with query params) - Business users see their own, ADMIN sees all
 transactionRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   TransactionController.getTransactions
 );
 
-// Get transaction by ID
+// Get transaction by ID - Business users see their own, ADMIN sees all
 transactionRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   TransactionController.getTransactionById
 );
 
-// Update transaction status
+// Update transaction status (ADMIN only)
 transactionRoutes.patch(
   "/status",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(TransactionValidationSchemas.updateTransactionStatusSchema),
   TransactionController.updateTransactionStatus
 );

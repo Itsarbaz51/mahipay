@@ -87,9 +87,15 @@ const AddCommissionModal = ({ onClose, onSuccess, editData }) => {
 
   // Fetch roles, users and services when component mounts
   useEffect(() => {
+<<<<<<< HEAD
     dispatch(getAllRoles());
     dispatch(getAllUsersByParentId({ search: "", status: "ACTIVE" }));
     dispatch(allServices());
+=======
+    dispatch(getAllRolesByType("business"));
+    dispatch(getAllBusinessUsersByParentId({ search: "", status: "ACTIVE" }));
+    dispatch(getServicesActive());
+>>>>>>> c24554586b4b263cbb166eb112789e1cf5bbf249
   }, [dispatch]);
 
   // Filter users based on search

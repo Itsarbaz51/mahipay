@@ -6,6 +6,7 @@ import S3Service from "../utils/S3Service.js";
 import { sendCredentialsEmail } from "../utils/sendCredentialsEmail.js";
 
 class UserServices {
+  // BUSINESS USER REGISTRATION
   static async register(payload) {
     const {
       username,
@@ -33,6 +34,11 @@ class UserServices {
 
       const role = await Prisma.role.findUnique({ where: { id: roleId } });
       if (!role) throw ApiError.badRequest("Invalid roleId");
+
+      // Ensure only business roles are assigned
+      if (role.type !== "business") {
+        throw ApiError.badRequest("Only business type roles can be assigned");
+      }
 
       const generatedPassword = Helper.generatePassword();
       const generatedTransactionPin = Helper.generateTransactionPin();
@@ -131,6 +137,7 @@ class UserServices {
         },
       });
 
+      // Create wallet for business user
       await Prisma.wallet.create({
         data: {
           userId: user.id,
@@ -144,12 +151,14 @@ class UserServices {
         },
       });
 
+      // Send business-specific credentials email
       await sendCredentialsEmail(
         user,
         generatedPassword,
         generatedTransactionPin,
         "created",
-        "Your account has been successfully created. Here are your login credentials:"
+        "Your business account has been successfully created. Here are your login credentials:",
+        "business"
       );
 
       const accessToken = Helper.generateAccessToken({
@@ -162,31 +171,36 @@ class UserServices {
       await Prisma.auditLog.create({
         data: {
           userId: user.id,
-          action: "REGISTER",
-          metadata: {},
+          action: "BUSINESS_USER_REGISTER",
+          metadata: {
+            role: user.role.name,
+            createdBy: parentId,
+          },
         },
       });
 
       return { user, accessToken };
     } catch (err) {
-      console.error("Registration error", {
+      console.error("Business user registration error", {
         email,
         error: err.message,
         stack: err.stack,
       });
 
       if (err instanceof ApiError) throw err;
-      throw ApiError.internal("Failed to register user. Please try again.");
+      throw ApiError.internal(
+        "Failed to register business user. Please try again."
+      );
     } finally {
       Helper.deleteOldImage(profileImage);
     }
   }
 
+  // BUSINESS USER PROFILE UPDATE
   static async updateProfile(userId, updateData, currentUserId) {
     const { username, phoneNumber, firstName, lastName, email, roleId } =
       updateData;
 
-    // Pehle current user ko fetch karo
     const currentUser = await Prisma.user.findUnique({
       where: { id: currentUserId },
       include: {
@@ -200,14 +214,11 @@ class UserServices {
       throw ApiError.unauthorized("Current user not found");
     }
 
-    // Phir userToUpdate ko fetch karo
     const userToUpdate = await Prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true, // id bhi include karo
-        email: true,
+      include: {
         role: {
-          select: { level: true },
+          select: { level: true, name: true, type: true },
         },
       },
     });
@@ -216,28 +227,26 @@ class UserServices {
       throw ApiError.notFound("User to update not found");
     }
 
-    // Admin check sahi tarike se karo
-    const isAdmin = currentUser.role.name === "ADMIN";
+    // Ensure we're updating a business user
+    if (userToUpdate.role.type !== "business") {
+      throw ApiError.badRequest("Can only update business users");
+    }
 
-    // Check if trying to update own profile - sahi variable use karo
+    const isAdmin = currentUser.role.name === "ADMIN";
     const isUpdatingOwnProfile = userId === currentUserId;
 
-    // Email change logic
     const isEmailChanged = email && email !== userToUpdate.email;
 
-    // Only allow email change if admin
     if (isEmailChanged && !isAdmin) {
       throw ApiError.forbidden(
         "Only administrators can update email addresses"
       );
     }
 
-    // Role change logic - only admins can change roles
     if (roleId && !isAdmin) {
       throw ApiError.forbidden("Only administrators can change user roles");
     }
 
-    // Check for duplicate username, phone, email
     if (username || phoneNumber || email) {
       const existingUser = await Prisma.user.findFirst({
         where: {
@@ -272,13 +281,15 @@ class UserServices {
     if (phoneNumber) formattedData.phoneNumber = phoneNumber;
     if (email) formattedData.email = email.trim().toLowerCase();
 
-    // Only include role if user is admin
     if (roleId && isAdmin) {
       const roleRecord = await Prisma.role.findUnique({
         where: { id: roleId },
       });
       if (!roleRecord) throw ApiError.badRequest("Invalid role");
-      formattedData.role = { connect: { id: roleRecord.id } };
+      if (roleRecord.type !== "business") {
+        throw ApiError.badRequest("Can only assign business roles");
+      }
+      formattedData.roleId = roleRecord.id;
     }
 
     const updatedUser = await Prisma.user.update({
@@ -322,10 +333,8 @@ class UserServices {
 
     await Prisma.auditLog.create({
       data: {
-        user: {
-          connect: { id: currentUserId },
-        },
-        action: "UPDATE_PROFILE",
+        userId: currentUserId,
+        action: "BUSINESS_PROFILE_UPDATE",
         entityType: "User",
         entityId: userId,
         metadata: {
@@ -340,13 +349,20 @@ class UserServices {
     return updatedUser;
   }
 
+  // BUSINESS USER PROFILE IMAGE UPDATE
   static async updateProfileImage(userId, profileImagePath) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
         include: {
           role: {
-            select: { id: true, name: true, level: true, description: true },
+            select: {
+              id: true,
+              name: true,
+              level: true,
+              description: true,
+              type: true,
+            },
           },
           wallets: true,
         },
@@ -354,6 +370,13 @@ class UserServices {
 
       if (!user) {
         throw ApiError.notFound("User not found");
+      }
+
+      // Ensure it's a business user
+      if (user.role.type !== "business") {
+        throw ApiError.badRequest(
+          "Can only update business user profile images"
+        );
       }
 
       if (user.profileImage) {
@@ -409,7 +432,7 @@ class UserServices {
       await Prisma.auditLog.create({
         data: {
           userId,
-          action: "UPDATE_PROFILE_IMAGE",
+          action: "BUSINESS_PROFILE_IMAGE_UPDATE",
           metadata: { newImage: profileImageUrl },
         },
       });
@@ -420,12 +443,19 @@ class UserServices {
     }
   }
 
+  // GET BUSINESS USER BY ID
   static async getUserById(userId, currentUser = null) {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
         role: {
-          select: { id: true, name: true, level: true, description: true },
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            description: true,
+            type: true,
+          },
         },
         wallets: true,
         parent: {
@@ -512,6 +542,11 @@ class UserServices {
 
     if (!user) throw ApiError.notFound("User not found");
 
+    // Ensure it's a business user
+    if (user.role.type !== "business") {
+      throw ApiError.badRequest("User is not a business user");
+    }
+
     const transformedUser = {
       ...user,
       kycInfo:
@@ -577,10 +612,20 @@ class UserServices {
     return safeUser;
   }
 
+  // GET ALL BUSINESS USERS BY ROLE
   static async getAllUsersByRole(roleId) {
     if (!roleId) {
-      console.warn("Get users by role attempted without role ID");
       throw ApiError.badRequest("roleId is required");
+    }
+
+    // Verify role is business type
+    const role = await Prisma.role.findUnique({
+      where: { id: roleId },
+      select: { type: true },
+    });
+
+    if (!role || role.type !== "business") {
+      throw ApiError.badRequest("Invalid business role");
     }
 
     const users = await Prisma.user.findMany({
@@ -632,7 +677,8 @@ class UserServices {
     return safeUsers;
   }
 
-  static async getAllUsersByParentId(parentId, options = {}) {
+  // GET ALL BUSINESS USERS BY PARENT ID
+  static async getAllRoleTypeUsersByParentId(parentId, options = {}) {
     const parent = await Prisma.user.findUnique({
       where: { id: parentId },
       include: {
@@ -648,30 +694,39 @@ class UserServices {
       page = 1,
       limit = 10,
       sort = "desc",
-      status = "ACTIVE",
+      status = "ALL",
       search = "",
     } = options;
 
     const skip = (page - 1) * limit;
     const isAll = status === "ALL";
 
-    const adminRole = await Prisma.role.findFirst({
-      where: { name: "ADMIN" },
-      select: { id: true },
+    // Get only business type roles
+    const businessRoles = await Prisma.role.findMany({
+      where: {
+        type: "business",
+        name: {
+          not: "ADMIN", // Exclude ADMIN role
+        },
+      },
+      select: { id: true, name: true },
     });
+
+    const businessRoleIds = businessRoles.map((role) => role.id);
 
     let queryWhere =
       parent.role?.name === "ADMIN"
         ? {
-            ...(adminRole && {
-              roleId: {
-                not: adminRole.id,
-              },
-            }),
+            roleId: {
+              in: businessRoleIds,
+            },
             ...(isAll ? {} : { status }),
           }
         : {
             parentId,
+            roleId: {
+              in: businessRoleIds,
+            },
             ...(isAll ? {} : { status }),
           };
 
@@ -719,7 +774,13 @@ class UserServices {
         where: queryWhere,
         include: {
           role: {
-            select: { id: true, name: true, level: true, description: true },
+            select: {
+              id: true,
+              name: true,
+              level: true,
+              description: true,
+              type: true,
+            },
           },
           wallets: true,
           parent: {
@@ -755,10 +816,16 @@ class UserServices {
         where: queryWhere,
       }),
     ]);
+
+    // Additional safety filter to ensure only business users are returned
+    const filteredUsers = users.filter(
+      (user) => user.role.type === "business" && user.role.name !== "ADMIN"
+    );
+
     let safeUsers;
 
     if (parent.role.name === "ADMIN") {
-      safeUsers = users.map((user) => {
+      safeUsers = filteredUsers.map((user) => {
         const serialized = Helper.serializeUser(user);
 
         if (serialized.password) {
@@ -782,7 +849,7 @@ class UserServices {
         return serialized;
       });
     } else {
-      safeUsers = users.map((user) => {
+      safeUsers = filteredUsers.map((user) => {
         const serialized = Helper.serializeUser(user);
         const { password, transactionPin, refreshToken, ...safeUser } =
           serialized;
@@ -790,357 +857,10 @@ class UserServices {
       });
     }
 
-    return { users: safeUsers, total };
+    return { users: safeUsers, total: filteredUsers.length };
   }
 
-  static async getAllUsersByChildrenId(userId) {
-    if (!userId) {
-      console.warn("Get children users attempted without user ID");
-      throw ApiError.badRequest("userId is required");
-    }
-
-    const user = await Prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, hierarchyPath: true },
-    });
-
-    if (!user) {
-      throw ApiError.notFound("User not found");
-    }
-
-    const users = await Prisma.user.findMany({
-      where: {
-        hierarchyPath: {
-          contains: userId,
-        },
-        status: "ACTIVE",
-      },
-      include: {
-        role: {
-          select: { id: true, name: true, level: true, description: true },
-        },
-        wallets: true,
-        parent: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
-          },
-        },
-        children: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
-            status: true,
-            createdAt: true,
-          },
-        },
-      },
-      orderBy: { hierarchyLevel: "asc" },
-    });
-
-    const safeUsers = users.map((user) => Helper.serializeUser(user));
-
-    return safeUsers;
-  }
-
-  static async getAllUsersCountByParentId(parentId) {
-    if (!parentId) {
-      console.warn("Get users count by parent attempted without parent ID");
-      throw ApiError.badRequest("parentId is required");
-    }
-
-    const count = await Prisma.user.count({
-      where: {
-        parentId,
-        status: "ACTIVE",
-      },
-    });
-
-    return { count };
-  }
-
-  static async getAllUsersCountByChildrenId(userId) {
-    if (!userId) {
-      console.warn("Get children count attempted without user ID");
-      throw ApiError.badRequest("userId is required");
-    }
-
-    const user = await Prisma.user.findUnique({
-      where: { id: userId },
-      select: { hierarchyPath: true },
-    });
-
-    if (!user) {
-      throw ApiError.notFound("User not found");
-    }
-
-    const count = await Prisma.user.count({
-      where: {
-        hierarchyPath: {
-          contains: userId,
-        },
-        status: "ACTIVE",
-      },
-    });
-
-    return { count };
-  }
-
-  static async updateUserStatus(userId, status, updatedBy) {
-    const user = await Prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw ApiError.notFound("User not found");
-    }
-
-    const updatedUser = await Prisma.user.update({
-      where: { id: userId },
-      data: { status },
-      include: {
-        role: {
-          select: { id: true, name: true, level: true, description: true },
-        },
-        wallets: true,
-        parent: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
-          },
-        },
-        children: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
-            status: true,
-            createdAt: true,
-          },
-        },
-      },
-    });
-
-    await Prisma.auditLog.create({
-      data: {
-        userId: updatedBy,
-        action: "UPDATE_USER_STATUS",
-        entityType: "User",
-        entityId: userId,
-        metadata: {
-          previousStatus: user.status,
-          newStatus: status,
-          updatedUserId: userId,
-        },
-      },
-    });
-
-    return updatedUser;
-  }
-
-  static async searchUsers(searchTerm, options = {}) {
-    const { page = 1, limit = 10, roleId, status = "ACTIVE" } = options;
-
-    const skip = (page - 1) * limit;
-
-    const searchConditions = {
-      OR: [
-        { username: { contains: searchTerm, mode: "insensitive" } },
-        { firstName: { contains: searchTerm, mode: "insensitive" } },
-        { lastName: { contains: searchTerm, mode: "insensitive" } },
-        { email: { contains: searchTerm, mode: "insensitive" } },
-        { phoneNumber: { contains: searchTerm } },
-      ],
-      status,
-    };
-
-    if (roleId) {
-      searchConditions.roleId = roleId;
-    }
-
-    const [users, total] = await Promise.all([
-      Prisma.user.findMany({
-        where: searchConditions,
-        include: {
-          role: {
-            select: { id: true, name: true, level: true, description: true },
-          },
-          wallets: true,
-          parent: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              profileImage: true,
-            },
-          },
-          children: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              profileImage: true,
-              status: true,
-              createdAt: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      Prisma.user.count({ where: searchConditions }),
-    ]);
-
-    const safeUsers = users.map((user) => Helper.serializeUser(user));
-
-    return { users: safeUsers, total };
-  }
-
-  static async getUserHierarchy(userId) {
-    const user = await Prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        parentId: true,
-        hierarchyPath: true,
-      },
-    });
-
-    if (!user) {
-      throw ApiError.notFound("User not found");
-    }
-
-    const [parent, children, siblings] = await Promise.all([
-      user.parentId
-        ? Prisma.user.findUnique({
-            where: { id: user.parentId },
-            include: {
-              role: {
-                select: {
-                  id: true,
-                  name: true,
-                  level: true,
-                  description: true,
-                },
-              },
-              wallets: true,
-              parent: {
-                select: {
-                  id: true,
-                  username: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  phoneNumber: true,
-                  profileImage: true,
-                },
-              },
-            },
-          })
-        : null,
-      Prisma.user.findMany({
-        where: {
-          parentId: userId,
-          status: "ACTIVE",
-        },
-        include: {
-          role: {
-            select: { id: true, name: true, level: true, description: true },
-          },
-          wallets: true,
-          parent: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              profileImage: true,
-            },
-          },
-          children: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              profileImage: true,
-              status: true,
-              createdAt: true,
-            },
-          },
-        },
-        orderBy: { hierarchyLevel: "asc" },
-      }),
-      user.parentId
-        ? Prisma.user.findMany({
-            where: {
-              parentId: user.parentId,
-              id: { not: userId },
-              status: "ACTIVE",
-            },
-            include: {
-              role: {
-                select: {
-                  id: true,
-                  name: true,
-                  level: true,
-                  description: true,
-                },
-              },
-              wallets: true,
-              parent: {
-                select: {
-                  id: true,
-                  username: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  phoneNumber: true,
-                  profileImage: true,
-                },
-              },
-            },
-            orderBy: { createdAt: "asc" },
-          })
-        : [],
-    ]);
-
-    return {
-      parent: parent ? Helper.serializeUser(parent) : null,
-      children: children.map((child) => Helper.serializeUser(child)),
-      siblings: siblings.map((sibling) => Helper.serializeUser(sibling)),
-    };
-  }
-
+  // BUSINESS USER DEACTIVATION
   static async deactivateUser(userId, deactivatedBy, reason) {
     try {
       const user = await Prisma.user.findUnique({
@@ -1150,6 +870,11 @@ class UserServices {
 
       if (!user) {
         throw ApiError.notFound("User not found");
+      }
+
+      // Ensure it's a business user
+      if (user.role.type !== "business") {
+        throw ApiError.badRequest("Can only deactivate business users");
       }
 
       if (user.status === "IN_ACTIVE") {
@@ -1217,7 +942,7 @@ class UserServices {
       await Prisma.auditLog.create({
         data: {
           userId: deactivatedBy,
-          action: "DEACTIVATE_USER",
+          action: "BUSINESS_USER_DEACTIVATE",
           entityType: "User",
           metadata: {
             previousStatus: user.status,
@@ -1232,26 +957,20 @@ class UserServices {
 
       return updatedUser;
     } catch (error) {
-      console.error("Failed to deactivate user", {
+      console.error("Failed to deactivate business user", {
         userId,
         deactivatedBy,
         error: error.message,
-        stack: error.stack,
       });
 
       if (error instanceof ApiError) throw error;
-
-      if (error.code) {
-        console.error("Prisma error details:", {
-          code: error.code,
-          meta: error.meta,
-        });
-      }
-
-      throw ApiError.internal("Failed to deactivate user. Please try again.");
+      throw ApiError.internal(
+        "Failed to deactivate business user. Please try again."
+      );
     }
   }
 
+  // BUSINESS USER REACTIVATION
   static async reactivateUser(userId, reactivatedBy, reason) {
     try {
       const user = await Prisma.user.findUnique({
@@ -1261,6 +980,11 @@ class UserServices {
 
       if (!user) {
         throw ApiError.notFound("User not found");
+      }
+
+      // Ensure it's a business user
+      if (user.role.type !== "business") {
+        throw ApiError.badRequest("Can only reactivate business users");
       }
 
       if (user.status === "DELETE") {
@@ -1332,7 +1056,7 @@ class UserServices {
       await Prisma.auditLog.create({
         data: {
           userId: reactivatedBy,
-          action: "REACTIVATE_USER",
+          action: "BUSINESS_USER_REACTIVATE",
           entityType: "User",
           metadata: {
             previousStatus: user.status,
@@ -1347,26 +1071,20 @@ class UserServices {
 
       return updatedUser;
     } catch (error) {
-      console.error("Failed to reactivate user", {
+      console.error("Failed to reactivate business user", {
         userId,
         reactivatedBy,
         error: error.message,
-        stack: error.stack,
       });
 
       if (error instanceof ApiError) throw error;
-
-      if (error.code) {
-        console.error("Prisma error details:", {
-          code: error.code,
-          meta: error.meta,
-        });
-      }
-
-      throw ApiError.internal("Failed to reactivate user. Please try again.");
+      throw ApiError.internal(
+        "Failed to reactivate business user. Please try again."
+      );
     }
   }
 
+  // BUSINESS USER SOFT DELETE
   static async deleteUser(userId, deletedBy, reason) {
     try {
       const user = await Prisma.user.findUnique({
@@ -1376,6 +1094,11 @@ class UserServices {
 
       if (!user) {
         throw ApiError.notFound("User not found");
+      }
+
+      // Ensure it's a business user
+      if (user.role.type !== "business") {
+        throw ApiError.badRequest("Can only delete business users");
       }
 
       const deleter = await Prisma.user.findUnique({
@@ -1435,7 +1158,7 @@ class UserServices {
       await Prisma.auditLog.create({
         data: {
           userId: deletedBy,
-          action: "DELETE_USER",
+          action: "BUSINESS_USER_DELETE",
           entityType: "User",
           metadata: {
             previousStatus: user.status,
@@ -1450,26 +1173,20 @@ class UserServices {
 
       return updatedUser;
     } catch (error) {
-      console.error("Failed to delete user", {
+      console.error("Failed to delete business user", {
         userId,
         deletedBy,
         error: error.message,
-        stack: error.stack,
       });
 
       if (error instanceof ApiError) throw error;
-
-      if (error.code) {
-        console.error("Prisma error details:", {
-          code: error.code,
-          meta: error.meta,
-        });
-      }
-
-      throw ApiError.internal("Failed to delete user. Please try again.");
+      throw ApiError.internal(
+        "Failed to delete business user. Please try again."
+      );
     }
   }
 
+  // HELPER METHODS
   static async regenerateCredentialsAndNotify(userId, newEmail) {
     try {
       const newPassword = Helper.generatePassword();
@@ -1483,6 +1200,10 @@ class UserServices {
         data: {
           password: hashedPassword,
           transactionPin: hashedTransactionPin,
+          email: newEmail,
+        },
+        include: {
+          role: true,
         },
       });
 
@@ -1491,21 +1212,25 @@ class UserServices {
         newPassword,
         newTransactionPin,
         "reset",
-        "Your credentials have been reset as requested. Here are your new login credentials:"
+        "Your business account credentials have been reset. Here are your new login credentials:",
+        "business"
       );
 
       await Prisma.auditLog.create({
         data: {
           userId,
-          action: "CREDENTIALS_REGENERATED",
+          action: "BUSINESS_CREDENTIALS_REGENERATED",
           metadata: {
             reason: "EMAIL_UPDATED",
             newEmail: newEmail,
           },
         },
       });
+
+      return user;
     } catch (error) {
-      console.error("Error regenerating credentials:", error);
+      console.error("Error regenerating business credentials:", error);
+      throw ApiError.internal("Failed to regenerate business credentials");
     }
   }
 
@@ -1518,6 +1243,116 @@ class UserServices {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
       .trim();
+  }
+
+  // BUSINESS SPECIFIC METHODS
+  static async getAllUsersByChildrenId(userId) {
+    if (!userId) {
+      throw ApiError.badRequest("userId is required");
+    }
+
+    const user = await Prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, hierarchyPath: true },
+    });
+
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const users = await Prisma.user.findMany({
+      where: {
+        hierarchyPath: {
+          contains: userId,
+        },
+        status: "ACTIVE",
+        role: {
+          type: "business", // Only business users
+        },
+      },
+      include: {
+        role: {
+          select: { id: true, name: true, level: true, description: true },
+        },
+        wallets: true,
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: { hierarchyLevel: "asc" },
+    });
+
+    const safeUsers = users.map((user) => Helper.serializeUser(user));
+
+    return safeUsers;
+  }
+
+  static async getAllUsersCountByParentId(parentId) {
+    if (!parentId) {
+      throw ApiError.badRequest("parentId is required");
+    }
+
+    const count = await Prisma.user.count({
+      where: {
+        parentId,
+        status: "ACTIVE",
+        role: {
+          type: "business", // Only business users
+        },
+      },
+    });
+
+    return { count };
+  }
+
+  static async getAllUsersCountByChildrenId(userId) {
+    if (!userId) {
+      throw ApiError.badRequest("userId is required");
+    }
+
+    const user = await Prisma.user.findUnique({
+      where: { id: userId },
+      select: { hierarchyPath: true },
+    });
+
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const count = await Prisma.user.count({
+      where: {
+        hierarchyPath: {
+          contains: userId,
+        },
+        status: "ACTIVE",
+        role: {
+          type: "business", // Only business users
+        },
+      },
+    });
+
+    return { count };
   }
 }
 

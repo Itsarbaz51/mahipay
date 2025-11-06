@@ -46,11 +46,36 @@ async function main() {
   console.log("\n👥 Creating roles...");
 
   const roles = [
-    { name: "ADMIN", level: 0, description: "System Administrator" },
-    { name: "STATE HEAD", level: 1, description: "State Head" },
-    { name: "MASTER DISTRIBUTOR", level: 2, description: "Master Distributor" },
-    { name: "DISTRIBUTOR", level: 3, description: "Distributor" },
-    { name: "RETAILER", level: 4, description: "Retailer" },
+    {
+      name: "ADMIN",
+      level: 0,
+      type: "business",
+      description: "System Administrator",
+    },
+    {
+      name: "STATE HEAD",
+      level: 1,
+      type: "business",
+      description: "State Head",
+    },
+    {
+      name: "MASTER DISTRIBUTOR",
+      level: 2,
+      type: "business",
+      description: "Master Distributor",
+    },
+    {
+      name: "DISTRIBUTOR",
+      level: 3,
+      type: "business",
+      description: "Distributor",
+    },
+    {
+      name: "RETAILER",
+      level: 4,
+      type: "business",
+      description: "Retailer",
+    },
   ];
 
   const createdRoles = {};
@@ -58,15 +83,21 @@ async function main() {
   for (const role of roles) {
     const created = await prisma.role.upsert({
       where: { level: role.level },
-      update: {},
+      update: {
+        name: role.name,
+        type: role.type,
+        description: role.description,
+      },
       create: {
         name: role.name,
         level: role.level,
+        type: role.type,
         description: role.description,
+        createdBy: null, // will be updated later for ADMIN
       },
     });
     createdRoles[role.level] = created;
-    console.log(`✅ Role created: ${created.name}`);
+    console.log(`✅ Role created: ${created.name} (${created.type})`);
   }
 
   console.log("\n👑 Creating Admin user...");
@@ -81,7 +112,7 @@ async function main() {
       username: "admin",
       firstName: "Admin",
       lastName: "User",
-      profileImage: "https://via.placeholder.com/150",
+      profileImage: "",
       email: "admin@gmail.com",
       phoneNumber: "9999999991",
       password: adminPassword,
@@ -96,6 +127,14 @@ async function main() {
 
   console.log(`✅ Admin created: ${admin.username}`);
 
+  // Update the ADMIN role with createdBy reference
+  await prisma.role.update({
+    where: { id: createdRoles[0].id },
+    data: {
+      createdBy: admin.id,
+    },
+  });
+
   console.log("\n👤 Creating State Head user...");
 
   const shPassword = CryptoService.encrypt("User@123");
@@ -108,7 +147,7 @@ async function main() {
       username: "state_head_1",
       firstName: "State",
       lastName: "Head",
-      profileImage: "https://via.placeholder.com/150",
+      profileImage: "",
       email: "statehead@gmail.com",
       phoneNumber: "9999999992",
       password: shPassword,

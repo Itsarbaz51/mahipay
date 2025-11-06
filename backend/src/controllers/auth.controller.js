@@ -9,7 +9,12 @@ const cookieOptions = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax",
   path: "/",
-  maxAge: 1000 * 60 * 60 * 24 * 7,
+  maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+};
+
+const refreshCookieOptions = {
+  ...cookieOptions,
+  maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
 };
 
 class AuthController {
@@ -20,21 +25,54 @@ class AuthController {
     );
 
     // Serialize and remove sensitive fields
-    const newUser = Helper.serializeUser(user);
-    const { __password, __transactionPin, __refreshToken, ...safeUser } =
-      newUser;
+    const safeUser = Helper.serializeUser(user);
+    const {
+      password,
+      transactionPin,
+      refreshToken: _,
+      ...userWithoutSensitiveData
+    } = safeUser;
 
     return res
       .status(200)
       .cookie("accessToken", accessToken, cookieOptions)
-      .cookie("refreshToken", refreshToken, cookieOptions)
+      .cookie("refreshToken", refreshToken, refreshCookieOptions)
       .json(
         ApiResponse.success(
-          { user: safeUser, accessToken },
-          `${safeUser.email} login successful`,
+          { user: userWithoutSensitiveData, accessToken },
+          `${userWithoutSensitiveData.email} login successful`,
           200
         )
       );
+  });
+
+  // GET CURRENT USER
+  static getCurrentUser = asyncHandler(async (req, res) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw ApiError.unauthorized("User not authenticated");
+    }
+    try {
+      const safeUser = await AuthServices.getUserById(userId);
+
+      if (!safeUser) {
+        throw ApiError.notFound("Business user not found");
+      }
+
+      return res
+        .status(200)
+        .json(
+          ApiResponse.success(
+            { user: safeUser },
+            "Current business user fetched",
+            200
+          )
+        );
+    } catch (error) {
+      console.error("Error fetching current business user:", error);
+      throw ApiError.internal("Failed to fetch business user data");
+    }
   });
 
   static logout = asyncHandler(async (req, res) => {
@@ -63,20 +101,23 @@ class AuthController {
     const { accessToken, refreshToken, user } =
       await AuthServices.refreshToken(incomingRefresh);
 
-    res.cookie("refreshToken", refreshToken, {
-      ...cookieOptions,
-      maxAge: 1000 * 60 * 60 * 24 * 30,
-    });
+    res.cookie("refreshToken", refreshToken, refreshCookieOptions);
     res.cookie("accessToken", accessToken, cookieOptions);
 
     const safeUser = Helper.serializeUser(user);
+    const {
+      password,
+      transactionPin,
+      refreshToken: _,
+      ...userWithoutSensitiveData
+    } = safeUser;
 
     return res
       .status(200)
       .json(
         ApiResponse.success(
-          { accessToken, user: safeUser },
-          "Token refreshed",
+          { accessToken, user: userWithoutSensitiveData },
+          "Token refreshed successfully",
           200
         )
       );
@@ -110,7 +151,7 @@ class AuthController {
     const { token } = req.query;
 
     if (!token) {
-      throw ApiError.badRequest("token required");
+      throw ApiError.badRequest("Token is required");
     }
 
     const result = await AuthServices.verifyEmail(String(token));

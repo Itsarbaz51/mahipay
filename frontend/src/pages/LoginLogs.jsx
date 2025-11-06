@@ -10,6 +10,7 @@ import {
   Globe,
   User,
   ArrowUpDown,
+  Building2,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useDebounce } from "use-debounce";
@@ -61,11 +62,6 @@ const LoginLogs = () => {
           sort: selectedSort,
           sortBy: selectedSortBy,
         };
-
-        console.log("=== COMPONENT PARAMS ===");
-        console.log("selectedRole:", selectedRole);
-        console.log("roleId in params:", params.roleId);
-        console.log("deviceType in params:", params.deviceType);
 
         await dispatch(getLoginLogs(params));
       } catch (error) {
@@ -540,6 +536,7 @@ const LoginLogs = () => {
                 {[
                   "User",
                   "Role",
+                  "Role Type",
                   "Device & Browser",
                   "IP",
                   "Location",
@@ -600,6 +597,24 @@ const LoginLogs = () => {
                           </div>
                           <div className="text-xs text-slate-500">
                             Level {log.user?.role?.level || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                          {log.roleType === "employee" ? (
+                            <User className="h-4 w-4" />
+                          ) : log.roleType === "business" ? (
+                            <Building2 className="h-4 w-4" />
+                          ) : (
+                            <User className="h-4 w-4" /> // default icon if roleType is missing
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-slate-900">
+                            {log.roleType || "N/A"}
                           </div>
                         </div>
                       </div>

@@ -3,20 +3,36 @@ import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
 import { CryptoService } from "../utils/cryptoService.js";
-import UserServices from "./user.service.js";
-import EmailTemplates from "../emaiTemplates/emailTemplates.js";
+import EmployeeServices from "./employee.service.js";
+import {
+  sendCredentialsEmail,
+  sendPasswordResetEmail,
+} from "../utils/sendCredentialsEmail.js";
 
 class AuthServices {
   static async login(payload, req) {
-    const { emailOrUsername, password } = payload;
+    const { emailOrUsername, password, latitude, longitude, accuracy } =
+      payload;
 
     const user = await Prisma.user.findFirst({
       where: {
         OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
       },
       include: {
-        role: true,
-        wallets: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            type: true,
+            description: true,
+          },
+        },
+        wallets: {
+          where: {
+            isActive: true,
+          },
+        },
         parent: {
           select: {
             id: true,
@@ -54,46 +70,240 @@ class AuthServices {
       throw ApiError.unauthorized("Invalid credentials");
     }
 
-    const accessToken = Helper.generateAccessToken({
+    // Generate tokens with role type information
+    const tokenPayload = {
       id: user.id,
       email: user.email,
       role: user.role.name,
       roleLevel: user.role.level,
-    });
+      roleType: user.role.type,
+    };
 
-    const refreshToken = Helper.generateRefreshToken({
-      id: user.id,
-      email: user.email,
-      role: user.role.name,
-      roleLevel: user.role.level,
-    });
+    // Include permissions for employees
+    if (user.role.type === "employee") {
+      const permissions = await EmployeeServices.getEmployeePermissions(
+        user.id
+      );
+      tokenPayload.permissions = permissions;
+    }
+
+    const accessToken = Helper.generateAccessToken(tokenPayload);
+    const refreshToken = Helper.generateRefreshToken(tokenPayload);
 
     await Prisma.user.update({
       where: { id: user.id },
       data: { refreshToken },
     });
 
+    // Get IP address
     const ip = Helper.getClientIP(req);
-    const geoData = await Helper.getGeoLocation(ip);
 
+    // Handle client location if provided
+    let clientLocation = null;
+    if (latitude && longitude) {
+      try {
+        clientLocation = await Helper.reverseGeocode(latitude, longitude);
+      } catch (error) {
+        console.error("Reverse geocoding error:", error);
+        clientLocation = { address: `${latitude}, ${longitude}` };
+      }
+    }
+
+    // Create login log
     const loginData = {
       userId: user.id,
       domainName: req.hostname,
       ipAddress: String(ip),
       userAgent: req.headers["user-agent"] || "",
+      roleType: user.role.type,
     };
 
-    if (geoData.location) loginData.location = geoData.location;
-    if (geoData.latitude) loginData.latitude = geoData.latitude;
-    if (geoData.longitude) loginData.longitude = geoData.longitude;
+    // Add client location data if available
+    if (clientLocation) {
+      loginData.latitude = latitude;
+      loginData.longitude = longitude;
+      loginData.location = clientLocation.address;
+      loginData.accuracy = accuracy;
+    }
 
     await Prisma.loginLogs.create({ data: loginData });
 
+    // Create audit log
     await Prisma.auditLog.create({
-      data: { userId: user.id, action: "LOGIN", metadata: {} },
+      data: {
+        userId: user.id,
+        action: "LOGIN",
+        metadata: {
+          roleType: user.role.type,
+          roleName: user.role.name,
+        },
+      },
     });
 
     return { user, accessToken, refreshToken };
+  }
+
+  static async getUserById(userId, currentUser = null) {
+    const user = await Prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            description: true,
+            type: true,
+          },
+        },
+        wallets: true,
+        parent: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+            profileImage: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+        kycs: {
+          include: {
+            address: {
+              include: {
+                state: {
+                  select: {
+                    id: true,
+                    stateName: true,
+                    stateCode: true,
+                    createdAt: true,
+                    updatedAt: true,
+                  },
+                },
+                city: {
+                  select: {
+                    id: true,
+                    cityName: true,
+                    cityCode: true,
+                    createdAt: true,
+                    updatedAt: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        bankAccounts: {
+          where: { status: "VERIFIED" },
+          orderBy: { isPrimary: "desc" },
+        },
+        userPermissions: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                isActive: true,
+              },
+            },
+          },
+        },
+        piiConsents: {
+          select: {
+            id: true,
+            piiType: true,
+            scope: true,
+            providedAt: true,
+            expiresAt: true,
+            userKycId: true,
+          },
+          where: { expiresAt: { gt: new Date() } },
+        },
+      },
+    });
+
+    if (!user) throw ApiError.notFound("User not found");
+
+    const transformedUser = {
+      ...user,
+      kycInfo:
+        user.kycs.length > 0
+          ? {
+              currentStatus: user.kycs[0].status,
+              isKycSubmitted: true,
+              latestKyc: user.kycs[0],
+              kycHistory: user.kycs,
+              totalKycAttempts: user.kycs.length,
+            }
+          : {
+              currentStatus: "NOT_SUBMITTED",
+              isKycSubmitted: false,
+              latestKyc: null,
+              kycHistory: [],
+              totalKycAttempts: 0,
+            },
+      bankInfo: {
+        totalAccounts: user.bankAccounts.length,
+        primaryAccount: user.bankAccounts.find((acc) => acc.isPrimary) || null,
+        verifiedAccounts: user.bankAccounts.filter(
+          (acc) => acc.status === "VERIFIED"
+        ),
+      },
+      kycs: undefined,
+      bankAccounts: undefined,
+    };
+
+    let safeUser;
+
+    const isCurrentUserAdmin = currentUser && currentUser.role === "ADMIN";
+
+    if (isCurrentUserAdmin) {
+      const serialized = Helper.serializeUser(transformedUser);
+
+      if (serialized.password) {
+        try {
+          serialized.password = CryptoService.decrypt(serialized.password);
+        } catch {
+          serialized.password = "Error decrypting";
+        }
+      }
+
+      if (serialized.transactionPin) {
+        try {
+          serialized.transactionPin = CryptoService.decrypt(
+            serialized.transactionPin
+          );
+        } catch {
+          serialized.transactionPin = "Error decrypting";
+        }
+      }
+
+      safeUser = serialized;
+    } else {
+      const serialized = Helper.serializeUser(transformedUser);
+      const { password, transactionPin, refreshToken, ...safeData } =
+        serialized;
+      safeUser = safeData;
+    }
+
+    return safeUser;
   }
 
   static async logout(userId, refreshToken) {
@@ -107,8 +317,7 @@ class AuthServices {
     if (refreshToken) {
       const payload = Helper.verifyRefreshToken(refreshToken);
       if (payload.jti && payload.exp) {
-        // Token revocation logic if needed (could store in database)
-        // await addRevokedToken(payload.jti, payload.exp - Math.floor(Date.now() / 1000));
+        // Token revocation logic if needed
       }
     }
 
@@ -128,7 +337,15 @@ class AuthServices {
     const user = await Prisma.user.findUnique({
       where: { id: payload.id },
       include: {
-        role: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            type: true,
+            description: true,
+          },
+        },
         parent: {
           select: {
             id: true,
@@ -154,19 +371,25 @@ class AuthServices {
       throw ApiError.unauthorized("Refresh token mismatch");
     }
 
-    const newAccessToken = Helper.generateAccessToken({
+    // Generate new tokens with updated role information
+    const tokenPayload = {
       id: user.id,
       email: user.email,
       role: user.role.name,
       roleLevel: user.role.level,
-    });
+      roleType: user.role.type,
+    };
 
-    const newRefreshToken = Helper.generateRefreshToken({
-      id: user.id,
-      email: user.email,
-      role: user.role.name,
-      roleLevel: user.role.level,
-    });
+    // Include permissions for employees
+    if (user.role.type === "employee") {
+      const permissions = await EmployeeServices.getEmployeePermissions(
+        user.id
+      );
+      tokenPayload.permissions = permissions;
+    }
+
+    const newAccessToken = Helper.generateAccessToken(tokenPayload);
+    const newRefreshToken = Helper.generateRefreshToken(tokenPayload);
 
     await Prisma.user.update({
       where: { id: user.id },
@@ -185,9 +408,15 @@ class AuthServices {
   }
 
   static async requestPasswordReset(email) {
-    const user = await Prisma.user.findUnique({
+    const user = await Prisma.user.findFirst({
       where: { email },
       include: {
+        role: {
+          select: {
+            name: true,
+            type: true,
+          },
+        },
         parent: {
           select: {
             id: true,
@@ -203,7 +432,10 @@ class AuthServices {
     });
 
     if (!user) {
-      return { message: "User not found." };
+      return {
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
+      };
     }
 
     const token = CryptoService.generateSecureToken(32);
@@ -222,21 +454,20 @@ class AuthServices {
     const encryptedToken = CryptoService.encrypt(token);
     const resetUrl = `${process.env.CLIENT_URL}/verify-reset-password?token=${encodeURIComponent(encryptedToken)}&email=${encodeURIComponent(email)}`;
 
-    const emailContent = EmailTemplates.generatePasswordResetTemplate({
-      firstName: user.firstName,
-      resetUrl: resetUrl,
-      expiryMinutes: 2,
-      supportEmail: process.env.SMTP_USER,
-      customMessage: null,
-    });
+    // Send type-specific password reset email
+    const userType = user.role.type === "employee" ? "employee" : "business";
 
-    await Helper.sendEmail({
-      to: user.email,
-      subject: emailContent.subject,
-      text: emailContent.text,
-      html: emailContent.html,
-    });
-    return { message: "Password reset link has been sent to your email." };
+    await sendPasswordResetEmail(
+      user,
+      resetUrl,
+      userType,
+      `We received a request to reset your ${userType} account password. Click the link below to create a new secure password.`
+    );
+
+    return {
+      message:
+        "If an account with that email exists, a password reset link has been sent.",
+    };
   }
 
   static async confirmPasswordReset(encryptedToken) {
@@ -250,6 +481,12 @@ class AuthServices {
           passwordResetExpires: { gt: new Date() },
         },
         include: {
+          role: {
+            select: {
+              type: true,
+              name: true,
+            },
+          },
           parent: {
             select: {
               id: true,
@@ -268,20 +505,63 @@ class AuthServices {
         throw ApiError.badRequest("Invalid or expired token");
       }
 
-      const hashedPassword = await UserServices.regenerateCredentialsAndNotify(
-        user.id,
-        user.email
-      );
+      // Generate new credentials
+      const generatedPassword = Helper.generatePassword();
+      const hashedPassword = CryptoService.encrypt(generatedPassword);
+
+      let generatedTransactionPin = null;
+      let hashedPin = null;
+
+      // Only business users get transaction pin
+      if (user.role.type === "business") {
+        generatedTransactionPin = Helper.generateTransactionPin();
+        hashedPin = CryptoService.encrypt(generatedTransactionPin);
+      }
+
+      // Update user data
+      const updateData = {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        refreshToken: null, // Invalidate all sessions
+      };
+
+      if (hashedPin) {
+        updateData.transactionPin = hashedPin;
+      }
 
       await Prisma.user.update({
         where: { id: user.id },
-        data: {
-          password: hashedPassword,
-          passwordResetToken: null,
-          passwordResetExpires: null,
-          refreshToken: null, // Invalidate all sessions
-        },
+        data: updateData,
       });
+
+      // Send type-specific credentials email
+      if (user.role.type === "employee") {
+        const permissions = await EmployeeServices.getEmployeePermissions(
+          user.id
+        );
+        await sendCredentialsEmail(
+          user,
+          generatedPassword,
+          null,
+          "reset",
+          `Your employee account password has been reset successfully. Here are your new login credentials.`,
+          "employee",
+          {
+            role: user.role.name,
+            permissions: permissions,
+          }
+        );
+      } else {
+        await sendCredentialsEmail(
+          user,
+          generatedPassword,
+          generatedTransactionPin,
+          "reset",
+          `Your business account password has been reset successfully. Here are your new login credentials.`,
+          "business"
+        );
+      }
 
       return {
         message:
@@ -355,18 +635,20 @@ class AuthServices {
 
     const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}&email=${encodeURIComponent(user.email)}`;
 
-    const formattedFirstName = AuthServices.formatName(user.firstName);
+    const userType = user.role?.type === "employee" ? "employee" : "business";
+
+    // Use EmailTemplates for email verification
+    const emailContent = EmailTemplates.generateEmailVerificationTemplate({
+      firstName: user.firstName,
+      verifyUrl: verifyUrl,
+      userType: userType,
+    });
 
     await Helper.sendEmail({
       to: user.email,
-      subject: "Verify your email",
-      text: `Hello ${formattedFirstName},\n\nClick to verify your email: ${verifyUrl}\nLink valid for 24 hours.`,
-      html: `
-      <p>Hello ${formattedFirstName},</p>
-      <p>Click the link below to verify your email address:</p>
-      <p><a href="${verifyUrl}" target="_blank" rel="noopener noreferrer">Verify Email</a></p>
-      <p>This link is valid for 24 hours.</p>
-    `,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
     });
   }
 
@@ -374,6 +656,11 @@ class AuthServices {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
+        role: {
+          select: {
+            type: true,
+          },
+        },
         parent: {
           select: {
             id: true,
@@ -394,22 +681,24 @@ class AuthServices {
 
     const isOwnUpdate = requestedBy === userId;
 
+    // Verify current password
     const decryptedStoredPassword = CryptoService.decrypt(user.password);
     const isPasswordValid =
       decryptedStoredPassword === credentialsData.currentPassword;
 
     if (!isPasswordValid) {
-      throw ApiError.unauthorized("User's current password is incorrect");
+      throw ApiError.unauthorized("Current password is incorrect");
     }
 
     const updateData = {};
 
     if (credentialsData.newPassword) {
       updateData.password = CryptoService.encrypt(credentialsData.newPassword);
-      updateData.refreshToken = null;
+      updateData.refreshToken = null; // Invalidate all sessions
     }
 
-    if (credentialsData.newTransactionPin) {
+    // Only business users have transaction pins
+    if (credentialsData.newTransactionPin && user.role.type === "business") {
       if (!credentialsData.currentTransactionPin) {
         throw ApiError.badRequest("Current transaction PIN is required");
       }
@@ -444,6 +733,7 @@ class AuthServices {
           isOwnUpdate: isOwnUpdate,
           updatedBy: requestedBy,
           targetUserId: userId,
+          userType: user.role.type,
         },
       },
     });

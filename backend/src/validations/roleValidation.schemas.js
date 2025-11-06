@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 class RoleValidationSchemas {
-  static get store() {
+  static get createRole() {
     return z.object({
       name: z
         .string()
@@ -14,10 +14,11 @@ class RoleValidationSchemas {
         }),
       description: z.string().trim().max(2000).nullable().optional(),
       level: z.number().int().positive().optional(),
+      type: z.enum(["employee"]).default("employee"), // Only allow employee type
     });
   }
 
-  static get update() {
+  static get updateRole() {
     return z.object({
       name: z
         .string()
@@ -31,6 +32,7 @@ class RoleValidationSchemas {
         .optional(),
       description: z.string().trim().max(2000).nullable().optional(),
       level: z.number().int().positive().optional(),
+      type: z.enum(["employee"]).optional(), // Only allow employee type
     });
   }
 }

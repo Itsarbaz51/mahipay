@@ -14,16 +14,75 @@ import {
   Lock,
   X,
   Wallet,
-  Briefcase, // New icon for Role
-  Hash, // New icon for ID
+  Briefcase,
+  Hash,
+  Building,
+  UserCheck,
 } from "lucide-react";
 
-export default function UserProfileView({ isAdminUser, userData, onClose }) {
+export default function UserProfileView({
+  isAdminUser,
+  userData,
+  onClose,
+  type = "business",
+}) {
   const [showPassword, setShowPassword] = useState(false);
   const [showTransactionPin, setShowTransactionPin] = useState(false);
 
-  // Handle different response structures
+  // Handle different response structures and types
   const user = userData?.data?.user || userData?.user || userData;
+
+  // Determine user type and adjust data structure accordingly
+  const isEmployee = type === "employee";
+  const userTypeLabel = isEmployee ? "Employee" : "business";
+  const userTypeIcon = isEmployee ? Building : UserCheck;
+
+  // Adapt data structure based on type
+  const adaptedUser = {
+    // Common fields
+    id: user?.id,
+    firstName: user?.firstName,
+    lastName: user?.lastName,
+    username: user?.username,
+    email: user?.email,
+    phoneNumber: user?.phoneNumber,
+    profileImage: user?.profileImage,
+    status: user?.status,
+    isKycVerified: user?.isKycVerified,
+    isAuthorized: user?.isAuthorized,
+    hierarchyLevel: user?.hierarchyLevel,
+    hierarchyPath: user?.hierarchyPath,
+    parentId: user?.parentId,
+    parent: user?.parent,
+    children: user?.children,
+    createdAt: user?.createdAt,
+    updatedAt: user?.updatedAt,
+    emailVerifiedAt: user?.emailVerifiedAt,
+
+    // Security fields (only for admin)
+    password: user?.password,
+    transactionPin: user?.transactionPin,
+
+    // Role information - adapt based on type
+    role:
+      user?.role ||
+      (isEmployee
+        ? { name: "Employee", level: user?.hierarchyLevel }
+        : user?.role),
+
+    // Wallet information
+    wallets: user?.wallets || (user?.wallet ? [user.wallet] : []),
+
+    // Type-specific fields
+    employeeId: isEmployee ? user?.employeeId : null,
+    employeeCode: isEmployee ? user?.employeeCode : null,
+    department: isEmployee ? user?.department : null,
+    designation: isEmployee ? user?.designation : null,
+  };
+
+
+  // console.log(userData);
+  
 
   // --- Error State ---
   // if (!user || !user?.id) {
@@ -60,8 +119,16 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
       INACTIVE: "bg-red-100 text-red-700 border-red-300",
       PENDING: "bg-yellow-100 text-yellow-700 border-yellow-300",
       IN_ACTIVE: "bg-red-100 text-red-700 border-red-300",
+      SUSPENDED: "bg-orange-100 text-orange-700 border-orange-300",
     };
-    const label = status === "IN_ACTIVE" ? "Inactive" : status;
+    const label =
+      status === "IN_ACTIVE"
+        ? "Inactive"
+        : status === "ACTIVE"
+        ? "Active"
+        : status === "SUSPENDED"
+        ? "Suspended"
+        : status;
     const Icon = status === "ACTIVE" ? CheckCircle : XCircle;
 
     return (
@@ -102,16 +169,71 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
   const sectionTitleClass =
     "text-xl font-extrabold text-gray-800 mb-4 border-b-2 border-cyan-100 pb-2 flex items-center gap-2";
 
+  // Employee-specific fields
+  const EmployeeSpecificInfo = () => {
+    if (!isEmployee) return null;
+
+    return (
+      <div className={detailCard}>
+        <h3 className={sectionTitleClass}>
+          <Building className="text-cyan-500" size={24} /> Employee Details
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {adaptedUser.employeeId && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                Employee ID
+              </label>
+              <p className="text-gray-900 mt-1 font-mono text-sm font-semibold">
+                {adaptedUser.employeeId}
+              </p>
+            </div>
+          )}
+          {adaptedUser.employeeCode && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                Employee Code
+              </label>
+              <p className="text-gray-900 mt-1 font-mono text-sm font-semibold">
+                {adaptedUser.employeeCode}
+              </p>
+            </div>
+          )}
+          {adaptedUser.department && (
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                Department
+              </label>
+              <p className="text-gray-900 mt-1 font-semibold text-base">
+                {adaptedUser.department}
+              </p>
+            </div>
+          )}
+          {adaptedUser.designation && (
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                Designation
+              </label>
+              <p className="text-gray-900 mt-1 font-semibold text-base">
+                {adaptedUser.designation}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // --- Main Pop-up Structure ---
   return (
-    // Fixed overlay covering the whole screen
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 overflow-y-auto p-4">
       {/* Centered Modal Container */}
       <div className="relative bg-white rounded-3xl shadow-2xl my-8 max-w-5xl w-full transform transition-all duration-500 scale-100 opacity-100 animate-in fade-in zoom-in duration-300">
         {/* Sticky Header with Close Button */}
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 rounded-t-3xl p-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <User className="text-cyan-500" size={24} /> User Profile Detail
+            <userTypeIcon className="text-cyan-500" size={24} />
+            {userTypeLabel} Profile Detail
           </h1>
           <button
             onClick={onClose}
@@ -130,10 +252,10 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
               {/* Profile Image & Level Badge */}
               <div className="relative flex-shrink-0">
                 <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-gray-300 flex items-center justify-center border-4 border-white shadow-2xl">
-                  {user?.profileImage ? (
+                  {adaptedUser?.profileImage ? (
                     <img
-                      src={user?.profileImage}
-                      alt={`${user?.firstName} ${user?.lastName}`}
+                      src={adaptedUser?.profileImage}
+                      alt={`${adaptedUser?.firstName} ${adaptedUser?.lastName}`}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -141,22 +263,28 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                   )}
                 </div>
                 <div className="absolute bottom-0 right-0 transform translate-x-1/4 translate-y-1/4 bg-purple-600 text-white text-sm font-bold px-3 py-1 rounded-full shadow-lg border-2 border-white">
-                  Lvl {user?.hierarchyLevel || "N/A"}
+                  {isEmployee ? "Emp" : "Lvl"}{" "}
+                  {adaptedUser?.hierarchyLevel || "N/A"}
                 </div>
               </div>
 
               {/* Name & Badges */}
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 mb-1 leading-tight">
-                  {user?.firstName} {user?.lastName}
+                  {adaptedUser?.firstName} {adaptedUser?.lastName}
                 </h2>
                 <p className="text-purple-600 text-xl font-mono mb-4">
-                  @{user?.username}
+                  @{adaptedUser?.username}
+                  {isEmployee && adaptedUser?.employeeCode && (
+                    <span className="text-gray-500 ml-2">
+                      ({adaptedUser.employeeCode})
+                    </span>
+                  )}
                 </p>
                 <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                  <StatusBadge status={user?.status} />
+                  <StatusBadge status={adaptedUser?.status} />
 
-                  {user?.isKycVerified ? (
+                  {adaptedUser?.isKycVerified ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold border border-blue-300 transition-all duration-200 hover:bg-blue-200">
                       <CheckCircle size={14} /> KYC Verified
                     </span>
@@ -166,9 +294,19 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                     </span>
                   )}
 
-                  {user?.isAuthorized && (
+                  {adaptedUser?.isAuthorized && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold border border-purple-300 transition-all duration-200 hover:bg-purple-200">
                       <Shield size={14} /> Authorized
+                    </span>
+                  )}
+
+                  {isEmployee ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold border border-green-300 transition-all duration-200 hover:bg-green-200">
+                      <Building size={14} /> Employee
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold border border-green-300 transition-all duration-200 hover:bg-green-200">
+                      <UserCheck size={14} /> Business User
                     </span>
                   )}
                 </div>
@@ -176,37 +314,51 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
             </div>
           </div>
 
+          {/* Employee Specific Info */}
+          <EmployeeSpecificInfo />
+
           {/* Quick Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard
-              icon={Wallet}
-              title="Current Balance"
-              value={formatCurrency(user?.wallets?.[0]?.balance || 0)}
-              color="green"
-            />
+            {!isEmployee && (
+              <StatCard
+                icon={Wallet}
+                title="Current Balance"
+                value={formatCurrency(adaptedUser?.wallets?.[0]?.balance || 0)}
+                color="green"
+              />
+            )}
             <StatCard
               icon={Users}
               title="Direct Children"
-              value={user?.children?.length || 0}
+              value={adaptedUser?.children?.length || 0}
               color="purple"
               subText="View list below"
             />
+
             <StatCard
               icon={Briefcase}
-              title="Role Level"
-              value={user?.role?.level || "N/A"}
+              title={isEmployee ? "Designation" : "Role Level"}
+              value={
+                isEmployee
+                  ? adaptedUser?.designation ||
+                    adaptedUser?.role?.level ||
+                    "N/A"
+                  : adaptedUser?.role?.level || "N/A"
+              }
               color="orange"
             />
             <StatCard
               icon={Calendar}
               title="Member Since"
               value={
-                user?.createdAt ? new Date(user?.createdAt).getFullYear() : "N/A"
+                adaptedUser?.createdAt
+                  ? new Date(adaptedUser?.createdAt).getFullYear()
+                  : "N/A"
               }
               color="blue"
               subText={
-                user?.createdAt
-                  ? new Date(user?.createdAt).toLocaleDateString()
+                adaptedUser?.createdAt
+                  ? new Date(adaptedUser?.createdAt).toLocaleDateString()
                   : "N/A"
               }
             />
@@ -225,10 +377,10 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                   {/* User ID (Highlighting its importance) */}
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <label className="text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
-                      <Hash size={14} /> Unique User ID
+                      <Hash size={14} /> Unique {userTypeLabel} ID
                     </label>
                     <p className="text-gray-900 mt-1 font-mono text-sm break-all font-semibold">
-                      {user?.id}
+                      {adaptedUser?.id}
                     </p>
                   </div>
                   {/* Username */}
@@ -237,7 +389,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Username
                     </label>
                     <p className="text-gray-900 mt-1 font-semibold text-lg">
-                      @{user?.username}
+                      @{adaptedUser?.username}
                     </p>
                   </div>
                   {/* First Name */}
@@ -246,7 +398,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       First Name
                     </label>
                     <p className="text-gray-900 mt-1 font-semibold text-base">
-                      {user?.firstName}
+                      {adaptedUser?.firstName}
                     </p>
                   </div>
                   {/* Last Name */}
@@ -255,7 +407,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Last Name
                     </label>
                     <p className="text-gray-900 mt-1 font-semibold text-base">
-                      {user?.lastName}
+                      {adaptedUser?.lastName}
                     </p>
                   </div>
                 </div>
@@ -278,21 +430,23 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                         Email Address
                       </label>
                       <p className="text-gray-900 font-semibold text-base break-all">
-                        {user?.email}
+                        {adaptedUser?.email}
                       </p>
                       <span
                         className={`text-xs font-semibold flex items-center gap-1 mt-0.5 ${
-                          user?.emailVerifiedAt
+                          adaptedUser?.emailVerifiedAt
                             ? "text-green-600"
                             : "text-orange-600"
                         }`}
                       >
-                        {user?.emailVerifiedAt ? (
+                        {adaptedUser?.emailVerifiedAt ? (
                           <CheckCircle size={12} />
                         ) : (
                           <XCircle size={12} />
                         )}
-                        {user?.emailVerifiedAt ? "Verified" : "Not verified"}
+                        {adaptedUser?.emailVerifiedAt
+                          ? "Verified"
+                          : "Not verified"}
                       </span>
                     </div>
                   </div>
@@ -306,7 +460,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                         Phone Number
                       </label>
                       <p className="text-gray-900 font-semibold text-base">
-                        {user?.phoneNumber || "N/A"}
+                        {adaptedUser?.phoneNumber || "N/A"}
                       </p>
                     </div>
                   </div>
@@ -341,34 +495,38 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                         </button>
                       </div>
                       <p className="text-gray-900 font-mono text-xs break-all cursor-text select-all">
-                        {showPassword ? user?.password || "N/A" : "•••••••"}
-                      </p>
-                    </div>
-                    {/* Transaction PIN Hash */}
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-cyan-400 transition-colors">
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-medium text-gray-500 uppercase">
-                          Transaction PIN Hash
-                        </label>
-                        <button
-                          onClick={() => setShowTransactionPin((s) => !s)}
-                          className="text-cyan-600 hover:text-cyan-700 flex items-center gap-1 text-sm font-medium transition-colors"
-                          aria-label="Toggle transaction pin visibility"
-                        >
-                          {showTransactionPin ? (
-                            <EyeOff size={16} />
-                          ) : (
-                            <Eye size={16} />
-                          )}
-                          {showTransactionPin ? "Hide Hash" : "Show Hash"}
-                        </button>
-                      </div>
-                      <p className="text-gray-900 font-mono text-xs break-all cursor-text select-all">
-                        {showTransactionPin
-                          ? user?.transactionPin || "N/A"
+                        {showPassword
+                          ? adaptedUser?.password || "N/A"
                           : "•••••••"}
                       </p>
                     </div>
+                    {/* Transaction PIN Hash */}
+                    {!isEmployee && (
+                      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-cyan-400 transition-colors">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs font-medium text-gray-500 uppercase">
+                            Transaction PIN Hash
+                          </label>
+                          <button
+                            onClick={() => setShowTransactionPin((s) => !s)}
+                            className="text-cyan-600 hover:text-cyan-700 flex items-center gap-1 text-sm font-medium transition-colors"
+                            aria-label="Toggle transaction pin visibility"
+                          >
+                            {showTransactionPin ? (
+                              <EyeOff size={16} />
+                            ) : (
+                              <Eye size={16} />
+                            )}
+                            {showTransactionPin ? "Hide Hash" : "Show Hash"}
+                          </button>
+                        </div>
+                        <p className="text-gray-900 font-mono text-xs break-all cursor-text select-all">
+                          {showTransactionPin
+                            ? adaptedUser?.transactionPin || "N/A"
+                            : "•••••••"}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -391,10 +549,10 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       <Users className="text-cyan-600" size={20} />
                       <div>
                         <p className="text-gray-900 font-semibold text-base">
-                          @{user?.parent?.username || "N/A"}
+                          @{adaptedUser?.parent?.username || "N/A"}
                         </p>
                         <p className="text-gray-600 text-xs font-mono">
-                          ID: {user?.parentId || "No parent ID"}
+                          ID: {adaptedUser?.parentId || "No parent ID"}
                         </p>
                       </div>
                     </div>
@@ -405,7 +563,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Hierarchy Path
                     </label>
                     <p className="text-gray-900 mt-1 font-mono text-xs bg-gray-50 px-3 py-2 rounded-lg break-all border border-gray-200 max-h-24 overflow-y-auto">
-                      {user?.hierarchyPath || "N/A"}
+                      {adaptedUser?.hierarchyPath || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -414,23 +572,30 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
               {/* Role Info */}
               <div className={detailCard}>
                 <h3 className={sectionTitleClass}>
-                  <Shield className="text-cyan-500" size={24} /> Role Assignment
+                  <Shield className="text-cyan-500" size={24} />{" "}
+                  {isEmployee ? "Employee" : "Role"} Information
                 </h3>
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs font-medium text-gray-500 uppercase">
-                      Role Name
+                      {isEmployee ? "Designation" : "Role Name"}
                     </label>
                     <p className="text-gray-900 mt-1 font-bold text-lg p-2 bg-purple-50 rounded-md border border-purple-200">
-                      {user?.role?.name || "N/A"}
+                      {isEmployee
+                        ? adaptedUser?.designation ||
+                          adaptedUser?.role?.name ||
+                          "N/A"
+                        : adaptedUser?.role?.name || "N/A"}
                     </p>
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500 uppercase">
-                      Role ID
+                      {isEmployee ? "Department" : "Role ID"}
                     </label>
                     <p className="text-gray-900 mt-1 font-mono text-sm bg-gray-50 px-3 py-2 rounded-lg break-all border border-gray-200">
-                      {user?.role?.id || "N/A"}
+                      {isEmployee
+                        ? adaptedUser?.department || "N/A"
+                        : adaptedUser?.role?.id || "N/A"}
                     </p>
                   </div>
                 </div>
@@ -447,7 +612,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Created At
                     </label>
                     <p className="text-gray-900 mt-1 text-sm font-medium">
-                      {formatDate(user?.createdAt)}
+                      {formatDate(adaptedUser?.createdAt)}
                     </p>
                   </div>
                   <div>
@@ -455,7 +620,7 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
                       Last Updated
                     </label>
                     <p className="text-gray-900 mt-1 text-sm font-medium">
-                      {formatDate(user?.updatedAt)}
+                      {formatDate(adaptedUser?.updatedAt)}
                     </p>
                   </div>
                 </div>
@@ -464,14 +629,15 @@ export default function UserProfileView({ isAdminUser, userData, onClose }) {
           </div>
 
           {/* Direct Children List - Full Width Section */}
-          {user?.children && user?.children.length > 0 && (
+          {adaptedUser?.children && adaptedUser?.children.length > 0 && (
             <div className={detailCard}>
               <h3 className={sectionTitleClass}>
-                <Users className="text-cyan-500" size={24} /> Direct Children (
-                {user?.children.length})
+                <Users className="text-cyan-500" size={24} /> Direct{" "}
+                {isEmployee ? "Team Members" : "Children"} (
+                {adaptedUser?.children.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {user?.children.map((child) => (
+                {adaptedUser?.children.map((child) => (
                   <div
                     key={child.id}
                     className="p-4 border rounded-xl bg-cyan-50 hover:bg-cyan-100 transition-colors duration-200 shadow-sm"

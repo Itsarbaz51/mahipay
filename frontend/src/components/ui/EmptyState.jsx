@@ -26,17 +26,15 @@ const EmptyState = ({ type = "empty", search = "" }) => {
   }
 
   return (
-    <tr>
-      <td colSpan="7" className="py-20 text-center">
-        <div className="flex flex-col items-center justify-center space-y-4 text-gray-500">
-          <Icon className="w-10 h-10 animate-pulse text-gray-400" />
-          <div>
-            <h3 className="text-lg font-semibold">{title}</h3>
-            <p className="text-sm">{message}</p>
-          </div>
+    <div className="py-20 text-center">
+      <div className="flex flex-col items-center justify-center space-y-4 text-gray-500">
+        <Icon className="w-10 h-10 animate-pulse text-gray-400" />
+        <div>
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <p className="text-sm">{message}</p>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 };
 

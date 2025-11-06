@@ -21,7 +21,8 @@ const ActionsMenu = ({
   onPermission,
   onDelete,
   onLogin,
-  isAdminUser, // 🆕 Added prop to check if current user is admin
+  isAdminUser,
+  type = "business",
 }) => {
   // 🆕 Base menu items that everyone can see
   const baseMenuItems = [
@@ -59,12 +60,17 @@ const ActionsMenu = ({
       onClick: () => onPermission(user),
       color: "text-indigo-600",
     },
-    {
-      icon: CreditCard,
-      label: "Change PIN",
-      onClick: () => onEditPin(user),
-      color: "text-red-600",
-    },
+    // Remove Change PIN option for employee users
+    ...(type !== "employee"
+      ? [
+          {
+            icon: CreditCard,
+            label: "Change PIN",
+            onClick: () => onEditPin(user),
+            color: "text-red-600",
+          },
+        ]
+      : []),
     {
       icon: Power,
       label:
