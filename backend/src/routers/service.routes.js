@@ -31,73 +31,32 @@ serviceRoutes.get(
   ServiceProviderController.getAll
 );
 
-// Get active service providers (ADMIN sees all active, users see assigned active)
-serviceRoutes.get(
-  "/providers/active",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "RETAILER",
-  ]),
-  ServiceProviderController.getAllActive
-);
-
-// Get service provider by ID
-serviceRoutes.get(
-  "/providers/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "RETAILER",
-  ]),
-  ServiceProviderController.getById
-);
-
-// Update service provider (ADMIN only)
 serviceRoutes.put(
-  "/providers/:id",
+  "/env-config/:id",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  validateRequest(ServiceValidationSchemas.updateServiceProvider),
-  ServiceProviderController.update
+  ServiceProviderController.updateEnvConfig
 );
 
-// Toggle active status (ADMIN only)
-serviceRoutes.patch(
-  "/providers/:id/status",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
-  validateRequest(ServiceValidationSchemas.toggleStatus),
-  ServiceProviderController.toggleActiveStatus
-);
-
-// Delete service provider (ADMIN only)
-serviceRoutes.delete(
-  "/providers/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
-  ServiceProviderController.delete
-);
-
-// Service Credential Management
 serviceRoutes.put(
-  "/providers/:id/credentials",
+  "/status/:id",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  ServiceProviderController.updateCredentials
+  ServiceProviderController.toggleServiceStatus
 );
 
-serviceRoutes.get(
-  "/providers/:id/credentials",
+serviceRoutes.put(
+  "/api-intigration-status/:id",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorizeRoles(["ADMIN"]),
-  ServiceProviderController.getCredentials
+  ServiceProviderController.toggleApiIntigrationStatus
+);
+
+serviceRoutes.post(
+  "/api-testing/:id",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  ServiceProviderController.apiTestConnection
 );
 
 export default serviceRoutes;

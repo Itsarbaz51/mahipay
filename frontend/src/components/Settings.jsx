@@ -12,7 +12,7 @@ import CompanyAccounts from "../pages/CompanyAccounts";
 import ManageServices from "../pages/ManageServices";
 import RoleManager from "./RoleManager";
 import PageHeader from "./ui/PageHeader";
-import ApiIntigration from "./ApiIntigration";
+import ApiIntegration from "../pages/ApiIntigration";
 
 const Settings = () => {
   const { currentUser = {} } = useSelector((state) => state.auth);
@@ -60,7 +60,7 @@ const Settings = () => {
       case "role":
         return roleName === "ADMIN" ? <RoleManager /> : <NoAccess />;
       case "api-intigration":
-        return roleName === "ADMIN" ? <ApiIntigration /> : <NoAccess />;
+        return roleName === "ADMIN" ? <ApiIntegration /> : <NoAccess />;
       default:
         return roleName === "ADMIN" ? <MainSettings /> : <NoAccess />;
     }

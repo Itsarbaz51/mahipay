@@ -100,9 +100,10 @@ export const getLoginLogs =
       dispatch(logsListSuccess(data));
       return data;
     } catch (error) {
-      console.error("API Error:", error.response?.data || error.message);
+
       const errMsg =
         error?.response?.data?.message ||
+        error?.response?.data.error ||
         error?.message ||
         "Failed to fetch login logs";
       dispatch(logsFail(errMsg));
