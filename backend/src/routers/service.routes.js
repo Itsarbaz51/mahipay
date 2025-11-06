@@ -28,28 +28,28 @@ serviceRoutes.get(
 serviceRoutes.put(
   "/env-config/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   ServiceProviderController.updateEnvConfig
 );
 
 serviceRoutes.put(
   "/status/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   ServiceProviderController.toggleServiceStatus
 );
 
 serviceRoutes.put(
   "/api-intigration-status/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   ServiceProviderController.toggleApiIntigrationStatus
 );
 
 serviceRoutes.post(
   "/api-testing/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   ServiceProviderController.apiTestConnection
 );
 
