@@ -13,6 +13,7 @@ import {
   User,
   AlertCircle,
   UsersRound,
+  RefreshCw,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { getbyId, getKycAll, verifyKyc } from "../../redux/slices/kycSlice";
@@ -265,7 +266,10 @@ const ProfileTable = () => {
               {loading ? (
                 <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
               ) : null}
-              Refresh
+              <RefreshCw
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
+              {loading ? "Refreshing..." : "Refresh"}
             </button>
           </div>
         </div>

@@ -112,8 +112,6 @@ export const updatekycSubmit =
 
 // ------------------ Manage by both (admin & user) --------------------------
 export const getbyId = (id) => async (dispatch) => {
-  console.log(id);
-
   try {
     dispatch(kycRequest());
     const { data } = await axios.get(`kycs/user-kyc-show/${id}`);

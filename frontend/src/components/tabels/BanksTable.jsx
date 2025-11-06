@@ -305,7 +305,7 @@ const BankTable = () => {
       {showModal && (
         <ConfirmCard
           actionType={selectedAction}
-          user={bankData.find((b) => b.id === selectedId)}
+          user={bankData.find((b) => b.id === selectedId)?.user}
           isClose={() => {
             setShowModal(false);
             setSelectedAction(null);

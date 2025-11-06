@@ -115,7 +115,7 @@ const DropdownField = ({
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (
-          <option key={option.id} value={option.id}>
+          <option key={option?.id} value={option?.id}>
             {option.stateName || option.cityName}
           </option>
         ))}
@@ -361,8 +361,8 @@ export default function AddProfileKYC() {
         await dispatch(getAllEntities("state-list"));
         await dispatch(getAllEntities("city-list"));
 
-        if (currentUser?.kycInfo?.currentStatus) {
-          await dispatch(getbyId(currentUser?.kycInfo?.latestKyc.id));
+        if (currentUser?.kycInfo?.currentStatus !== "NOT_SUBMITTED") {
+          await dispatch(getbyId(currentUser?.kycInfo?.latestKyc?.id));
         }
       } catch (error) {
         console.error("Failed to fetch KYC data:", error);
@@ -379,8 +379,8 @@ export default function AddProfileKYC() {
   useEffect(() => {
     if (currentUser?.id) {
       const fetchKYCIfNeeded = async () => {
-        if (currentUser?.kycInfo?.currentStatus) {
-          await dispatch(getbyId(currentUser?.kycInfo?.latestKyc.id));
+        if (currentUser?.kycInfo?.currentStatus !== "NOT_SUBMITTED") {
+          await dispatch(getbyId(currentUser?.kycInfo?.latestKyc?.id));
         }
       };
       fetchKYCIfNeeded();
@@ -389,7 +389,7 @@ export default function AddProfileKYC() {
     dispatch,
     currentUser?.id,
     currentUser?.kycInfo?.currentStatus,
-    currentUser?.kycInfo?.latestKyc.id,
+    currentUser?.kycInfo?.latestKyc?.id,
   ]);
 
   const stateList = useMemo(
@@ -779,7 +779,7 @@ export default function AddProfileKYC() {
       }
 
       // Refresh KYC data
-      dispatch(getbyId());
+      dispatch(getbyId(currentUser?.kycInfo?.latestKyc?.id));
     } catch (err) {
       toast.error(err?.message || "Submission failed");
     } finally {

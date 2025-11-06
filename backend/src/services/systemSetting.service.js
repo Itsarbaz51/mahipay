@@ -65,7 +65,7 @@ class SystemSettingService {
 
   static async getById(userId) {
     const setting = await Prisma.systemSetting.findFirst({ where: { userId } });
-    if (!setting) throw ApiError.notFound("System setting not found");
+    if (!setting) return;
 
     const mapped = this.mapToSystemSetting(setting);
     return mapped;

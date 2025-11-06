@@ -44,10 +44,12 @@ function ConfirmCard({
         {user && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
             <p className="font-medium text-gray-900">
-              {user.firstName} {user.lastName}
+              {user?.firstName || user?.profile?.name} {user?.lastName}
             </p>
-            <p className="text-sm text-gray-600">{user.email}</p>
-            <p className="text-sm text-gray-600">{user.role?.name}</p>
+            <p className="text-sm text-gray-600">
+              {user?.email || user?.profile?.email}
+            </p>
+            <p className="text-sm text-gray-600">{user?.role?.name}</p>
           </div>
         )}
 

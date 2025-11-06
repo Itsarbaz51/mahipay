@@ -29,7 +29,7 @@ class UserKycController {
   });
 
   static show = asyncHandler(async (req, res) => {
-    const requestingUser = req.user.id;
+    const requestingUser = req.user;
     if (!requestingUser) {
       throw ApiError.unauthorized("User not authenticated");
     }

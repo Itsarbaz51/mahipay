@@ -180,7 +180,7 @@ class KycServices {
                 lastName: true,
                 email: true,
                 hierarchyPath: true,
-                hierarchyLevel: true, // ✅ This should work now
+                hierarchyLevel: true,
               },
             },
           },
@@ -244,7 +244,7 @@ class KycServices {
         name: kyc.user.parent
           ? `${kyc.user.parent.firstName} ${kyc.user.parent.lastName}`
           : "N/A",
-        hierarchyLevel: kyc.user.parent?.hierarchyLevel || "N/A",
+        hierarchyLevel: kyc.user.parent?.hierarchyLevel,
         hierarchyPath: kyc.user.parent?.hierarchyPath || "N/A",
         email: kyc.user.parent?.email || "N/A",
         phone: kyc.user.parent?.phoneNumber || "N/A",
