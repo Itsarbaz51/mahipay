@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Search } from "lucide-react";
 import { createOrUpdateCommissionSetting } from "../../redux/slices/commissionSlice";
-import { getAllRoles } from "../../redux/slices/roleSlice";
-import { getAllUsersByParentId } from "../../redux/slices/userSlice";
-import { allServices } from "../../redux/slices/serviceSlice";
+import { getAllRoles, getAllRolesByType } from "../../redux/slices/roleSlice";
+import { getAllBusinessUsersByParentId } from "../../redux/slices/userSlice";
+import { allServices, getServicesActive } from "../../redux/slices/serviceSlice";
 
 const scopes = ["ROLE", "USER"];
 const commissionTypes = ["FLAT", "PERCENTAGE"];
@@ -87,15 +87,11 @@ const AddCommissionModal = ({ onClose, onSuccess, editData }) => {
 
   // Fetch roles, users and services when component mounts
   useEffect(() => {
-<<<<<<< HEAD
     dispatch(getAllRoles());
-    dispatch(getAllUsersByParentId({ search: "", status: "ACTIVE" }));
     dispatch(allServices());
-=======
     dispatch(getAllRolesByType("business"));
     dispatch(getAllBusinessUsersByParentId({ search: "", status: "ACTIVE" }));
     dispatch(getServicesActive());
->>>>>>> c24554586b4b263cbb166eb112789e1cf5bbf249
   }, [dispatch]);
 
   // Filter users based on search
