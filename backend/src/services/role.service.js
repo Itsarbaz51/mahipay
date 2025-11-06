@@ -2,6 +2,37 @@ import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
 
 class RoleServices {
+  static getAllRoles = async (options = {}) => {
+    const { currentUserRoleLevel, excludeAdmin = false } = options;
+
+    const where = {};
+
+    if (excludeAdmin) {
+      where.name = { not: "ADMIN" };
+    }
+
+    if (typeof currentUserRoleLevel === "number") {
+      where.level = { gt: currentUserRoleLevel };
+    }
+
+    // Query using Prisma
+    const roles = await Prisma.role.findMany({
+      where,
+      orderBy: { level: "asc" },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        level: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return roles;
+  };
+
   static async getAllRolesByType(options) {
     const { currentUserRoleLevel, type } = options;
 
@@ -10,8 +41,10 @@ class RoleServices {
       throw new Error("Type parameter is required");
     }
 
-    if (!["employe", "role"].includes(type)) {
-      throw new Error("Invalid type parameter. Must be 'employe' or 'role'");
+    if (!["employee", "business"].includes(type)) {
+      throw new Error(
+        "Invalid type parameter. Must be 'employee' or 'business'"
+      );
     }
 
     const where = {
@@ -140,14 +173,13 @@ class RoleServices {
   }
 
   static async createRole(payload) {
-    let { name, description, level, type = "employe", createdBy } = payload;
+    let { name, description, type = "employee", createdBy } = payload;
 
-    // TYPE VALIDATION: Only allow creating 'employe' type roles
-    if (type !== "employe") {
-      throw ApiError.badRequest("Only 'employe' type roles can be created");
+    // TYPE VALIDATION: Only allow creating 'employee' type roles
+    if (type !== "employee") {
+      throw ApiError.badRequest("Only 'employee' type roles can be created");
     }
 
-    // Check if role with same name exists
     const existingByName = await Prisma.role.findUnique({
       where: { name },
     });
@@ -155,26 +187,16 @@ class RoleServices {
       throw ApiError.conflict("Role with this name already exists");
     }
 
-    // Check if level is provided and unique
-    if (level !== undefined) {
-      const existingByLevel = await Prisma.role.findUnique({
-        where: { level },
-      });
-      if (existingByLevel) {
-        throw ApiError.conflict("Role with this level already exists");
-      }
-    } else {
-      // Auto-determine level if not provided
-      const maxLevelRole = await Prisma.role.findFirst({
-        orderBy: { level: "desc" },
-      });
-      level = maxLevelRole ? maxLevelRole.level + 1 : 1;
-    }
+    // Auto-determine level for employee roles - start from level 5 since 0-4 are taken by business roles
+    const maxLevelRole = await Prisma.role.findFirst({
+      orderBy: { level: "desc" },
+    });
+    const level = maxLevelRole ? maxLevelRole.level + 1 : 5;
 
     const role = await Prisma.role.create({
       data: {
         name,
-        type: "employe", // Force type to be 'employe'
+        type: "employee", // Force type to be 'employee'
         level,
         description: description ?? null,
         createdBy,
@@ -236,9 +258,9 @@ class RoleServices {
     });
     if (!existingRole) return null;
 
-    // TYPE CHECK: Only allow updating 'employe' type roles
-    if (existingRole.type !== "employe") {
-      throw ApiError.forbidden("Cannot update non-employe type roles");
+    // TYPE CHECK: Only allow updating 'employee' type roles
+    if (existingRole.type !== "employee") {
+      throw ApiError.forbidden("Cannot update non-employee type roles");
     }
 
     // Check for name conflict with other roles
@@ -261,16 +283,16 @@ class RoleServices {
       }
     }
 
-    // Prevent changing type to 'role'
-    if (type && type !== "employe") {
-      throw ApiError.badRequest("Cannot change role type to non-employe");
+    // Prevent changing type to 'business'
+    if (type && type !== "employee") {
+      throw ApiError.badRequest("Cannot change role type to non-employee");
     }
 
     const updateData = {};
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (level !== undefined) updateData.level = level;
-    updateData.type = "employe"; // Force type to remain 'employe'
+    updateData.type = "employee"; // Force type to remain 'employee'
 
     const role = await Prisma.role.update({
       where: { id },
@@ -314,9 +336,9 @@ class RoleServices {
 
     if (!existingRole) return false;
 
-    // TYPE CHECK: Only allow deleting 'employe' type roles
-    if (existingRole.type !== "employe") {
-      throw ApiError.forbidden("Cannot delete non-employe type roles");
+    // TYPE CHECK: Only allow deleting 'employee' type roles
+    if (existingRole.type !== "employee") {
+      throw ApiError.forbidden("Cannot delete non-employee type roles");
     }
 
     // Check if role is assigned to any users
@@ -348,6 +370,49 @@ class RoleServices {
   // Additional method to check if user can manage this role
   static async canUserManageRole(userRoleLevel, targetRoleLevel) {
     return userRoleLevel < targetRoleLevel;
+  }
+
+  // Get business roles for user registration
+  static async getBusinessRolesForUser(currentUserRoleLevel) {
+    const where = {
+      type: "business",
+    };
+
+    // Add role level filter if currentUserRoleLevel is provided
+    if (typeof currentUserRoleLevel === "number") {
+      where.level = { gt: currentUserRoleLevel };
+    }
+
+    const roles = await Prisma.role.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        description: true,
+      },
+      orderBy: { level: "asc" },
+    });
+
+    return roles;
+  }
+
+  // Get employee roles for employee registration
+  static async getEmployeeRolesForAdmin() {
+    const roles = await Prisma.role.findMany({
+      where: {
+        type: "employee",
+      },
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        description: true,
+      },
+      orderBy: { level: "asc" },
+    });
+
+    return roles;
   }
 }
 

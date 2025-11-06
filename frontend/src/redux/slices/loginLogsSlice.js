@@ -88,9 +88,6 @@ export const getLoginLogs =
         }
       });
 
-      console.log("=== FINAL REQUEST BODY ===");
-      console.log(requestBody);
-
       const { data } = await axios.post("/login-logs", requestBody, {
         headers: {
           "Content-Type": "application/json",

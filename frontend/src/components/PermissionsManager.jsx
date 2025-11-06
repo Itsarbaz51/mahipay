@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import AddPermission from "./forms/AddPermission";
 import { useDispatch, useSelector } from "react-redux";
 import { getAllRolesByType } from "../redux/slices/roleSlice";
-import { getAllRoleTypeUsersByParentId } from "../redux/slices/userSlice";
+import { getAllBusinessUsersByParentId } from "../redux/slices/userSlice";
 import {
   updatePermissionInList,
   removePermissionFromList,
@@ -30,7 +30,7 @@ const RolePermissionsManager = () => {
 
   // Load initial data
   useEffect(() => {
-    dispatch(getAllRolesByType("role"));
+    dispatch(getAllRolesByType("business"));
     loadUsers(); // Load initial users
   }, [dispatch]);
 
@@ -54,7 +54,7 @@ const RolePermissionsManager = () => {
           params.refresh = true;
         }
 
-        await dispatch(getAllRoleTypeUsersByParentId(params));
+        await dispatch(getAllBusinessUsersByParentId());
       } catch (error) {
         console.error("Failed to load users:", error);
       }

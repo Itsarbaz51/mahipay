@@ -139,7 +139,7 @@ async function main() {
       username: "admin",
       firstName: "Admin",
       lastName: "User",
-      profileImage: "https://via.placeholder.com/150",
+      profileImage: "",
       email: "admin1@gmail.com",
       phoneNumber: "9999999991",
       password: adminPassword,

@@ -7,98 +7,100 @@ import idempotencyMiddleware from "../middlewares/idempotency.middleware.js";
 
 const walletRoutes = Router();
 
-// Credit wallet with idempotency
+// Credit wallet with idempotency (ADMIN only)
 walletRoutes.post(
   "/credit",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.walletCreditSchema),
   WalletController.creditWallet
 );
 
-// Debit wallet with idempotency
+// Debit wallet with idempotency (ADMIN only)
 walletRoutes.post(
   "/debit",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.walletDebitSchema),
   WalletController.debitWallet
 );
 
-// Hold amount
+// Hold amount (Business users only)
 walletRoutes.post(
   "/hold",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.holdAmountSchema),
   WalletController.holdAmount
 );
 
-// Release hold amount
+// Release hold amount (Business users only)
 walletRoutes.post(
   "/release-hold",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.releaseHoldAmountSchema),
   WalletController.releaseHoldAmount
 );
 
-// Get wallet by user ID
+// Get wallet by user ID (Business users only)
 walletRoutes.get(
   "/user/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
-    "RETAIlER",
+    "RETAILER",
   ]),
   validateRequest(WallletValidationSchemas.getWalletSchema),
   WalletController.getWallet
 );
 
-// Get all user wallets
+// Get all user wallets (Business users only)
 walletRoutes.get(
   "/user/:userId/all",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
-    "RETAIlER",
+    "RETAILER",
   ]),
   WalletController.getUserWallets
 );
 
-// Get wallet balance
+// Get wallet balance (Business users only)
 walletRoutes.get(
   "/balance/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
-    "RETAIlER",
+    "RETAILER",
   ]),
   validateRequest(WallletValidationSchemas.getWalletBalanceSchema),
   WalletController.getWalletBalance
 );
 
-// Get wallet transactions
+// Get wallet transactions (Business users only)
 walletRoutes.get(
   "/transactions/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
-    "RETAIlER",
+    "RETAILER",
   ]),
   validateRequest(WallletValidationSchemas.walletTransactionsSchema),
   WalletController.getWalletTransactions

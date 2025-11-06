@@ -14,7 +14,7 @@ class RoleValidationSchemas {
         }),
       description: z.string().trim().max(2000).nullable().optional(),
       level: z.number().int().positive().optional(),
-      type: z.enum(["employe", "role"]).default("employe"), // Type validation add kiya
+      type: z.enum(["employee"]).default("employee"), // Only allow employee type
     });
   }
 
@@ -32,7 +32,7 @@ class RoleValidationSchemas {
         .optional(),
       description: z.string().trim().max(2000).nullable().optional(),
       level: z.number().int().positive().optional(),
-      type: z.enum(["employe", "role"]).optional(), // Type validation add kiya
+      type: z.enum(["employee"]).optional(), // Only allow employee type
     });
   }
 }

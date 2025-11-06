@@ -5,6 +5,7 @@ import UserServices from "../services/user.service.js";
 import Helper from "../utils/helper.js";
 
 class UserController {
+  // BUSINESS USER REGISTRATION
   static register = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
@@ -24,7 +25,7 @@ class UserController {
     });
 
     if (!user || !accessToken) {
-      throw ApiError.internal("User creation failed!");
+      throw ApiError.internal("Business user creation failed!");
     }
 
     const safeUser = Helper.serializeUser(user);
@@ -34,12 +35,13 @@ class UserController {
       .json(
         ApiResponse.success(
           { user: safeUser, accessToken },
-          "User created successfully",
+          "Business user created successfully",
           201
         )
       );
   });
 
+  // BUSINESS USER PROFILE UPDATE
   static updateProfile = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const currentUserId = req.user.id;
@@ -62,12 +64,13 @@ class UserController {
       .json(
         ApiResponse.success(
           { user: safeUser },
-          "Profile updated successfully",
+          "Business profile updated successfully",
           200
         )
       );
   });
 
+  // BUSINESS USER PROFILE IMAGE UPDATE
   static updateProfileImage = asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
@@ -88,30 +91,29 @@ class UserController {
       .json(
         ApiResponse.success(
           { user: safeUser },
-          "Profile image updated successfully",
+          "Business profile image updated successfully",
           200
         )
       );
   });
 
+  // GET BUSINESS USER BY ID
   static getUserById = asyncHandler(async (req, res) => {
     const userId = req.params.id;
-    const currentUser = req.user; // Current authenticated user from middleware
+    const currentUser = req.user;
 
     if (!userId) {
       throw ApiError.badRequest("userId required");
     }
 
-    // Pass current user to the service function
     const user = await UserServices.getUserById(userId, currentUser);
-
-    const { password, transactionPin, refreshToken, ...safeUser } = user;
 
     return res
       .status(200)
-      .json(ApiResponse.success({ user: safeUser }, "User fetched", 200));
+      .json(ApiResponse.success({ user }, "Business user fetched", 200));
   });
 
+  // GET CURRENT BUSINESS USER
   static getCurrentUser = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
 
@@ -122,20 +124,25 @@ class UserController {
       const safeUser = await UserServices.getUserById(userId);
 
       if (!safeUser) {
-        throw ApiError.notFound("User not found");
+        throw ApiError.notFound("Business user not found");
       }
 
       return res
         .status(200)
         .json(
-          ApiResponse.success({ user: safeUser }, "Current user fetched", 200)
+          ApiResponse.success(
+            { user: safeUser },
+            "Current business user fetched",
+            200
+          )
         );
     } catch (error) {
-      console.error("Error fetching current user:", error);
-      throw ApiError.internal("Failed to fetch user data");
+      console.error("Error fetching current business user:", error);
+      throw ApiError.internal("Failed to fetch business user data");
     }
   });
 
+  // GET ALL BUSINESS USERS BY ROLE
   static getAllUsersByRole = asyncHandler(async (req, res) => {
     const { roleId } = req.params;
 
@@ -147,9 +154,16 @@ class UserController {
 
     return res
       .status(200)
-      .json(ApiResponse.success({ users }, "Users fetched successfully", 200));
+      .json(
+        ApiResponse.success(
+          { users },
+          "Business users fetched successfully",
+          200
+        )
+      );
   });
 
+  // GET ALL BUSINESS USERS BY PARENT ID
   static getAllRoleTypeUsersByParentId = asyncHandler(async (req, res) => {
     const parentId = req.user?.id;
 
@@ -169,7 +183,6 @@ class UserController {
     const parsedLimit = parseInt(limit, 10) || 10;
     const parsedSort = sort.toLowerCase() === "asc" ? "asc" : "desc";
 
-    // Accept ALL but validate against real enum values
     const allowedStatuses = ["ALL", "ACTIVE", "IN_ACTIVE", "DELETED"];
     const upperStatus = (status || "ALL").toUpperCase();
 
@@ -197,65 +210,13 @@ class UserController {
           limit: parsedLimit,
           totalPages: Math.ceil(total / parsedLimit),
         },
-        "Role type users fetched successfully",
+        "Business users fetched successfully",
         200
       )
     );
   });
 
-  static getAllEmployeUsersByParentId = asyncHandler(async (req, res) => {
-    const parentId = req.user?.id;
-
-    if (!parentId) {
-      throw ApiError.unauthorized("User not authenticated");
-    }
-
-    const {
-      page = "1",
-      limit = "10",
-      sort = "desc",
-      status = "ALL",
-      search = "",
-    } = req.query;
-
-    const parsedPage = parseInt(page, 10) || 1;
-    const parsedLimit = parseInt(limit, 10) || 10;
-    const parsedSort = sort.toLowerCase() === "asc" ? "asc" : "desc";
-
-    // Accept ALL but validate against real enum values
-    const allowedStatuses = ["ALL", "ACTIVE", "IN_ACTIVE", "DELETED"];
-    const upperStatus = (status || "ALL").toUpperCase();
-
-    const parsedStatus = allowedStatuses.includes(upperStatus)
-      ? upperStatus
-      : "ALL";
-
-    const { users, total } = await UserServices.getAllEmployeUsersByParentId(
-      parentId,
-      {
-        page: parsedPage,
-        limit: parsedLimit,
-        sort: parsedSort,
-        status: parsedStatus,
-        search: search,
-      }
-    );
-
-    return res.status(200).json(
-      ApiResponse.success(
-        {
-          users,
-          total,
-          page: parsedPage,
-          limit: parsedLimit,
-          totalPages: Math.ceil(total / parsedLimit),
-        },
-        "Employe users fetched successfully",
-        200
-      )
-    );
-  });
-
+  // GET ALL BUSINESS USERS BY CHILDREN ID
   static getAllUsersByChildrenId = asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
@@ -270,12 +231,13 @@ class UserController {
       .json(
         ApiResponse.success(
           { users },
-          "Children users fetched successfully",
+          "Business children users fetched successfully",
           200
         )
       );
   });
 
+  // GET BUSINESS USERS COUNT BY PARENT ID
   static getAllUsersCountByParentId = asyncHandler(async (req, res) => {
     const { parentId } = req.params;
 
@@ -288,10 +250,15 @@ class UserController {
     return res
       .status(200)
       .json(
-        ApiResponse.success(result, "Users count fetched successfully", 200)
+        ApiResponse.success(
+          result,
+          "Business users count fetched successfully",
+          200
+        )
       );
   });
 
+  // GET BUSINESS USERS COUNT BY CHILDREN ID
   static getAllUsersCountByChildrenId = asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
@@ -304,10 +271,15 @@ class UserController {
     return res
       .status(200)
       .json(
-        ApiResponse.success(result, "Children count fetched successfully", 200)
+        ApiResponse.success(
+          result,
+          "Business children count fetched successfully",
+          200
+        )
       );
   });
 
+  // DEACTIVATE BUSINESS USER
   static deactivateUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const deactivatedBy = req.user?.id;
@@ -318,7 +290,7 @@ class UserController {
     }
 
     if (!userId) {
-      throw ApiError.badRequest("User ID is required");
+      throw ApiError.badRequest("Business User ID is required");
     }
 
     try {
@@ -335,7 +307,7 @@ class UserController {
         .json(
           ApiResponse.success(
             { user: safeUser },
-            "User deactivated successfully",
+            "Business user deactivated successfully",
             200
           )
         );
@@ -345,6 +317,7 @@ class UserController {
     }
   });
 
+  // REACTIVATE BUSINESS USER
   static reactivateUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const reactivatedBy = req.user?.id;
@@ -355,7 +328,7 @@ class UserController {
     }
 
     if (!userId) {
-      throw ApiError.badRequest("User ID is required");
+      throw ApiError.badRequest("Business User ID is required");
     }
 
     try {
@@ -372,7 +345,7 @@ class UserController {
         .json(
           ApiResponse.success(
             { user: safeUser },
-            "User reactivated successfully",
+            "Business user reactivated successfully",
             200
           )
         );
@@ -382,6 +355,7 @@ class UserController {
     }
   });
 
+  // DELETE BUSINESS USER
   static deleteUser = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     const deletedBy = req.user?.id;
@@ -392,7 +366,7 @@ class UserController {
     }
 
     if (!userId) {
-      throw ApiError.badRequest("User ID is required");
+      throw ApiError.badRequest("Business User ID is required");
     }
 
     try {
@@ -405,12 +379,12 @@ class UserController {
         .json(
           ApiResponse.success(
             { user: safeUser },
-            "User deleted successfully",
+            "Business user deleted successfully",
             200
           )
         );
     } catch (error) {
-      console.error("Controller error in deleteUser:".error);
+      console.error("Controller error in deleteUser:", error);
       throw error;
     }
   });

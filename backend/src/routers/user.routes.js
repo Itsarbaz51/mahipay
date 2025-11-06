@@ -7,31 +7,19 @@ import UserValidationSchemas from "../validations/userValidation.schemas.js";
 
 const userRoutes = Router();
 
-// ✅ SPECIFIC ROUTES FIRST (before parameterized routes)
-
-userRoutes.get(
-  "/employe",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
-  UserController.getAllEmployeUsersByParentId
-);
-
+// ✅ GET CURRENT BUSINESS USER
 userRoutes.get(
   "/me",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-  ]),
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   UserController.getCurrentUser
 );
 
+// ✅ GET BUSINESS USERS BY ROLE
 userRoutes.get(
   "/role/:roleId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -40,10 +28,11 @@ userRoutes.get(
   UserController.getAllUsersByRole
 );
 
+// ✅ GET BUSINESS USERS BY CHILDREN ID
 userRoutes.get(
   "/children/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -52,10 +41,11 @@ userRoutes.get(
   UserController.getAllUsersByChildrenId
 );
 
+// ✅ GET BUSINESS USERS COUNT BY PARENT ID
 userRoutes.get(
   "/count/parent/:parentId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -64,10 +54,11 @@ userRoutes.get(
   UserController.getAllUsersCountByParentId
 );
 
+// ✅ GET BUSINESS USERS COUNT BY CHILDREN ID
 userRoutes.get(
   "/count/children/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -76,12 +67,11 @@ userRoutes.get(
   UserController.getAllUsersCountByChildrenId
 );
 
-// ✅ PARAMETERIZED ROUTES LAST
-
+// ✅ GET BUSINESS USER BY ID
 userRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -90,12 +80,12 @@ userRoutes.get(
   UserController.getUserById
 );
 
-// Other routes remain the same...
+// ✅ REGISTER BUSINESS USER
 userRoutes.post(
   "/register",
   upload.single("profileImage"),
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -105,10 +95,11 @@ userRoutes.post(
   UserController.register
 );
 
+// ✅ UPDATE BUSINESS USER PROFILE
 userRoutes.put(
   "/:userId/profile",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -118,10 +109,11 @@ userRoutes.put(
   UserController.updateProfile
 );
 
+// ✅ UPDATE BUSINESS USER PROFILE IMAGE
 userRoutes.put(
   "/:userId/profile-image",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -132,10 +124,11 @@ userRoutes.put(
   UserController.updateProfileImage
 );
 
+// ✅ GET ALL BUSINESS USERS BY PARENT ID
 userRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
+  AuthMiddleware.authorizeBusinessRoles([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -144,26 +137,29 @@ userRoutes.get(
   UserController.getAllRoleTypeUsersByParentId
 );
 
+// ✅ DEACTIVATE BUSINESS USER
 userRoutes.patch(
   "/:userId/deactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(UserValidationSchemas.deactivateUser),
   UserController.deactivateUser
 );
 
+// ✅ REACTIVATE BUSINESS USER
 userRoutes.patch(
   "/:userId/reactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(UserValidationSchemas.reactivateUser),
   UserController.reactivateUser
 );
 
+// ✅ DELETE BUSINESS USER
 userRoutes.delete(
   "/:userId/delete",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(UserValidationSchemas.deleteUser),
   UserController.deleteUser
 );

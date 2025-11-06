@@ -4,17 +4,36 @@ import RoleServices from "../services/role.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 class RoleController {
+  static getAllRoles = asyncHandler(async (req, res) => {
+    const userRoleLevel = req.user?.roleLevel;
+
+    const options = {
+      ...(typeof userRoleLevel === "number" && {
+        currentUserRoleLevel: userRoleLevel,
+      }),
+      excludeAdmin: true, // Exclude ADMIN role
+    };
+
+    const roles = await RoleServices.getAllRoles(options);
+
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(roles, "All non-admin roles fetched successfully")
+      );
+  });
+
   static getAllRolesByType = asyncHandler(async (req, res) => {
     const userRoleLevel = req.user?.roleLevel;
     const { type } = req.params;
 
     // Validate type parameter
-    if (!type || !["employe", "role"].includes(type)) {
+    if (!type || !["employee", "business"].includes(type)) {
       return res
         .status(400)
         .json(
-          ApiResponse.error(
-            "Invalid type parameter. Must be 'employe' or 'role'",
+          ApiError.badRequest(
+            "Invalid type parameter. Must be 'employee' or 'business'",
             400
           )
         );
@@ -30,9 +49,9 @@ class RoleController {
     const roles = await RoleServices.getAllRolesByType(options);
 
     const message =
-      type === "employe"
+      type === "employee"
         ? "Employee roles fetched successfully"
-        : "System roles fetched successfully";
+        : "Business roles fetched successfully";
 
     return res.status(200).json(ApiResponse.success(roles, message, 200));
   });
@@ -74,11 +93,11 @@ class RoleController {
     }
 
     // Check if user can create roles with the requested level
-    const { level, type = "employe" } = req.body;
+    const { level, type = "employee" } = req.body;
 
-    // TYPE VALIDATION: Only allow creating 'employe' type roles
-    if (type !== "employe") {
-      throw ApiError.badRequest("Only 'employe' type roles can be created");
+    // TYPE VALIDATION: Only allow creating 'employee' type roles
+    if (type !== "employee") {
+      throw ApiError.badRequest("Only 'employee' type roles can be created");
     }
 
     if (level !== undefined && level <= userRoleLevel) {
@@ -94,7 +113,7 @@ class RoleController {
     return res
       .status(201)
       .json(
-        ApiResponse.success(role, "Employe role created successfully", 201)
+        ApiResponse.success(role, "Employee role created successfully", 201)
       );
   });
 
@@ -121,9 +140,9 @@ class RoleController {
       throw ApiError.notFound("Role not found");
     }
 
-    // TYPE CHECK: Only allow updating 'employe' type roles
-    if (existingRole.type !== "employe") {
-      throw ApiError.forbidden("Cannot update non-employe type roles");
+    // TYPE CHECK: Only allow updating 'employee' type roles
+    if (existingRole.type !== "employee") {
+      throw ApiError.forbidden("Cannot update non-employee type roles");
     }
 
     // Check if user can update this role
@@ -134,9 +153,9 @@ class RoleController {
     // Check if trying to update level to invalid value
     const { level, type } = req.body;
 
-    // Prevent changing type to 'role'
-    if (type && type !== "employe") {
-      throw ApiError.badRequest("Cannot change role type to non-employe");
+    // Prevent changing type to 'business'
+    if (type && type !== "employee") {
+      throw ApiError.badRequest("Cannot change role type to non-employee");
     }
 
     if (level !== undefined && level <= userRoleLevel) {
@@ -148,14 +167,14 @@ class RoleController {
     const role = await RoleServices.updateRole(roleId, {
       ...req.body,
       updatedBy,
-      // Ensure type remains 'employe'
-      type: "employe",
+      // Ensure type remains 'employee'
+      type: "employee",
     });
 
     return res
       .status(200)
       .json(
-        ApiResponse.success(role, "Employe role updated successfully", 200)
+        ApiResponse.success(role, "Employee role updated successfully", 200)
       );
   });
 
@@ -177,9 +196,9 @@ class RoleController {
       throw ApiError.notFound("Role not found");
     }
 
-    // TYPE CHECK: Only allow deleting 'employe' type roles
-    if (existingRole.type !== "employe") {
-      throw ApiError.forbidden("Cannot delete non-employe type roles");
+    // TYPE CHECK: Only allow deleting 'employee' type roles
+    if (existingRole.type !== "employee") {
+      throw ApiError.forbidden("Cannot delete non-employee type roles");
     }
 
     // Check if user can delete this role
@@ -196,7 +215,31 @@ class RoleController {
     return res
       .status(200)
       .json(
-        ApiResponse.success(null, "Employe role deleted successfully", 200)
+        ApiResponse.success(null, "Employee role deleted successfully", 200)
+      );
+  });
+
+  // Get business roles for user registration
+  static getBusinessRoles = asyncHandler(async (req, res) => {
+    const userRoleLevel = req.user?.roleLevel;
+
+    const roles = await RoleServices.getBusinessRolesForUser(userRoleLevel);
+
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(roles, "Business roles fetched successfully", 200)
+      );
+  });
+
+  // Get employee roles for employee registration
+  static getEmployeeRoles = asyncHandler(async (req, res) => {
+    const roles = await RoleServices.getEmployeeRolesForAdmin();
+
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(roles, "Employee roles fetched successfully", 200)
       );
   });
 }

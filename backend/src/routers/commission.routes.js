@@ -10,41 +10,39 @@ import {
 const commissionRoutes = Router();
 
 // Commission Setting Routes
+
+// Get commission settings by role or user (ADMIN only)
 commissionRoutes.get(
   "/setting",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   CommissionSettingController.getByRoleOrUser
 );
 
+// Get commission settings created by current user (Business users)
 commissionRoutes.get(
   "/setting/created-by-me",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "RETAIlER",
-  ]),
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   CommissionSettingController.getByCreatedBy
 );
 
+// Create or update commission setting (ADMIN only)
 commissionRoutes.post(
   "/setting",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(
     CommissionValidationSchemas.createOrUpdateCommissionSettingSchema
   ),
   CommissionSettingController.createOrUpdate
 );
 
-// Commission Earning Routes
+// Commission Earning Routes (ADMIN only)
 commissionRoutes.post(
   "/earn",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(CommissionValidationSchemas.createCommissionEarningSchema),
   CommissionEarningController.create
 );
@@ -52,7 +50,7 @@ commissionRoutes.post(
 commissionRoutes.get(
   "/earnings",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   CommissionEarningController.getAll
 );
 

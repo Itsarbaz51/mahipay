@@ -1,3 +1,4 @@
+// EmployeeTable.js
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Search,
@@ -21,15 +22,19 @@ import { toast } from "react-toastify";
 import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  getAllEmployeUsersByParentId,
-  getUserById,
   setCurrentUser,
   clearUserError,
   clearUserSuccess,
-  deactivateUser,
-  reactivateUser,
-  deleteUser,
 } from "../../redux/slices/userSlice";
+
+// ✅ FIXED: Import employee-specific actions
+import {
+  getEmployeeById,
+  getAllEmployeesByParentId,
+  deactivateEmployee,
+  reactivateEmployee,
+  deleteEmployee,
+} from "../../redux/slices/employeeSlice";
 
 import ButtonField from "../ui/ButtonField";
 import ConfirmCard from "../ui/ConfirmCard";
@@ -39,7 +44,6 @@ import ActionsMenu from "../ui/ActionsMenu";
 import UserProfileView from "../../pages/view/UserProfileView";
 import EditCredentialsModal from "../forms/EditCredentialsModal";
 import EditProfileImageModal from "../forms/EditProfileImageModal";
-import AddPermission from "../forms/AddPermission";
 import {
   getPermissionById,
   upsertPermission,
@@ -47,6 +51,7 @@ import {
 import { getServicesActive } from "../../redux/slices/serviceSlice";
 import { login } from "../../redux/slices/authSlice";
 import PageHeader from "../ui/PageHeader";
+import AddEmployeePermissions from "../forms/AddEmployeePermissions";
 
 const EmployeeTable = () => {
   const [search, setSearch] = useState("");
@@ -59,7 +64,6 @@ const EmployeeTable = () => {
   const [previewImage, setPreviewImage] = useState(null);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
-  const [showEditPin, setShowEditPin] = useState(false);
   const [showPasswords, setShowPasswords] = useState({});
   const [showPins, setShowPins] = useState({});
 
@@ -73,8 +77,8 @@ const EmployeeTable = () => {
   const [existingPermissions, setExistingPermissions] = useState([]);
   const [permissionMode, setPermissionMode] = useState("add");
 
-  // Users state
-  const usersState = useSelector((state) => state.users || {});
+  // ✅ FIXED: Use employee state instead of user state
+  const employeesState = useSelector((state) => state.employees || {});
 
   // ✅ CURRENT LOGGED-IN USER ka data get karo
   const authState = useSelector((state) => state.auth || {});
@@ -82,22 +86,22 @@ const EmployeeTable = () => {
   const currentUserRole = currentLoggedInUser.role?.name || "";
 
   const {
-    users = [],
+    employees = [],
     isLoading = false,
-    currentUser: viewedUser = null,
+    currentEmployee: viewedEmployee = null,
     pagination = {
       page: 1,
       limit: 10,
       total: 0,
       totalPages: 0,
     },
-    error: userError,
-    success: userSuccess,
-  } = usersState;
+    error: employeeError,
+    success: employeeSuccess,
+  } = employeesState;
 
   const currentPage = pagination.page || 1;
   const totalPages = pagination.totalPages || 0;
-  const totalUsers = pagination.total || 0;
+  const totalEmployees = pagination.total || 0;
   const limit = pagination.limit || 10;
 
   const services =
@@ -106,9 +110,9 @@ const EmployeeTable = () => {
   // ✅ Check if current user is ADMIN
   const isAdminUser = currentUserRole === "ADMIN";
 
-  // ✅ FIXED: Simplified loadUsers function without currentPage dependency
-  const loadUsers = useCallback(
-    async (page = currentPage, searchTerm = search, forceRefresh = false) => {
+  // ✅ FIXED: Use employee-specific load function
+  const loadEmployees = useCallback(
+    async (page = 1, searchTerm = "", forceRefresh = false) => {
       try {
         const params = {
           page,
@@ -125,10 +129,10 @@ const EmployeeTable = () => {
           params.timestamp = Date.now();
         }
 
-        await dispatch(getAllEmployeUsersByParentId(params));
+        await dispatch(getAllEmployeesByParentId(params));
       } catch (error) {
-        console.error("Failed to load users:", error);
-        toast.error(error.message || "Failed to load users");
+        console.error("Failed to load employees:", error);
+        toast.error(error.message || "Failed to load employees");
       }
     },
     [dispatch, limit]
@@ -138,27 +142,27 @@ const EmployeeTable = () => {
   const handlePageChange = useCallback(
     (page) => {
       if (page >= 1 && page <= totalPages) {
-        loadUsers(page, search);
+        loadEmployees(page, search);
       }
     },
-    [totalPages, loadUsers, search]
+    [totalPages, loadEmployees, search]
   );
 
   // ✅ FIXED: Manual refresh
   const handleManualRefresh = useCallback(() => {
-    loadUsers(currentPage, search, true);
+    loadEmployees(1, search, true);
     toast.info("Refreshing data...");
-  }, [loadUsers, currentPage, search]);
+  }, [loadEmployees, search]);
 
   // Toast handling
   useEffect(() => {
-    if (userError) {
-      toast.error(userError);
-      dispatch(clearUserError());
+    if (employeeError) {
+      toast.error(employeeError);
+      dispatch(clearUserError()); // Using user error clear for now
     }
 
-    if (userSuccess) {
-      const lowerSuccess = userSuccess.toLowerCase();
+    if (employeeSuccess) {
+      const lowerSuccess = employeeSuccess.toLowerCase();
       const isGenericSuccess = ![
         "registered",
         "updated",
@@ -169,21 +173,21 @@ const EmployeeTable = () => {
       ].some((word) => lowerSuccess.includes(word));
 
       if (isGenericSuccess) {
-        toast.success(userSuccess);
+        toast.success(employeeSuccess);
       }
-      dispatch(clearUserSuccess());
+      dispatch(clearUserSuccess()); // Using user success clear for now
     }
-  }, [userError, userSuccess, dispatch]);
+  }, [employeeError, employeeSuccess, dispatch]);
 
   // ✅ FIXED: Initial load only once
   useEffect(() => {
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
-      loadUsers();
+      loadEmployees();
     }
-  }, [loadUsers]);
+  }, [loadEmployees]);
 
-  // ✅ FIXED: Search with debouncing - directly dispatch instead of using loadUsers
+  // ✅ FIXED: Search with debouncing
   useEffect(() => {
     if (!initialLoadRef.current) return;
 
@@ -192,17 +196,7 @@ const EmployeeTable = () => {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      // Direct dispatch for search to avoid dependency issues
-      dispatch(
-        getAllEmployeUsersByParentId({
-          page: 1, // Reset to page 1 when searching
-          limit,
-          sort: "desc",
-          status: "ALL",
-          search,
-          timestamp: Date.now(),
-        })
-      );
+      loadEmployees(1, search);
     }, 500);
 
     return () => {
@@ -210,7 +204,7 @@ const EmployeeTable = () => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [search, dispatch, limit]);
+  }, [search, loadEmployees]);
 
   // Permission effect
   useEffect(() => {
@@ -360,6 +354,7 @@ const EmployeeTable = () => {
     }
   };
 
+  // ✅ FIXED: Use employee-specific actions
   const confirmAction = async (reason) => {
     if (actionType && selectedUser) {
       try {
@@ -367,36 +362,36 @@ const EmployeeTable = () => {
 
         if (actionType === "Deactivate") {
           await dispatch(
-            deactivateUser({
-              userId: selectedUser.id,
+            deactivateEmployee({
+              employeeId: selectedUser.id,
               reason: finalReason,
             })
           );
         } else if (actionType === "Activate") {
           await dispatch(
-            reactivateUser({
-              userId: selectedUser.id,
+            reactivateEmployee({
+              employeeId: selectedUser.id,
               reason: finalReason,
             })
           );
         } else if (actionType === "Delete") {
           await dispatch(
-            deleteUser({
-              userId: selectedUser.id,
+            deleteEmployee({
+              employeeId: selectedUser.id,
               reason: finalReason,
             })
           );
         }
 
-        toast.success(`User ${actionType.toLowerCase()}d successfully!`);
+        toast.success(`Employee ${actionType.toLowerCase()}d successfully!`);
 
         setTimeout(() => {
           handleManualRefresh();
         }, 500);
       } catch (error) {
-        console.error(`Failed to ${actionType.toLowerCase()} user:`, error);
+        console.error(`Failed to ${actionType.toLowerCase()} employee:`, error);
         toast.error(
-          error.message || `Failed to ${actionType.toLowerCase()} user`
+          error.message || `Failed to ${actionType.toLowerCase()} employee`
         );
       }
     }
@@ -408,7 +403,7 @@ const EmployeeTable = () => {
   // View user
   const handleViewUser = async (user) => {
     try {
-      await dispatch(getUserById(user.id));
+      await dispatch(getEmployeeById(user.id));
       setShowViewProfile(true);
       setOpenMenuId(null);
     } catch (error) {
@@ -430,7 +425,9 @@ const EmployeeTable = () => {
     setSelectedUser(null);
     handleManualRefresh();
     toast.success(
-      selectedUser ? "User updated successfully!" : "User added successfully!"
+      selectedUser
+        ? "Employee updated successfully!"
+        : "Employee added successfully!"
     );
   };
 
@@ -443,20 +440,19 @@ const EmployeeTable = () => {
 
   const handleCredentialsSuccess = () => {
     setShowEditPassword(false);
-    setShowEditPin(false);
     setSelectedUser(null);
     handleManualRefresh();
     toast.success("Credentials updated successfully!");
   };
 
-  // Filter users safely
-  const filteredUsers = Array.isArray(users)
-    ? users.filter(
-        (user) =>
-          user.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-          user.lastName?.toLowerCase().includes(search.toLowerCase()) ||
-          user.email?.toLowerCase().includes(search.toLowerCase()) ||
-          user.phoneNumber?.toLowerCase().includes(search.toLowerCase())
+  // Filter employees safely
+  const filteredEmployees = Array.isArray(employees)
+    ? employees.filter(
+        (employee) =>
+          employee.firstName?.toLowerCase().includes(search.toLowerCase()) ||
+          employee.lastName?.toLowerCase().includes(search.toLowerCase()) ||
+          employee.email?.toLowerCase().includes(search.toLowerCase()) ||
+          employee.phoneNumber?.toLowerCase().includes(search.toLowerCase())
       )
     : [];
 
@@ -590,18 +586,11 @@ const EmployeeTable = () => {
                 ROLE
               </th>
               {currentUserRole === "ADMIN" && (
-                <>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    PASSWORD
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    TRANSACTION PIN
-                  </th>
-                </>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  PASSWORD
+                </th>
               )}
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                WALLET
-              </th>
+
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 STATUS
               </th>
@@ -618,7 +607,7 @@ const EmployeeTable = () => {
                   <EmptyState type="loading" />
                 </td>
               </tr>
-            ) : filteredUsers.length === 0 ? (
+            ) : filteredEmployees.length === 0 ? (
               <tr>
                 <td colSpan={currentUserRole === "ADMIN" ? 9 : 7}>
                   <EmptyState
@@ -628,8 +617,11 @@ const EmployeeTable = () => {
                 </td>
               </tr>
             ) : (
-              filteredUsers.map((user, index) => (
-                <tr key={user.id} className="hover:bg-blue-50 transition-all">
+              filteredEmployees.map((employee, index) => (
+                <tr
+                  key={employee.id}
+                  className="hover:bg-blue-50 transition-all"
+                >
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {(currentPage - 1) * limit + index + 1}
                   </td>
@@ -638,35 +630,35 @@ const EmployeeTable = () => {
                     <div className="flex items-center">
                       <div
                         className={`h-10 w-10 rounded-full ${getAvatarColor(
-                          user.firstName
+                          employee.firstName
                         )} flex items-center justify-center text-white font-medium text-sm cursor-pointer hover:scale-105 transition-transform`}
                         onClick={() =>
-                          user.profileImage &&
-                          setPreviewImage(user.profileImage)
+                          employee.profileImage &&
+                          setPreviewImage(employee.profileImage)
                         }
                       >
-                        {user.profileImage ? (
+                        {employee.profileImage ? (
                           <img
-                            src={user.profileImage}
-                            alt={user.firstName || "User"}
+                            src={employee.profileImage}
+                            alt={employee.firstName || "Employee"}
                             className="w-full h-full object-cover rounded-full"
                           />
                         ) : (
-                          getInitials(user.firstName, user.lastName)
+                          getInitials(employee.firstName, employee.lastName)
                         )}
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {`${user.firstName || ""} ${
-                            user.lastName || ""
+                          {`${employee.firstName || ""} ${
+                            employee.lastName || ""
                           }`.trim()}
                         </div>
                         <div className="text-sm text-gray-500">
-                          @{user.username}
+                          @{employee.username}
                         </div>
                         <div className="text-xs text-gray-400 flex items-center">
                           <UsersRound className="w-3 h-3 mr-1" />
-                          Parent: {user.parent?.username || ""}
+                          Parent: {employee.parent?.username || ""}
                         </div>
                       </div>
                     </div>
@@ -675,21 +667,21 @@ const EmployeeTable = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 flex items-center">
                       <Mail className="w-4 h-4 mr-2 text-gray-400" />
-                      {user.email || "No email"}
+                      {employee.email || "No email"}
                     </div>
                     <div className="text-sm text-gray-500 flex items-center">
                       <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                      {user.phoneNumber || "No phone"}
+                      {employee.phoneNumber || "No phone"}
                     </div>
                   </td>
 
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getRoleColor(
-                        user.role?.name
+                        employee.role?.name
                       )}`}
                     >
-                      {getRoleDisplayName(user.role?.name)}
+                      {getRoleDisplayName(employee.role?.name)}
                     </span>
                   </td>
 
@@ -699,36 +691,18 @@ const EmployeeTable = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-mono">
-                            {showPasswords[user.id]
-                              ? user.password
+                            {showPasswords[employee.id]
+                              ? employee.password
                               : "••••••••"}
                           </span>
                           <button
-                            onClick={() => togglePasswordVisibility(user.id)}
+                            onClick={() =>
+                              togglePasswordVisibility(employee.id)
+                            }
                             className="text-gray-500 hover:text-gray-700 transition-colors"
-                            title={showPasswords[user.id] ? "Hide" : "Show"}
+                            title={showPasswords[employee.id] ? "Hide" : "Show"}
                           >
-                            {showPasswords[user.id] ? (
-                              <EyeOff size={14} />
-                            ) : (
-                              <Eye size={14} />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Transaction PIN Column */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-mono">
-                            {showPins[user.id] ? user.transactionPin : "••••••"}
-                          </span>
-                          <button
-                            onClick={() => togglePinVisibility(user.id)}
-                            className="text-gray-500 hover:text-gray-700 transition-colors"
-                            title={showPins[user.id] ? "Hide" : "Show"}
-                          >
-                            {showPins[user.id] ? (
+                            {showPasswords[employee.id] ? (
                               <EyeOff size={14} />
                             ) : (
                               <Eye size={14} />
@@ -740,41 +714,24 @@ const EmployeeTable = () => {
                   )}
 
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <Wallet className="w-4 h-4 text-gray-400" />
-                      <span
-                        className={`text-sm font-semibold ${
-                          (user.wallets?.[0]?.balance || 0) > 0
-                            ? "text-green-600"
-                            : "text-red-500"
-                        }`}
-                      >
-                        ₹
-                        {(user.wallets?.[0]?.balance || 0).toLocaleString() ||
-                          0}
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
-                        user.status === "IN_ACTIVE"
+                        employee.status === "IN_ACTIVE"
                           ? "bg-red-100 text-red-800 border-red-300"
-                          : user.status === "ACTIVE"
+                          : employee.status === "ACTIVE"
                           ? "bg-green-100 text-green-800 border-green-300"
-                          : user.status === "DELETE"
+                          : employee.status === "DELETE"
                           ? "bg-gray-100 text-gray-800 border-gray-300"
                           : "bg-yellow-100 text-yellow-800 border-yellow-300"
                       }`}
                     >
-                      {user.status === "IN_ACTIVE"
+                      {employee.status === "IN_ACTIVE"
                         ? "Inactive"
-                        : user.status === "ACTIVE"
+                        : employee.status === "ACTIVE"
                         ? "Active"
-                        : user.status === "DELETE"
+                        : employee.status === "DELETE"
                         ? "Deleted"
-                        : user.status || "Unknown"}
+                        : employee.status || "Unknown"}
                     </span>
                   </td>
 
@@ -783,58 +740,56 @@ const EmployeeTable = () => {
                       <button
                         className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                         onClick={() =>
-                          setOpenMenuId(openMenuId === user.id ? null : user.id)
+                          setOpenMenuId(
+                            openMenuId === employee.id ? null : employee.id
+                          )
                         }
                       >
-                        {openMenuId === user.id ? (
+                        {openMenuId === employee.id ? (
                           <X className="w-5 h-5 text-gray-600" />
                         ) : (
                           <MoreVertical className="w-5 h-5 text-gray-600" />
                         )}
                       </button>
 
-                      {openMenuId === user.id && (
+                      {openMenuId === employee.id && (
                         <ActionsMenu
-                          user={user}
+                          type="employee"
+                          user={employee}
                           isAdminUser={isAdminUser}
                           onView={handleViewUser}
-                          onEdit={(user) => {
-                            setSelectedUser(user);
+                          onEdit={(employee) => {
+                            setSelectedUser(employee);
                             setShowForm(true);
                             setOpenMenuId(null);
                           }}
-                          onEditProfile={(user) => {
-                            setSelectedUser(user);
+                          onEditProfile={(employee) => {
+                            setSelectedUser(employee);
                             setShowEditProfile(true);
                             setOpenMenuId(null);
                           }}
-                          onEditPassword={(user) => {
-                            setSelectedUser(user);
+                          onEditPassword={(employee) => {
+                            setSelectedUser(employee);
                             setShowEditPassword(true);
                             setOpenMenuId(null);
                           }}
-                          onEditPin={(user) => {
-                            setSelectedUser(user);
-                            setShowEditPin(true);
+                          onPermission={(employee) => {
+                            handleAddPermission(employee);
                             setOpenMenuId(null);
                           }}
-                          onPermission={(user) => {
-                            handleAddPermission(user);
-                            setOpenMenuId(null);
-                          }}
-                          onToggleStatus={(user) => {
+                          onToggleStatus={(employee) => {
                             setActionType(
-                              user.status === "IN_ACTIVE"
+                              employee.status === "IN_ACTIVE"
                                 ? "Activate"
                                 : "Deactivate"
                             );
-                            setSelectedUser(user);
+                            setSelectedUser(employee);
                             setShowActionModal(true);
                             setOpenMenuId(null);
                           }}
-                          onDelete={(user) => {
+                          onDelete={(employee) => {
                             setActionType("Delete");
-                            setSelectedUser(user);
+                            setSelectedUser(employee);
                             setShowActionModal(true);
                             setOpenMenuId(null);
                           }}
@@ -853,15 +808,22 @@ const EmployeeTable = () => {
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-300 flex items-center justify-between">
           <div className="text-sm text-gray-700">
-            Showing {filteredUsers.length} of {totalUsers} employees
+            Showing {filteredEmployees.length} of {totalEmployees} employees
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
-              Active: {users.filter((user) => user.status === "ACTIVE").length}
+              Active:{" "}
+              {
+                employees.filter((employee) => employee.status === "ACTIVE")
+                  .length
+              }
             </div>
             <div className="text-sm text-gray-600">
               Inactive:{" "}
-              {users.filter((user) => user.status === "IN_ACTIVE").length}
+              {
+                employees.filter((employee) => employee.status === "IN_ACTIVE")
+                  .length
+              }
             </div>
           </div>
         </div>
@@ -876,15 +838,16 @@ const EmployeeTable = () => {
         />
       )}
 
-      {/* All Modals - Same as MembersTable */}
+      {/* All Modals */}
       {showViewProfile && (
         <UserProfileView
-          userData={viewedUser || selectedUser}
+          userData={viewedEmployee || selectedUser}
           isAdminUser={isAdminUser}
           onClose={() => {
             setShowViewProfile(false);
             dispatch(setCurrentUser(null));
           }}
+          type={"employee"}
         />
       )}
 
@@ -935,7 +898,7 @@ const EmployeeTable = () => {
             onSuccess={handleFormSuccess}
             editData={selectedUser}
             isAdmin={isAdminUser}
-            type={"employe"}
+            type={"employee"}
           />
         </div>
       )}
@@ -948,6 +911,7 @@ const EmployeeTable = () => {
             setSelectedUser(null);
           }}
           onSuccess={handleEditProfileSuccess}
+          type="employee"
         />
       )}
 
@@ -963,20 +927,8 @@ const EmployeeTable = () => {
         />
       )}
 
-      {showEditPin && selectedUser && (
-        <EditCredentialsModal
-          userId={selectedUser.id}
-          type="pin"
-          onClose={() => {
-            setShowEditPin(false);
-            setSelectedUser(null);
-          }}
-          onSuccess={handleCredentialsSuccess}
-        />
-      )}
-
       {showPermissionModal && permissionUser && (
-        <AddPermission
+        <AddEmployeePermissions
           mode={permissionMode}
           onSubmit={handlePermissionSubmit}
           onCancel={handleClosePermissionModal}

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-class UserValidationSchemas {
+class EmployeeValidationSchemas {
   static get register() {
     return z.object({
       username: z
@@ -19,6 +19,12 @@ class UserValidationSchemas {
         .string()
         .regex(/^\d{10}$/, "Phone number must be 10 digits"),
       roleId: z.string().uuid("Invalid role ID"),
+      permissions: z
+        .array(z.string())
+        .min(1, "At least one permission is required")
+        .max(20, "Cannot assign more than 20 permissions")
+        .optional()
+        .default([]),
     });
   }
 
@@ -49,7 +55,16 @@ class UserValidationSchemas {
     return z.object({});
   }
 
-  static get deactivateUser() {
+  static get updatePermissions() {
+    return z.object({
+      permissions: z
+        .array(z.string())
+        .min(1, "At least one permission is required")
+        .max(20, "Cannot assign more than 20 permissions"),
+    });
+  }
+
+  static get deactivateEmployee() {
     return z.object({
       reason: z
         .string()
@@ -60,7 +75,7 @@ class UserValidationSchemas {
     });
   }
 
-  static get reactivateUser() {
+  static get reactivateEmployee() {
     return z.object({
       reason: z
         .string()
@@ -71,7 +86,7 @@ class UserValidationSchemas {
     });
   }
 
-  static get deleteUser() {
+  static get deleteEmployee() {
     return z.object({
       reason: z
         .string()
@@ -81,6 +96,21 @@ class UserValidationSchemas {
         .default("Deleted by admin"),
     });
   }
+
+  static get checkPermission() {
+    return z.object({
+      permission: z.string().min(1, "Permission is required"),
+    });
+  }
+
+  static get checkPermissions() {
+    return z.object({
+      permissions: z
+        .array(z.string())
+        .min(1, "At least one permission is required")
+        .max(20, "Cannot check more than 20 permissions"),
+    });
+  }
 }
 
-export default UserValidationSchemas;
+export default EmployeeValidationSchemas;

@@ -1,14 +1,12 @@
+// roleSlice.js
 import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-// Configure axios
-axios.defaults.withCredentials = true;
-const baseURL = import.meta.env.VITE_API_BASE_URL;
-axios.defaults.baseURL = baseURL;
-
 const initialState = {
   roles: [],
+  businessRoles: [],
+  employeeRoles: [],
   currentRole: null,
   isLoading: false,
   error: null,
@@ -45,22 +43,67 @@ const roleSlice = createSlice({
     setRoles: (state, action) => {
       state.roles = action.payload;
     },
+    setBusinessRoles: (state, action) => {
+      state.businessRoles = action.payload;
+    },
+    setEmployeeRoles: (state, action) => {
+      state.employeeRoles = action.payload;
+    },
     setCurrentRole: (state, action) => {
       state.currentRole = action.payload;
     },
     addRole: (state, action) => {
-      state.roles.push(action.payload);
+      const newRole = action.payload;
+      state.roles.push(newRole);
+      // Add to appropriate list based on type
+      if (newRole.type === "employee") {
+        state.employeeRoles.push(newRole);
+      } else if (newRole.type === "business") {
+        state.businessRoles.push(newRole);
+      }
     },
     updateRoleInList: (state, action) => {
       const updatedRole = action.payload;
+
+      // Update in main roles array
       const index = state.roles.findIndex((role) => role.id === updatedRole.id);
       if (index !== -1) {
         state.roles[index] = updatedRole;
       }
+
+      // Update in specific arrays based on type
+      if (updatedRole.type === "employee") {
+        const employeeIndex = state.employeeRoles.findIndex(
+          (role) => role.id === updatedRole.id
+        );
+        if (employeeIndex !== -1) {
+          state.employeeRoles[employeeIndex] = updatedRole;
+        }
+      } else if (updatedRole.type === "business") {
+        const businessIndex = state.businessRoles.findIndex(
+          (role) => role.id === updatedRole.id
+        );
+        if (businessIndex !== -1) {
+          state.businessRoles[businessIndex] = updatedRole;
+        }
+      }
     },
     removeRoleFromList: (state, action) => {
       const roleId = action.payload;
+      const roleToDelete = state.roles.find((role) => role.id === roleId);
+
       state.roles = state.roles.filter((role) => role.id !== roleId);
+
+      // Remove from specific arrays based on type
+      if (roleToDelete?.type === "employee") {
+        state.employeeRoles = state.employeeRoles.filter(
+          (role) => role.id !== roleId
+        );
+      } else if (roleToDelete?.type === "business") {
+        state.businessRoles = state.businessRoles.filter(
+          (role) => role.id !== roleId
+        );
+      }
     },
   },
 });
@@ -72,6 +115,8 @@ export const {
   clearRoleError,
   clearRoleSuccess,
   setRoles,
+  setBusinessRoles,
+  setEmployeeRoles,
   setCurrentRole,
   addRole,
   updateRoleInList,
@@ -80,16 +125,50 @@ export const {
 
 // Async action creators
 
-/**
- * Get all roles by type (employe/role)
- */
+// Get all roles (employee/business)
+export const getAllRoles = () => async (dispatch) => {
+  try {
+    dispatch(roleRequest());
+    const { data } = await axios.get(`/roles`);
+
+    const roles = data.data?.roles || data.data || [];
+
+    dispatch(setRoles(roles));
+
+    // Separate roles by type
+    const businessRoles = roles.filter((role) => role.type === "business");
+    const employeeRoles = roles.filter((role) => role.type === "employee");
+
+    dispatch(setBusinessRoles(businessRoles));
+    dispatch(setEmployeeRoles(employeeRoles));
+
+    dispatch(roleSuccess(data));
+    return data;
+  } catch (error) {
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to fetch roles";
+    dispatch(roleFail(errMsg));
+    throw new Error(errMsg);
+  }
+};
+
+// Get all roles by type (employee/business)
 export const getAllRolesByType = (type) => async (dispatch) => {
   try {
     dispatch(roleRequest());
     const { data } = await axios.get(`/roles/type/${type}`);
 
-    // Backend returns { data: { roles: [], meta: {} }, message: "", success: true }
-    const roles = data.data?.roles || [];
+    const roles = data.data?.roles || data.data || [];
+
+    if (type === "business") {
+      dispatch(setBusinessRoles(roles));
+    } else if (type === "employee") {
+      dispatch(setEmployeeRoles(roles));
+    }
+
+    // Also update the main roles array
     dispatch(setRoles(roles));
     dispatch(roleSuccess(data));
     return data;
@@ -103,15 +182,52 @@ export const getAllRolesByType = (type) => async (dispatch) => {
   }
 };
 
-/**
- * Get role by ID
- */
+// Get business roles for user registration
+export const getBusinessRoles = () => async (dispatch) => {
+  try {
+    dispatch(roleRequest());
+    const { data } = await axios.get(`/roles/business`);
+
+    const roles = data.data?.roles || data.data || [];
+    dispatch(setBusinessRoles(roles));
+    dispatch(roleSuccess(data));
+    return data;
+  } catch (error) {
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to fetch business roles";
+    dispatch(roleFail(errMsg));
+    throw new Error(errMsg);
+  }
+};
+
+// Get employee roles for employee registration
+export const getEmployeeRoles = () => async (dispatch) => {
+  try {
+    dispatch(roleRequest());
+    const { data } = await axios.get(`/roles/employee`);
+
+    const roles = data.data?.roles || data.data || [];
+    dispatch(setEmployeeRoles(roles));
+    dispatch(roleSuccess(data));
+    return data;
+  } catch (error) {
+    const errMsg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to fetch employee roles";
+    dispatch(roleFail(errMsg));
+    throw new Error(errMsg);
+  }
+};
+
+// Get role by ID
 export const getRoleById = (roleId) => async (dispatch) => {
   try {
     dispatch(roleRequest());
     const { data } = await axios.get(`/roles/${roleId}`);
 
-    // Backend returns { data: roleObject, message: "", success: true }
     dispatch(setCurrentRole(data.data));
     dispatch(roleSuccess(data));
     return data;
@@ -125,20 +241,16 @@ export const getRoleById = (roleId) => async (dispatch) => {
   }
 };
 
-/**
- * Create new role
- */
+// Create new role
 export const createRole = (roleData) => async (dispatch) => {
   try {
     dispatch(roleRequest());
     const { data } = await axios.post(`/roles`, roleData);
 
-    // Backend returns { data: roleObject, message: "", success: true }
     dispatch(addRole(data.data));
     dispatch(roleSuccess(data));
 
-    const roleType = roleData.type === "role" ? "Role" : "Employee role";
-    toast.success(data.message || `${roleType} created successfully`);
+    toast.success(data.message || "Role created successfully");
     return data;
   } catch (error) {
     const errMsg =
@@ -150,20 +262,16 @@ export const createRole = (roleData) => async (dispatch) => {
   }
 };
 
-/**
- * Update role
- */
+// Update role
 export const updateRole = (roleId, roleData) => async (dispatch) => {
   try {
     dispatch(roleRequest());
     const { data } = await axios.put(`/roles/${roleId}`, roleData);
 
-    // Backend returns { data: roleObject, message: "", success: true }
     dispatch(updateRoleInList(data.data));
     dispatch(roleSuccess(data));
 
-    const roleType = roleData.type === "role" ? "Role" : "Employee role";
-    toast.success(data.message || `${roleType} updated successfully`);
+    toast.success(data.message || "Role updated successfully");
     return data;
   } catch (error) {
     const errMsg =
@@ -175,9 +283,7 @@ export const updateRole = (roleId, roleData) => async (dispatch) => {
   }
 };
 
-/**
- * Delete role
- */
+// Delete role
 export const deleteRole = (roleId) => async (dispatch) => {
   try {
     dispatch(roleRequest());
@@ -196,29 +302,5 @@ export const deleteRole = (roleId) => async (dispatch) => {
     throw new Error(errMsg);
   }
 };
-
-/**
- * Get roles for current user based on their role level
- */
-export const getRolesForCurrentUser =
-  (type = "employe") =>
-  async (dispatch) => {
-    try {
-      dispatch(roleRequest());
-      const { data } = await axios.get(`/roles/type/${type}`);
-
-      const roles = data.data?.roles || [];
-      dispatch(setRoles(roles));
-      dispatch(roleSuccess(data));
-      return data;
-    } catch (error) {
-      const errMsg =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to fetch roles";
-      dispatch(roleFail(errMsg));
-      throw new Error(errMsg);
-    }
-  };
 
 export default roleSlice.reducer;

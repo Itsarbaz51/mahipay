@@ -11,51 +11,33 @@ const serviceRoutes = Router();
 serviceRoutes.post(
   "/create",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   upload.single("icon"),
   validateRequest(ServiceValidationSchemas.createServiceProvider),
   ServiceProviderController.create
 );
 
-// Get all service providers (ADMIN sees all, users see assigned)
+// Get all service providers (ADMIN sees all, business users see assigned)
 serviceRoutes.get(
   "/lists",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "RETAILER",
-  ]),
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   ServiceProviderController.getAll
 );
 
-// Get active service providers (ADMIN sees all active, users see assigned active)
+// Get active service providers (ADMIN sees all active, business users see assigned active)
 serviceRoutes.get(
   "/providers/active",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "RETAILER",
-  ]),
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   ServiceProviderController.getAllActive
 );
 
-// Get service provider by ID
+// Get service provider by ID (Business users and employees)
 serviceRoutes.get(
   "/providers/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "RETAILER",
-  ]),
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   ServiceProviderController.getById
 );
 
@@ -63,7 +45,7 @@ serviceRoutes.get(
 serviceRoutes.put(
   "/providers/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(ServiceValidationSchemas.updateServiceProvider),
   ServiceProviderController.update
 );
@@ -72,7 +54,7 @@ serviceRoutes.put(
 serviceRoutes.patch(
   "/providers/:id/status",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(ServiceValidationSchemas.toggleStatus),
   ServiceProviderController.toggleActiveStatus
 );
@@ -81,22 +63,22 @@ serviceRoutes.patch(
 serviceRoutes.delete(
   "/providers/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   ServiceProviderController.delete
 );
 
-// Service Credential Management
+// Service Credential Management (ADMIN only)
 serviceRoutes.put(
   "/providers/:id/credentials",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   ServiceProviderController.updateCredentials
 );
 
 serviceRoutes.get(
   "/providers/:id/credentials",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   ServiceProviderController.getCredentials
 );
 

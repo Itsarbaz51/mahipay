@@ -49,31 +49,31 @@ async function main() {
     {
       name: "ADMIN",
       level: 0,
-      type: "role",
+      type: "business",
       description: "System Administrator",
     },
     {
       name: "STATE HEAD",
       level: 1,
-      type: "role",
+      type: "business",
       description: "State Head",
     },
     {
       name: "MASTER DISTRIBUTOR",
       level: 2,
-      type: "role",
+      type: "business",
       description: "Master Distributor",
     },
     {
       name: "DISTRIBUTOR",
       level: 3,
-      type: "role",
+      type: "business",
       description: "Distributor",
     },
     {
       name: "RETAILER",
       level: 4,
-      type: "role",
+      type: "business",
       description: "Retailer",
     },
   ];
@@ -93,7 +93,7 @@ async function main() {
         level: role.level,
         type: role.type,
         description: role.description,
-        createdBy: null, // Will be set to null since we're seeding
+        createdBy: null, // will be updated later for ADMIN
       },
     });
     createdRoles[role.level] = created;
@@ -112,7 +112,7 @@ async function main() {
       username: "admin",
       firstName: "Admin",
       lastName: "User",
-      profileImage: "https://via.placeholder.com/150",
+      profileImage: "",
       email: "admin@gmail.com",
       phoneNumber: "9999999991",
       password: adminPassword,
@@ -147,7 +147,7 @@ async function main() {
       username: "state_head_1",
       firstName: "State",
       lastName: "Head",
-      profileImage: "https://via.placeholder.com/150",
+      profileImage: "",
       email: "statehead@gmail.com",
       phoneNumber: "9999999992",
       password: shPassword,

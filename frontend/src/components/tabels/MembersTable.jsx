@@ -1,3 +1,4 @@
+// MembersTable.js
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Search,
@@ -18,7 +19,7 @@ import { toast } from "react-toastify";
 import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  getAllRoleTypeUsersByParentId,
+  getAllBusinessUsersByParentId,
   getUserById,
   setCurrentUser,
   clearUserError,
@@ -103,9 +104,9 @@ const MembersTable = () => {
   // ✅ Check if current user is ADMIN
   const isAdminUser = currentUserRole === "ADMIN";
 
-  // ✅ FIXED: Simplified loadUsers function without currentPage dependency
+  // ✅ FIXED: Correct loadUsers function
   const loadUsers = useCallback(
-    async (page = currentPage, searchTerm = search, forceRefresh = false) => {
+    async (page = 1, searchTerm = "", forceRefresh = false) => {
       try {
         const params = {
           page,
@@ -122,7 +123,7 @@ const MembersTable = () => {
           params.timestamp = Date.now();
         }
 
-        await dispatch(getAllRoleTypeUsersByParentId(params));
+        await dispatch(getAllBusinessUsersByParentId(params));
       } catch (error) {
         console.error("Failed to load users:", error);
         toast.error(error.message || "Failed to load users");
@@ -143,9 +144,9 @@ const MembersTable = () => {
 
   // ✅ FIXED: Manual refresh
   const handleManualRefresh = useCallback(() => {
-    loadUsers(currentPage, search, true);
+    loadUsers(1, search, true);
     toast.info("Refreshing data...");
-  }, [loadUsers, currentPage, search]);
+  }, [loadUsers, search]);
 
   // Toast handling
   useEffect(() => {
@@ -180,7 +181,7 @@ const MembersTable = () => {
     }
   }, [loadUsers]);
 
-  // ✅ FIXED: Search with debouncing - directly dispatch instead of using loadUsers
+  // ✅ FIXED: Search with debouncing
   useEffect(() => {
     if (!initialLoadRef.current) return;
 
@@ -189,17 +190,7 @@ const MembersTable = () => {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      // Direct dispatch for search to avoid dependency issues
-      dispatch(
-        getAllRoleTypeUsersByParentId({
-          page: 1, // Reset to page 1 when searching
-          limit,
-          sort: "desc",
-          status: "ALL",
-          search,
-          timestamp: Date.now(),
-        })
-      );
+      loadUsers(1, search);
     }, 500);
 
     return () => {
@@ -207,7 +198,7 @@ const MembersTable = () => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [search, dispatch, limit]);
+  }, [search, loadUsers]);
 
   // Permission effect
   useEffect(() => {
@@ -504,8 +495,6 @@ const MembersTable = () => {
               {isLoading ? "Refreshing..." : "Refresh"}
             </button>
 
-            {/* ✅ Add Member button bhi sirf ADMIN ke liye show karo */}
-
             <ButtonField
               name="Add Member"
               isOpen={() => {
@@ -556,7 +545,6 @@ const MembersTable = () => {
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Status
               </th>
-              {/* ✅ Actions column header bhi sirf ADMIN ke liye show karo */}
               <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
                 Actions
               </th>
@@ -565,9 +553,20 @@ const MembersTable = () => {
 
           <tbody className="divide-y divide-gray-100">
             {isLoading ? (
-              <EmptyState type="loading" />
+              <tr>
+                <td colSpan={currentUserRole === "ADMIN" ? 10 : 8}>
+                  <EmptyState type="loading" />
+                </td>
+              </tr>
             ) : filteredUsers.length === 0 ? (
-              <EmptyState type={search ? "search" : "empty"} search={search} />
+              <tr>
+                <td colSpan={currentUserRole === "ADMIN" ? 10 : 8}>
+                  <EmptyState
+                    type={search ? "search" : "empty"}
+                    search={search}
+                  />
+                </td>
+              </tr>
             ) : (
               filteredUsers.map((user, index) => (
                 <tr key={user?.id} className="hover:bg-blue-50 transition-all">
@@ -589,6 +588,9 @@ const MembersTable = () => {
                             src={user?.profileImage}
                             alt={user?.firstName || "User"}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                            }}
                           />
                         ) : (
                           <User className="w-6 h-6 text-gray-600" />
@@ -638,7 +640,6 @@ const MembersTable = () => {
 
                   {currentUserRole === "ADMIN" && (
                     <>
-                      {/* Password Column */}
                       <td className="px-6 py-5">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-mono">
@@ -660,11 +661,12 @@ const MembersTable = () => {
                         </div>
                       </td>
 
-                      {/* Transaction PIN Column */}
                       <td className="px-6 py-5">
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-mono">
-                            {showPins[user?.id] ? user?.transactionPin : "••••••"}
+                            {showPins[user?.id]
+                              ? user?.transactionPin
+                              : "••••••"}
                           </span>
                           <button
                             onClick={() => togglePinVisibility(user?.id)}
@@ -726,7 +728,9 @@ const MembersTable = () => {
                       <button
                         className="p-2 rounded-full hover:bg-gray-100 transition-colors"
                         onClick={() =>
-                          setOpenMenuId(openMenuId === user?.id ? null : user?.id)
+                          setOpenMenuId(
+                            openMenuId === user?.id ? null : user?.id
+                          )
                         }
                       >
                         {openMenuId === user?.id ? (
@@ -739,7 +743,7 @@ const MembersTable = () => {
                       {openMenuId === user?.id && (
                         <ActionsMenu
                           user={user}
-                          isAdminUser={isAdminUser} // 🆕 Add this prop
+                          isAdminUser={isAdminUser}
                           onView={handleViewUser}
                           onEdit={(user) => {
                             setSelectedUser(user);
@@ -812,6 +816,7 @@ const MembersTable = () => {
             setShowViewProfile(false);
             dispatch(setCurrentUser(null));
           }}
+          type={"business"}
         />
       )}
 
@@ -865,7 +870,7 @@ const MembersTable = () => {
             onSuccess={handleFormSuccess}
             editData={selectedUser}
             isAdmin={isAdminUser}
-            type={"memeber"}
+            type={"business"}
           />
         </div>
       )}
@@ -879,6 +884,7 @@ const MembersTable = () => {
             setSelectedUser(null);
           }}
           onSuccess={handleEditProfileSuccess}
+          type="business"
         />
       )}
 

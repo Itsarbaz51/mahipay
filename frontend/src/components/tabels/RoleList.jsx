@@ -1,14 +1,15 @@
-import { Trash2, Edit2, Users, Shield } from "lucide-react";
+// RoleList.js
+import { Trash2, Edit2, Users, Shield, TrendingUp } from "lucide-react";
 
 export function RoleList({
   roles,
   onEdit,
   onDelete,
   onPermission,
-  type = "employe",
+  type = "employee",
 }) {
-  // Sirf employe tab ke liye actions allow karen
-  const allowActions = type === "employe";
+  // Only allow actions for employee roles
+  const allowActions = type === "employee";
 
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -20,6 +21,9 @@ export function RoleList({
             </th>
             <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
               Role Name
+            </th>
+            <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
+              Level
             </th>
             <th className="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">
               Description
@@ -35,7 +39,7 @@ export function RoleList({
           {roles?.length === 0 ? (
             <tr>
               <td
-                colSpan={allowActions ? "4" : "3"}
+                colSpan={allowActions ? 5 : 4}
                 className="px-6 py-16 text-center"
               >
                 <div className="flex flex-col items-center justify-center text-gray-400">
@@ -48,20 +52,34 @@ export function RoleList({
                   <p className="text-sm mt-1">
                     {allowActions
                       ? 'Click "Create Employee Role" to create your first role'
-                      : "System roles are managed automatically"}
+                      : "Business roles are system-managed"}
                   </p>
                 </div>
               </td>
             </tr>
           ) : (
             roles?.map((role, idx) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={role.id || idx}
+                className="hover:bg-gray-50 transition-colors"
+              >
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
                   {idx + 1}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-semibold text-gray-900">
                     {role.name}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Type: {role.type || "N/A"}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm font-semibold text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                      Level {role.level}
+                    </span>
                   </div>
                 </td>
                 <td className="px-6 py-4">

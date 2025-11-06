@@ -9,11 +9,11 @@ import {
 
 const permissionRoutes = Router();
 
-// Role Permission Routes
+// Role Permission Routes (ADMIN only)
 permissionRoutes.post(
   "/role-upsert",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(PermissionValidationSchemas.createOrUpdateRolePermission),
   RolePermissionController.createOrUpdate
 );
@@ -21,23 +21,23 @@ permissionRoutes.post(
 permissionRoutes.get(
   "/role-permission/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   RolePermissionController.getByRole
 );
 
 permissionRoutes.delete(
   "/role-permission/:roleId/:serviceId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(PermissionValidationSchemas.deleteRolePermission),
   RolePermissionController.delete
 );
 
-// User Permission Routes
+// User Permission Routes (ADMIN only)
 permissionRoutes.post(
   "/user-upsert",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(PermissionValidationSchemas.createOrUpdateUserPermission),
   UserPermissionController.createOrUpdate
 );
@@ -45,14 +45,14 @@ permissionRoutes.post(
 permissionRoutes.get(
   "/user-permission/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   UserPermissionController.getByUser
 );
 
 permissionRoutes.delete(
   "/user-permission/:userId/:serviceId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoles(["ADMIN"]),
+  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(PermissionValidationSchemas.deleteUserPermission),
   UserPermissionController.delete
 );

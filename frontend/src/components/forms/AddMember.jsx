@@ -1,7 +1,13 @@
+// AddMember.js
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getAllRolesByType } from "../../redux/slices/roleSlice";
-import { register, updateProfile } from "../../redux/slices/userSlice";
+import { registerUser, updateUserProfile } from "../../redux/slices/userSlice";
+// ✅ FIXED: Import employee actions
+import {
+  registerEmployee,
+  updateEmployeeProfile,
+} from "../../redux/slices/employeeSlice";
 
 export default function AddMember({
   isAdmin = false,
@@ -9,7 +15,7 @@ export default function AddMember({
   onClose,
   onSuccess,
   editData,
-  type = "member", // Fixed typo from "memeber" to "member"
+  type = "business",
 }) {
   const [formData, setFormData] = useState({
     username: "",
@@ -30,7 +36,7 @@ export default function AddMember({
 
   // Get display text based on type
   const getDisplayText = () => {
-    if (type === "employe") {
+    if (type === "employee") {
       return {
         title: profileEdit
           ? "Profile Update"
@@ -55,7 +61,6 @@ export default function AddMember({
           : "Employee added successfully!",
       };
     } else {
-      // Default to member
       return {
         title: profileEdit
           ? "Profile Update"
@@ -86,8 +91,13 @@ export default function AddMember({
 
   useEffect(() => {
     // Fetch roles based on type
-    const roleType = type === "employe" ? "employe" : "role";
-    dispatch(getAllRolesByType(roleType));
+    let roleType = "";
+    if (type === "employee") roleType = "employee";
+    if (type === "business") roleType = "business";
+
+    if (roleType) {
+      dispatch(getAllRolesByType(roleType));
+    }
 
     if (editData) {
       setFormData({
@@ -103,7 +113,7 @@ export default function AddMember({
         setImagePreview(editData.profileImage);
       }
     }
-  }, [editData, dispatch, type]); // Added type to dependencies
+  }, [editData, dispatch, type]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -119,7 +129,7 @@ export default function AddMember({
     }
 
     if (errors[name]) setErrors({ ...errors, [name]: "" });
-    if (message.text) setMessage({ type: "", text: "" }); // Clear message on change
+    if (message.text) setMessage({ type: "", text: "" });
   };
 
   const handleFileChange = (e) => {
@@ -151,20 +161,21 @@ export default function AddMember({
     return Object.keys(newErrors).length === 0;
   };
 
+  // ✅ FIXED: Handle form submission based on type
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
       setMessage({
         type: "error",
-        text: "Please fill the details before proceed",
+        text: "Please fill the required details before proceeding",
       });
       return;
     }
 
     setLoading(true);
     setMessage({ type: "", text: "" });
-    setErrors({}); // Clear previous errors
+    setErrors({});
 
     try {
       let res;
@@ -196,7 +207,12 @@ export default function AddMember({
           delete submitData.roleId;
         }
 
-        res = await dispatch(updateProfile(editData.id, submitData));
+        // ✅ FIXED: Use appropriate update function based on type
+        if (type === "employee") {
+          res = await dispatch(updateEmployeeProfile(editData.id, submitData));
+        } else {
+          res = await dispatch(updateUserProfile(editData.id, submitData));
+        }
       } else {
         // New member case
         const form = new FormData();
@@ -209,7 +225,13 @@ export default function AddMember({
             form.append(key, formData[key]);
           }
         });
-        res = await dispatch(register(form));
+
+        // ✅ FIXED: Use appropriate register function based on type
+        if (type === "employee") {
+          res = await dispatch(registerEmployee(form));
+        } else {
+          res = await dispatch(registerUser(form));
+        }
       }
 
       // Check for success
@@ -227,7 +249,7 @@ export default function AddMember({
         onSuccess();
         onClose();
       } else {
-        // Handle other types of errors from dispatch
+        // Handle errors
         const errorData = res?.error || res?.payload || res?.data || {};
         const errorMessage = errorData?.message || "Operation failed";
 
@@ -257,7 +279,6 @@ export default function AddMember({
 
         setMessage(formattedErrors);
       } else {
-        // Handle other errors
         setMessage({
           type: "error",
           text:
