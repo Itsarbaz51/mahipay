@@ -96,10 +96,68 @@ export const allServices = () => async (dispatch) => {
   }
 };
 
-export const getServicesActive = () => async (dispatch) => {
+export const envConfig =
+  ({ id, payload }) =>
+  async (dispatch) => {
+    try {
+      dispatch(serviceRequest());
+      const { data } = await axios.put(`/services/env-config/${id}`, payload);
+      dispatch(setServiceProviders(data));
+      dispatch(allServices());
+      return data;
+    } catch (error) {
+      const errMsg = error?.response?.data?.message || error?.message;
+      dispatch(serviceFail(errMsg));
+      throw error;
+    }
+  };
+
+export const toggleStatusService = (id) => async (dispatch) => {
   try {
     dispatch(serviceRequest());
-    const { data } = await axios.get(`/services/providers/status`);
+    const { data } = await axios.put(`/services/status/${id}`);
+    dispatch(setServiceProviders(data));
+    dispatch(allServices());
+    return data;
+  } catch (error) {
+    const errMsg = error?.response?.data?.message || error?.message;
+    dispatch(serviceFail(errMsg));
+    throw error;
+  }
+};
+
+export const toggleStatusApiIntigration = (id) => async (dispatch) => {
+  try {
+    dispatch(serviceRequest());
+    const { data } = await axios.put(`/services/api-intigration-status/${id}`);
+    dispatch(setServiceProviders(data));
+    dispatch(allServices());
+    return data;
+  } catch (error) {
+    const errMsg = error?.response?.data?.message || error?.message;
+    dispatch(serviceFail(errMsg));
+    throw error;
+  }
+};
+
+export const ApiTesting = (id, payload) => async (dispatch) => {
+  try {
+    dispatch(serviceRequest());
+    const { data } = await axios.post(`/services/api-testing/${id}`, payload);
+    dispatch(setServiceProviders(data));
+    dispatch(allServices());
+    return data;
+  } catch (error) {
+    const errMsg = error?.response?.data?.message || error?.message;
+    dispatch(serviceFail(errMsg));
+    throw error;
+  }
+};
+
+export const getServicesActive = (id) => async (dispatch) => {
+  try {
+    dispatch(serviceRequest());
+    const { data } = await axios.put(`/services/status/${id}`);
     dispatch(setServiceProviders(data));
     return data;
   } catch (error) {
@@ -108,41 +166,5 @@ export const getServicesActive = () => async (dispatch) => {
     throw error;
   }
 };
-
-// Get service provider by ID
-export const getServiceProviderById = (id) => async (dispatch) => {
-  try {
-    dispatch(serviceRequest());
-    const { data } = await axios.get(`/services/providers/${id}`);
-    dispatch(setCurrentServiceProvider(data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(serviceFail(errMsg));
-    throw error;
-  }
-};
-
-// Toggle active status change active status
-export const toggleServiceProviderStatus =
-  (id, isActive) => async (dispatch) => {
-    try {
-      dispatch(serviceRequest());
-      const { data } = await axios.patch(`/services/providers/${id}/status`, {
-        isActive,
-      });
-      dispatch(serviceSuccess(data));
-      dispatch(updateServiceProviderInList(data));
-
-      // Also update current service provider if it's the one being updated
-      dispatch(setCurrentServiceProvider(data));
-
-      return data;
-    } catch (error) {
-      const errMsg = error?.response?.data?.message || error?.message;
-      dispatch(serviceFail(errMsg));
-      throw error;
-    }
-  };
 
 export default serviceSlice.reducer;

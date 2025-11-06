@@ -40,7 +40,6 @@ class ServiceProviderController {
       );
   });
 
-  // Get all services (ADMIN only) or user assigned services
   static getAll = asyncHandler(async (req, res) => {
     const user = req.user;
     let serviceProviders;
@@ -64,147 +63,80 @@ class ServiceProviderController {
       );
   });
 
-  // Get active services (ADMIN sees all active, users see assigned active)
-  static getAllActive = asyncHandler(async (req, res) => {
-    const user = req.user;
-    let serviceProviders;
+  static updateEnvConfig = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { envConfig, subServices } = req.body;
+    console.log(req.body);
 
-    if (user.role === "ADMIN") {
-      serviceProviders = await ServiceProviderService.getAllActive();
-    } else {
-      serviceProviders = await ServiceProviderService.getUserActiveServices(
-        user.id
-      );
+    if (!id) {
+      throw ApiError.badRequest("Service Provider ID is required");
     }
 
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          serviceProviders,
-          "Active Service Providers fetched successfully",
-          200
-        )
-      );
-  });
-
-  static getById = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    if (!id) throw ApiError.badRequest("Service Provider ID is required");
-
-    const serviceProvider = await ServiceProviderService.getById(id);
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          serviceProvider,
-          "Service Provider fetched successfully",
-          200
-        )
-      );
-  });
-
-  static toggleActiveStatus = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { isActive } = req.body;
-
-    if (!id) throw ApiError.badRequest("Service Provider ID is required");
-
-    if (typeof isActive !== "boolean")
-      throw ApiError.badRequest("isActive must be a boolean");
-
-    const serviceProvider = await ServiceProviderService.toggleActiveStatus(
+    const updatedServiceProvider = await ServiceProviderService.updateEnvConfig(
       id,
-      isActive
-    );
-
-    const statusMessage = isActive ? "activated" : "deactivated";
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          serviceProvider,
-          `Service Provider ${statusMessage} successfully`,
-          200
-        )
-      );
-  });
-
-  static update = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    if (!id) throw ApiError.badRequest("Service Provider ID is required");
-
-    const serviceProvider = await ServiceProviderService.update(id, req.body);
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          serviceProvider,
-          "Service Provider updated successfully",
-          200
-        )
-      );
-  });
-
-  static delete = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    if (!id) throw ApiError.badRequest("Service Provider ID is required");
-
-    const result = await ServiceProviderService.delete(id);
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          result,
-          "Service Provider deleted successfully",
-          200
-        )
-      );
-  });
-
-  // Service Credential Management
-  static updateCredentials = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { credentials } = req.body;
-
-    if (!id) throw ApiError.badRequest("Service Provider ID is required");
-    if (!credentials) throw ApiError.badRequest("Credentials are required");
-
-    const updatedService = await ServiceProviderService.updateCredentials(
-      id,
-      credentials
+      {
+        envConfig,
+        subServices,
+      }
     );
 
     return res
       .status(200)
       .json(
         ApiResponse.success(
-          updatedService,
-          "Service credentials updated successfully",
+          updatedServiceProvider,
+          "Environment configuration updated successfully",
           200
         )
       );
   });
 
-  static getCredentials = asyncHandler(async (req, res) => {
+  static toggleServiceStatus = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    if (!id) throw ApiError.badRequest("Service Provider ID is required");
 
-    const credentials = await ServiceProviderService.getCredentials(id);
+    if (!id) {
+      throw ApiError.badRequest("Service ID is required");
+    }
+
+    const result = await ServiceProviderService.toggleServiceStatus(id);
+
+    return res
+      .status(200)
+      .json(ApiResponse.success(result, "service updated", 200));
+  });
+
+  static toggleApiIntigrationStatus = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    if (!id) {
+      throw ApiError.badRequest("Api Intigration ID is required");
+    }
+
+    const result = await ServiceProviderService.toggleApiIntigrationStatus(id);
 
     return res
       .status(200)
       .json(
-        ApiResponse.success(
-          credentials,
-          "Service credentials fetched successfully",
-          200
-        )
+        ApiResponse.success(result, "successfully Api Intigration chnage", 200)
       );
+  });
+
+  static apiTestConnection = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { envConfig } = req.body;
+
+    if (!id) {
+      throw ApiError.badRequest("Service Provider ID is required");
+    }
+
+    const testResult = await ServiceProviderService.testApiConnection(
+      id,
+      envConfig
+    );
+
+    return res
+      .status(200)
+      .json(ApiResponse.success(testResult, "Connection test successful", 200));
   });
 }
 

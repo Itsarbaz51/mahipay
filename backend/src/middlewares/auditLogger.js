@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import Prisma from "../db/db.js";
 
 export async function auditLogger(req, res, next) {
   // Record start time
@@ -30,7 +28,7 @@ export async function auditLogger(req, res, next) {
         cookies: req.cookies,
       };
 
-      await prisma.auditLog.create({
+      await Prisma.auditLog.create({
         data: {
           userId,
           ipAddress: req.ip,

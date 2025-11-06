@@ -1,14 +1,11 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  allServices,
-  toggleServiceProviderStatus,
-} from "../redux/slices/serviceSlice";
+import { allServices, toggleStatusService } from "../redux/slices/serviceSlice";
 
 export default function ManageServices() {
   const dispatch = useDispatch();
-  const { serviceProviders, isLoading } = useSelector(
-    (state) => state.services
+  const { activeServices, isLoading } = useSelector(
+    (state) => state.services.serviceProviders
   );
 
   const [localLoading, setLocalLoading] = useState({});
@@ -24,22 +21,22 @@ export default function ManageServices() {
       const newStatus = !currentStatus;
 
       // Toggle parent or sub-service
-      await dispatch(toggleServiceProviderStatus(serviceId, newStatus));
+      await dispatch(toggleStatusService(serviceId));
 
       // If this is a parent, also toggle all its sub-services
       if (isParent) {
-        const parent = serviceProviders.find((s) => s.id === serviceId);
+        const parent = activeServices.find((s) => s.id === serviceId);
         if (parent && parent.subService?.length > 0) {
           for (const sub of parent.subService) {
             // Make sure child matches parent toggle
             if (sub.isActive !== newStatus) {
-              await dispatch(toggleServiceProviderStatus(sub.id, newStatus));
+              await dispatch(toggleStatusService(sub.id));
             }
           }
         }
       } else {
         // If toggling a sub-service, check if all siblings share same state
-        const parent = serviceProviders.find((s) =>
+        const parent = activeServices.find((s) =>
           s.subService?.some((sub) => sub.id === serviceId)
         );
 
@@ -50,15 +47,13 @@ export default function ManageServices() {
 
           // If all sub-services are now same state, toggle parent to match
           if (allSubSameState && parent.isActive !== newStatus) {
-            await dispatch(
-              toggleServiceProviderStatus(parent.id, newStatus)
-            ).unwrap();
+            await dispatch(toggleStatusService(parent.id));
           }
         }
       }
 
       // Refresh hierarchy
-      await dispatch(allServices()).unwrap();
+      await dispatch(allServices());
     } catch (error) {
       console.error("Error toggling service:", error);
     } finally {
@@ -69,7 +64,7 @@ export default function ManageServices() {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      await dispatch(allServices()).unwrap();
+      await dispatch(allServices());
     } catch (error) {
       console.error("Error refreshing services:", error);
     } finally {
@@ -77,7 +72,7 @@ export default function ManageServices() {
     }
   };
 
-  if (isLoading && serviceProviders.length === 0) {
+  if (isLoading && activeServices?.length === 0) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -85,7 +80,7 @@ export default function ManageServices() {
     );
   }
 
-  if (!isLoading && serviceProviders.length === 0) {
+  if (!isLoading && activeServices?.length === 0) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="text-center">
@@ -133,7 +128,7 @@ export default function ManageServices() {
 
       {/* Services Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {serviceProviders.map((serviceProvider) => {
+        {activeServices?.map((serviceProvider) => {
           const isActive = serviceProvider.isActive;
           const isServiceLoading = localLoading[serviceProvider.id];
           const hasSubServices =
@@ -143,7 +138,7 @@ export default function ManageServices() {
           return (
             <div
               key={serviceProvider.id}
-              className={`relative p-6 rounded-2xl border-2 transition-all duration-300 ${
+              className={`relative p-6 rounded-2xl border-2 transition-all duration-300 h-fit ${
                 isActive
                   ? "bg-white border-blue-200 shadow-lg shadow-blue-100"
                   : "bg-gray-50 border-red-200 shadow-sm"

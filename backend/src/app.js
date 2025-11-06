@@ -11,6 +11,8 @@ import { IdempotencyService } from "./services/idempotencyKey.service.js";
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -32,7 +34,6 @@ app.use(cookieParser());
 app.use(helmet());
 app.use(requestId);
 app.use(rateLimiterMiddleware);
-app.set("trust proxy", true);
 app.use(auditLogger);
 
 app.get("/health", (req, res) => {
