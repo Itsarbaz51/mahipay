@@ -1,3 +1,5 @@
+// ActionsMenu.js
+import React from "react";
 import {
   Edit,
   Key,
@@ -6,7 +8,6 @@ import {
   Power,
   Shield,
   Trash2,
-  KeyRound,
 } from "lucide-react";
 
 const ActionsMenu = ({
@@ -24,7 +25,7 @@ const ActionsMenu = ({
   isAdminUser,
   type = "business",
 }) => {
-  // 🆕 Base menu items that everyone can see
+  // Base menu items that everyone can see
   const baseMenuItems = [
     {
       icon: User,
@@ -34,7 +35,7 @@ const ActionsMenu = ({
     },
   ];
 
-  // 🆕 Admin-only menu items
+  // Admin-only menu items
   const adminMenuItems = [
     {
       icon: User,
@@ -56,7 +57,7 @@ const ActionsMenu = ({
     },
     {
       icon: Shield,
-      label: "Add Permission",
+      label: "Manage Permissions",
       onClick: () => onPermission(user),
       color: "text-indigo-600",
     },
@@ -66,7 +67,7 @@ const ActionsMenu = ({
           {
             icon: CreditCard,
             label: "Change PIN",
-            onClick: () => onEditPin(user),
+            onClick: () => onEditPin && onEditPin(user),
             color: "text-red-600",
           },
         ]
@@ -83,12 +84,16 @@ const ActionsMenu = ({
           ? "text-red-600"
           : "text-green-600",
     },
-    {
-      icon: Power,
-      label: "Login as User",
-      onClick: () => onLogin && onLogin(user),
-      color: "text-blue-600",
-    },
+    ...(onLogin
+      ? [
+          {
+            icon: Power,
+            label: "Login as User",
+            onClick: () => onLogin(user),
+            color: "text-blue-600",
+          },
+        ]
+      : []),
     {
       icon: Trash2,
       label: "Delete User",
@@ -98,7 +103,7 @@ const ActionsMenu = ({
     },
   ];
 
-  // 🆕 Combine menu items based on user role
+  // Combine menu items based on user role
   const menuItems = isAdminUser
     ? [...baseMenuItems, ...adminMenuItems]
     : baseMenuItems;

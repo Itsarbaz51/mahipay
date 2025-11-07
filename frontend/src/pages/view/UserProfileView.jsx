@@ -18,6 +18,7 @@ import {
   Hash,
   Building,
   UserCheck,
+  Key,
 } from "lucide-react";
 
 export default function UserProfileView({
@@ -73,21 +74,20 @@ export default function UserProfileView({
     // Wallet information
     wallets: user?.wallets || (user?.wallet ? [user.wallet] : []),
 
+    // ✅ UPDATED: Employee permissions - extract from EmployeePermissionsOwned
+    permissions: user?.EmployeePermissionsOwned
+      ? user.EmployeePermissionsOwned.map((item) => item.permission)
+      : user?.permissions || [],
+
+    // ✅ NEW: Store full permissions data for detailed view
+    permissionsData: user?.EmployeePermissionsOwned || [],
+
     // Type-specific fields
     employeeId: isEmployee ? user?.employeeId : null,
     employeeCode: isEmployee ? user?.employeeCode : null,
     department: isEmployee ? user?.department : null,
     designation: isEmployee ? user?.designation : null,
   };
-
-
-  // console.log(userData);
-  
-
-  // --- Error State ---
-  // if (!user || !user?.id) {
-  //   alert("User not found");
-  // }
 
   // --- Utility Functions ---
   const formatDate = (dateString) => {
@@ -142,6 +142,13 @@ export default function UserProfileView({
       </span>
     );
   };
+
+  // --- Permission Badge Component ---
+  const PermissionBadge = ({ permission }) => (
+    <span className="inline-flex px-2 py-1 rounded text-xs bg-green-100 text-green-800 border border-green-300 font-medium">
+      {permission.toUpperCase()}
+    </span>
+  );
 
   // --- New Stat Card Component ---
   const StatCard = ({
@@ -220,6 +227,80 @@ export default function UserProfileView({
             </div>
           )}
         </div>
+      </div>
+    );
+  };
+
+  // ✅ UPDATED: Employee Permissions Section with detailed view
+  const EmployeePermissionsSection = () => {
+    if (!isEmployee || !isAdminUser) return null;
+
+    const permissions = adaptedUser.permissions || [];
+
+    return (
+      <div className={detailCard + " p-6 bg-white shadow-lg rounded-xl"}>
+        {/* Header Section with Border */}
+        <div className="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
+          <h3
+            className={
+              sectionTitleClass +
+              " flex items-center text-xl font-semibold text-gray-800"
+            }
+          >
+            <Key className="text-cyan-600 mr-2" size={24} />
+            Employee Permissions
+          </h3>
+          {/* Optional: Button to Manage Permissions here */}
+        </div>
+
+        {permissions.length > 0 ? (
+          <div>
+            {/* Summary Badge for Total Permissions */}
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-base text-gray-600">
+                Total permissions assigned to this employee:
+              </p>
+              <span className="inline-flex px-4 py-1.5 bg-cyan-50 text-cyan-700 rounded-full text-base font-bold border border-cyan-200 shadow-sm">
+                {permissions.length} Permission
+                {permissions.length > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Permissions List Grid - Simplified and Focused */}
+            <h4 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wider">
+              Assigned Permissions
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {permissions.map((permission, index) => (
+                // Better visual distinction and hover for individual badge container
+                <div
+                  key={index}
+                  className="bg-gray-50 p-3 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-cyan-50 hover:border-cyan-300"
+                >
+                  {/* Assuming PermissionBadge component renders the permission name visually */}
+                  <PermissionBadge permission={permission} />
+                  <span>{permission.assignedAt}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* Enhanced Empty State Design */
+          <div className="text-center py-10 px-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50">
+            <Key className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h4 className="text-xl font-semibold text-gray-800 mb-2">
+              No Permissions Assigned
+            </h4>
+            <p className="text-gray-500 text-base max-w-sm mx-auto">
+              This employee currently has no specific permissions. Assign roles
+              or permissions to define their access.
+            </p>
+            {/* Optional: Add an "Assign Permissions" Button */}
+            {/* <button className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500">
+        Assign Permissions
+      </button> */}
+          </div>
+        )}
       </div>
     );
   };
@@ -309,6 +390,14 @@ export default function UserProfileView({
                       <UserCheck size={14} /> Business User
                     </span>
                   )}
+
+                  {/* ✅ UPDATED: Permissions Count Badge for Employees */}
+                  {isEmployee && isAdminUser && adaptedUser.permissions && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-semibold border border-orange-300 transition-all duration-200 hover:bg-orange-200">
+                      <Key size={14} /> {adaptedUser.permissions.length}{" "}
+                      Permissions
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -316,6 +405,9 @@ export default function UserProfileView({
 
           {/* Employee Specific Info */}
           <EmployeeSpecificInfo />
+
+          {/* ✅ UPDATED: Employee Permissions Section */}
+          <EmployeePermissionsSection />
 
           {/* Quick Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

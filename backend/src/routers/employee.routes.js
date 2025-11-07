@@ -100,7 +100,7 @@ employeeRoutes.delete(
 employeeRoutes.post(
   "/check-permission",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["employee"]),
+  AuthMiddleware.authorizeRoleTypes(["employee", "business"]),
   validateRequest(EmployeeValidationSchemas.checkPermission),
   EmployeeController.checkPermission
 );

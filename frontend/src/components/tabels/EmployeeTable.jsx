@@ -1,4 +1,4 @@
-// EmployeeTable.js
+// EmployeeTable.js - UPDATED PERMISSIONS FIX
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Search,
@@ -17,23 +17,24 @@ import {
   FileSpreadsheet,
   Printer,
   Copy,
+  Shield,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  setCurrentUser,
-  clearUserError,
-  clearUserSuccess,
-} from "../../redux/slices/userSlice";
+import { setCurrentUser } from "../../redux/slices/userSlice";
 
-// ✅ FIXED: Import employee-specific actions
+// ✅ UPDATED: Import all employee actions from employeeSlice
 import {
   getEmployeeById,
   getAllEmployeesByParentId,
   deactivateEmployee,
   reactivateEmployee,
   deleteEmployee,
+  updateEmployeePermissions,
+  getEmployeePermissions,
+  clearEmployeeError,
+  clearEmployeeSuccess,
 } from "../../redux/slices/employeeSlice";
 
 import ButtonField from "../ui/ButtonField";
@@ -44,11 +45,6 @@ import ActionsMenu from "../ui/ActionsMenu";
 import UserProfileView from "../../pages/view/UserProfileView";
 import EditCredentialsModal from "../forms/EditCredentialsModal";
 import EditProfileImageModal from "../forms/EditProfileImageModal";
-import {
-  getPermissionById,
-  upsertPermission,
-} from "../../redux/slices/permissionSlice";
-import { getServicesActive } from "../../redux/slices/serviceSlice";
 import { login } from "../../redux/slices/authSlice";
 import PageHeader from "../ui/PageHeader";
 import AddEmployeePermissions from "../forms/AddEmployeePermissions";
@@ -77,13 +73,18 @@ const EmployeeTable = () => {
   const [existingPermissions, setExistingPermissions] = useState([]);
   const [permissionMode, setPermissionMode] = useState("add");
 
-  // ✅ FIXED: Use employee state instead of user state
+  // ✅ NEW: Store individual employee permissions
+  const [employeePermissionsMap, setEmployeePermissionsMap] = useState({});
+
+  // ✅ UPDATED: Use employee state with proper structure
   const employeesState = useSelector((state) => state.employees || {});
+  const { permissionCheck } = employeesState;
 
   // ✅ CURRENT LOGGED-IN USER ka data get karo
   const authState = useSelector((state) => state.auth || {});
   const currentLoggedInUser = authState.currentUser || {};
   const currentUserRole = currentLoggedInUser.role?.name || "";
+  const isAdminUser = currentUserRole === "ADMIN";
 
   const {
     employees = [],
@@ -97,6 +98,7 @@ const EmployeeTable = () => {
     },
     error: employeeError,
     success: employeeSuccess,
+    // ❌ REMOVED: We'll use local state instead of global permissions
   } = employeesState;
 
   const currentPage = pagination.page || 1;
@@ -104,13 +106,7 @@ const EmployeeTable = () => {
   const totalEmployees = pagination.total || 0;
   const limit = pagination.limit || 10;
 
-  const services =
-    useSelector((state) => state.services.serviceProviders) || [];
-
-  // ✅ Check if current user is ADMIN
-  const isAdminUser = currentUserRole === "ADMIN";
-
-  // ✅ FIXED: Use employee-specific load function
+  // ✅ UPDATED: Use employee-specific load function
   const loadEmployees = useCallback(
     async (page = 1, searchTerm = "", forceRefresh = false) => {
       try {
@@ -138,7 +134,7 @@ const EmployeeTable = () => {
     [dispatch, limit]
   );
 
-  // ✅ FIXED: Page change handler
+  // ✅ UPDATED: Page change handler
   const handlePageChange = useCallback(
     (page) => {
       if (page >= 1 && page <= totalPages) {
@@ -148,17 +144,17 @@ const EmployeeTable = () => {
     [totalPages, loadEmployees, search]
   );
 
-  // ✅ FIXED: Manual refresh
+  // ✅ UPDATED: Manual refresh
   const handleManualRefresh = useCallback(() => {
     loadEmployees(1, search, true);
     toast.info("Refreshing data...");
   }, [loadEmployees, search]);
 
-  // Toast handling
+  // Toast handling - UPDATED for employee slice
   useEffect(() => {
     if (employeeError) {
       toast.error(employeeError);
-      dispatch(clearUserError()); // Using user error clear for now
+      dispatch(clearEmployeeError());
     }
 
     if (employeeSuccess) {
@@ -175,11 +171,11 @@ const EmployeeTable = () => {
       if (isGenericSuccess) {
         toast.success(employeeSuccess);
       }
-      dispatch(clearUserSuccess()); // Using user success clear for now
+      dispatch(clearEmployeeSuccess());
     }
   }, [employeeError, employeeSuccess, dispatch]);
 
-  // ✅ FIXED: Initial load only once
+  // ✅ UPDATED: Initial load only once
   useEffect(() => {
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
@@ -187,7 +183,7 @@ const EmployeeTable = () => {
     }
   }, [loadEmployees]);
 
-  // ✅ FIXED: Search with debouncing
+  // ✅ UPDATED: Search with debouncing
   useEffect(() => {
     if (!initialLoadRef.current) return;
 
@@ -206,75 +202,83 @@ const EmployeeTable = () => {
     };
   }, [search, loadEmployees]);
 
-  // Permission effect
+  // ✅ UPDATED: Permission effect - using employee permissions
   useEffect(() => {
     if (showPermissionModal && permissionUser?.id) {
-      dispatch(getPermissionById(permissionUser.id))
-        .then((result) => {
-          if (result?.data) {
-            setExistingPermissions(result.data);
-          }
-        })
-        .catch((error) => {
-          setExistingPermissions([]);
-        });
+      fetchEmployeePermissions(permissionUser.id);
     }
   }, [dispatch, showPermissionModal, permissionUser]);
 
-  // Service providers effect
-  useEffect(() => {
-    if (showPermissionModal) {
-      dispatch(getServicesActive());
-    }
-  }, [showPermissionModal, dispatch]);
-
-  // Open Permission Modal
-  const handleAddPermission = async (user) => {
-    setPermissionUser(user);
-
+  // ✅ NEW: Separate function to fetch employee permissions
+  const fetchEmployeePermissions = async (employeeId) => {
     try {
-      const result = await dispatch(getPermissionById(user.id));
-      if (
-        result?.data &&
-        Array.isArray(result.data) &&
-        result.data.length > 0
-      ) {
+      const result = await dispatch(getEmployeePermissions(employeeId));
+
+      // ✅ Handle different response structures
+      const permissions =
+        result?.data?.permissions ||
+        result?.permissions ||
+        result?.data?.finalPermissions ||
+        [];
+
+      if (permissions && permissions.length > 0) {
+        setExistingPermissions(permissions);
         setPermissionMode("edit");
-        setExistingPermissions(result.data);
+
+        // ✅ Store permissions in local map for display
+        setEmployeePermissionsMap((prev) => ({
+          ...prev,
+          [employeeId]: permissions,
+        }));
       } else {
-        setPermissionMode("add");
         setExistingPermissions([]);
+        setPermissionMode("add");
+
+        // ✅ Ensure empty array for this employee
+        setEmployeePermissionsMap((prev) => ({
+          ...prev,
+          [employeeId]: [],
+        }));
       }
     } catch (error) {
-      setPermissionMode("add");
+      console.error("Failed to fetch employee permissions:", error);
       setExistingPermissions([]);
+      setPermissionMode("add");
     }
+  };
 
+  // ✅ UPDATED: Open Permission Modal
+  const handleAddPermission = async (user) => {
+    setPermissionUser(user);
     setShowPermissionModal(true);
   };
 
-  // Submit Permission
-  const handlePermissionSubmit = (permissionData) => {
+  // ✅ UPDATED: Submit Permission - using employee permissions
+  const handlePermissionSubmit = async (permissions) => {
     if (!permissionUser) return;
 
-    const finalData = {
-      userId: permissionUser.id,
-      ...permissionData,
-    };
+    try {
+      const permissionsArray = Array.isArray(permissions) ? permissions : [];
 
-    dispatch(upsertPermission(finalData))
-      .then(() => {
-        toast.success(
-          `Permissions ${
-            permissionMode === "add" ? "added" : "updated"
-          } successfully!`
-        );
-        handleClosePermissionModal();
-        handleManualRefresh();
-      })
-      .catch((error) => {
-        toast.error(error.message || "Failed to update permissions");
-      });
+      await dispatch(
+        updateEmployeePermissions(permissionUser.id, permissionsArray)
+      );
+
+      // ✅ Update local permissions map after successful update
+      setEmployeePermissionsMap((prev) => ({
+        ...prev,
+        [permissionUser.id]: permissionsArray,
+      }));
+
+      toast.success(
+        `Permissions ${
+          permissionMode === "add" ? "added" : "updated"
+        } successfully!`
+      );
+      handleClosePermissionModal();
+    } catch (error) {
+      toast.error(error.message || "Failed to update permissions");
+    }
   };
 
   // Close Modal
@@ -284,6 +288,47 @@ const EmployeeTable = () => {
     setPermissionMode("add");
     setExistingPermissions([]);
   };
+
+  // ✅ UPDATED: Get permissions for specific employee from local map
+  const getEmployeeSpecificPermissions = (employeeId) => {
+    return employeePermissionsMap[employeeId] || [];
+  };
+
+  // ✅ NEW: Load permissions for all employees when data loads
+  useEffect(() => {
+    if (employees.length > 0 && isAdminUser) {
+      // Load permissions for each employee
+      employees.forEach((employee) => {
+        if (!employeePermissionsMap[employee.id]) {
+          // Fetch permissions only if not already loaded
+          dispatch(getEmployeePermissions(employee.id))
+            .then((result) => {
+              const permissions =
+                result?.data?.permissions ||
+                result?.permissions ||
+                result?.data?.finalPermissions ||
+                [];
+
+              setEmployeePermissionsMap((prev) => ({
+                ...prev,
+                [employee.id]: permissions,
+              }));
+            })
+            .catch((error) => {
+              console.error(
+                `Failed to load permissions for employee ${employee.id}:`,
+                error
+              );
+              // Set empty array if failed to load
+              setEmployeePermissionsMap((prev) => ({
+                ...prev,
+                [employee.id]: [],
+              }));
+            });
+        }
+      });
+    }
+  }, [employees, isAdminUser, dispatch]);
 
   // Role colors and display names
   const getRoleColor = (roleName) => {
@@ -333,20 +378,16 @@ const EmployeeTable = () => {
     }));
   };
 
-  const togglePinVisibility = (userId) => {
-    setShowPins((prev) => ({
-      ...prev,
-      [userId]: !prev[userId],
-    }));
-  };
-
   const handleLogin = async (user) => {
     if (!user?.email || !user?.password) return;
 
+    const payload = {
+      emailOrUsername: user.email || user.username,
+      password: user.password,
+    };
+
     try {
-      await dispatch(
-        login({ emailOrUsername: user.email, password: user.password })
-      );
+      await dispatch(login(payload));
       toast.success(`Logged in as ${user.username}`);
     } catch (err) {
       console.error("Login failed:", err);
@@ -354,7 +395,7 @@ const EmployeeTable = () => {
     }
   };
 
-  // ✅ FIXED: Use employee-specific actions
+  // ✅ UPDATED: Use employee-specific actions with proper parameters
   const confirmAction = async (reason) => {
     if (actionType && selectedUser) {
       try {
@@ -400,14 +441,14 @@ const EmployeeTable = () => {
     setActionType("");
   };
 
-  // View user
+  // View user - UPDATED for employee
   const handleViewUser = async (user) => {
     try {
       await dispatch(getEmployeeById(user.id));
       setShowViewProfile(true);
       setOpenMenuId(null);
     } catch (error) {
-      console.error("Failed to load user details:", error);
+      console.error("Failed to load employee details:", error);
       dispatch(setCurrentUser(user));
       setShowViewProfile(true);
       setOpenMenuId(null);
@@ -586,9 +627,14 @@ const EmployeeTable = () => {
                 ROLE
               </th>
               {currentUserRole === "ADMIN" && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  PASSWORD
-                </th>
+                <>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PASSWORD
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PERMISSIONS
+                  </th>
+                </>
               )}
 
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -603,13 +649,13 @@ const EmployeeTable = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {isLoading ? (
               <tr>
-                <td colSpan={currentUserRole === "ADMIN" ? 9 : 7}>
+                <td colSpan={currentUserRole === "ADMIN" ? 8 : 6}>
                   <EmptyState type="loading" />
                 </td>
               </tr>
             ) : filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={currentUserRole === "ADMIN" ? 9 : 7}>
+                <td colSpan={currentUserRole === "ADMIN" ? 8 : 6}>
                   <EmptyState
                     type={search ? "search" : "empty"}
                     search={search}
@@ -617,190 +663,224 @@ const EmployeeTable = () => {
                 </td>
               </tr>
             ) : (
-              filteredEmployees.map((employee, index) => (
-                <tr
-                  key={employee.id}
-                  className="hover:bg-blue-50 transition-all"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {(currentPage - 1) * limit + index + 1}
-                  </td>
+              filteredEmployees.map((employee, index) => {
+                const employeePerms = getEmployeeSpecificPermissions(
+                  employee.id
+                );
 
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div
-                        className={`h-10 w-10 rounded-full ${getAvatarColor(
-                          employee.firstName
-                        )} flex items-center justify-center text-white font-medium text-sm cursor-pointer hover:scale-105 transition-transform`}
-                        onClick={() =>
-                          employee.profileImage &&
-                          setPreviewImage(employee.profileImage)
-                        }
+                return (
+                  <tr
+                    key={employee.id}
+                    className="hover:bg-blue-50 transition-all"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {(currentPage - 1) * limit + index + 1}
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div
+                          className={`h-10 w-10 rounded-full ${getAvatarColor(
+                            employee.firstName
+                          )} flex items-center justify-center text-white font-medium text-sm cursor-pointer hover:scale-105 transition-transform`}
+                          onClick={() =>
+                            employee.profileImage &&
+                            setPreviewImage(employee.profileImage)
+                          }
+                        >
+                          {employee.profileImage ? (
+                            <img
+                              src={employee.profileImage}
+                              alt={employee.firstName || "Employee"}
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          ) : (
+                            getInitials(employee.firstName, employee.lastName)
+                          )}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {`${employee.firstName || ""} ${
+                              employee.lastName || ""
+                            }`.trim()}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            @{employee.username}
+                          </div>
+                          <div className="text-xs text-gray-400 flex items-center">
+                            <UsersRound className="w-3 h-3 mr-1" />
+                            Parent: {employee.parent?.username || ""}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 flex items-center">
+                        <Mail className="w-4 h-4 mr-2 text-gray-400" />
+                        {employee.email || "No email"}
+                      </div>
+                      <div className="text-sm text-gray-500 flex items-center">
+                        <Phone className="w-4 h-4 mr-2 text-gray-400" />
+                        {employee.phoneNumber || "No phone"}
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getRoleColor(
+                          employee.role?.name
+                        )}`}
                       >
-                        {employee.profileImage ? (
-                          <img
-                            src={employee.profileImage}
-                            alt={employee.firstName || "Employee"}
-                            className="w-full h-full object-cover rounded-full"
-                          />
-                        ) : (
-                          getInitials(employee.firstName, employee.lastName)
-                        )}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {`${employee.firstName || ""} ${
-                            employee.lastName || ""
-                          }`.trim()}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          @{employee.username}
-                        </div>
-                        <div className="text-xs text-gray-400 flex items-center">
-                          <UsersRound className="w-3 h-3 mr-1" />
-                          Parent: {employee.parent?.username || ""}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
+                        {getRoleDisplayName(employee.role?.name)}
+                      </span>
+                    </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 flex items-center">
-                      <Mail className="w-4 h-4 mr-2 text-gray-400" />
-                      {employee.email || "No email"}
-                    </div>
-                    <div className="text-sm text-gray-500 flex items-center">
-                      <Phone className="w-4 h-4 mr-2 text-gray-400" />
-                      {employee.phoneNumber || "No phone"}
-                    </div>
-                  </td>
+                    {currentUserRole === "ADMIN" && (
+                      <>
+                        {/* Password Column */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-mono">
+                              {showPasswords[employee.id]
+                                ? employee.password
+                                : "••••••••"}
+                            </span>
+                            <button
+                              onClick={() =>
+                                togglePasswordVisibility(employee.id)
+                              }
+                              className="text-gray-500 hover:text-gray-700 transition-colors"
+                              title={
+                                showPasswords[employee.id] ? "Hide" : "Show"
+                              }
+                            >
+                              {showPasswords[employee.id] ? (
+                                <EyeOff size={14} />
+                              ) : (
+                                <Eye size={14} />
+                              )}
+                            </button>
+                          </div>
+                        </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${getRoleColor(
-                        employee.role?.name
-                      )}`}
-                    >
-                      {getRoleDisplayName(employee.role?.name)}
-                    </span>
-                  </td>
-
-                  {currentUserRole === "ADMIN" && (
-                    <>
-                      {/* Password Column */}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-mono">
-                            {showPasswords[employee.id]
-                              ? employee.password
-                              : "••••••••"}
-                          </span>
-                          <button
-                            onClick={() =>
-                              togglePasswordVisibility(employee.id)
-                            }
-                            className="text-gray-500 hover:text-gray-700 transition-colors"
-                            title={showPasswords[employee.id] ? "Hide" : "Show"}
-                          >
-                            {showPasswords[employee.id] ? (
-                              <EyeOff size={14} />
-                            ) : (
-                              <Eye size={14} />
+                        {/* ✅ FIXED: Permissions Column - Now shows correct permissions per employee */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-1">
+                            {employeePerms
+                              .slice(0, 2)
+                              .map((permission, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex px-2 py-1 rounded text-xs bg-green-100 text-green-800 border border-green-300"
+                                >
+                                  {permission.toUpperCase()}
+                                </span>
+                              ))}
+                            {employeePerms.length > 2 && (
+                              <span className="inline-flex px-2 py-1 rounded text-xs bg-gray-100 text-gray-600 border border-gray-300">
+                                +{employeePerms.length - 2} more
+                              </span>
                             )}
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  )}
+                            {employeePerms.length === 0 && (
+                              <span className="inline-flex px-2 py-1 rounded text-xs bg-gray-100 text-gray-500 border border-gray-300">
+                                No permissions
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
 
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
-                        employee.status === "IN_ACTIVE"
-                          ? "bg-red-100 text-red-800 border-red-300"
-                          : employee.status === "ACTIVE"
-                          ? "bg-green-100 text-green-800 border-green-300"
-                          : employee.status === "DELETE"
-                          ? "bg-gray-100 text-gray-800 border-gray-300"
-                          : "bg-yellow-100 text-yellow-800 border-yellow-300"
-                      }`}
-                    >
-                      {employee.status === "IN_ACTIVE"
-                        ? "Inactive"
-                        : employee.status === "ACTIVE"
-                        ? "Active"
-                        : employee.status === "DELETE"
-                        ? "Deleted"
-                        : employee.status || "Unknown"}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap text-center relative">
-                    <div className="inline-block relative">
-                      <button
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                        onClick={() =>
-                          setOpenMenuId(
-                            openMenuId === employee.id ? null : employee.id
-                          )
-                        }
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
+                          employee.status === "IN_ACTIVE"
+                            ? "bg-red-100 text-red-800 border-red-300"
+                            : employee.status === "ACTIVE"
+                            ? "bg-green-100 text-green-800 border-green-300"
+                            : employee.status === "DELETE"
+                            ? "bg-gray-100 text-gray-800 border-gray-300"
+                            : "bg-yellow-100 text-yellow-800 border-yellow-300"
+                        }`}
                       >
-                        {openMenuId === employee.id ? (
-                          <X className="w-5 h-5 text-gray-600" />
-                        ) : (
-                          <MoreVertical className="w-5 h-5 text-gray-600" />
-                        )}
-                      </button>
+                        {employee.status === "IN_ACTIVE"
+                          ? "Inactive"
+                          : employee.status === "ACTIVE"
+                          ? "Active"
+                          : employee.status === "DELETE"
+                          ? "Deleted"
+                          : employee.status || "Unknown"}
+                      </span>
+                    </td>
 
-                      {openMenuId === employee.id && (
-                        <ActionsMenu
-                          type="employee"
-                          user={employee}
-                          isAdminUser={isAdminUser}
-                          onView={handleViewUser}
-                          onEdit={(employee) => {
-                            setSelectedUser(employee);
-                            setShowForm(true);
-                            setOpenMenuId(null);
-                          }}
-                          onEditProfile={(employee) => {
-                            setSelectedUser(employee);
-                            setShowEditProfile(true);
-                            setOpenMenuId(null);
-                          }}
-                          onEditPassword={(employee) => {
-                            setSelectedUser(employee);
-                            setShowEditPassword(true);
-                            setOpenMenuId(null);
-                          }}
-                          onPermission={(employee) => {
-                            handleAddPermission(employee);
-                            setOpenMenuId(null);
-                          }}
-                          onToggleStatus={(employee) => {
-                            setActionType(
-                              employee.status === "IN_ACTIVE"
-                                ? "Activate"
-                                : "Deactivate"
-                            );
-                            setSelectedUser(employee);
-                            setShowActionModal(true);
-                            setOpenMenuId(null);
-                          }}
-                          onDelete={(employee) => {
-                            setActionType("Delete");
-                            setSelectedUser(employee);
-                            setShowActionModal(true);
-                            setOpenMenuId(null);
-                          }}
-                          onLogin={handleLogin}
-                          onClose={() => setOpenMenuId(null)}
-                        />
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    <td className="px-6 py-4 whitespace-nowrap text-center relative">
+                      <div className="inline-block relative">
+                        <button
+                          className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                          onClick={() =>
+                            setOpenMenuId(
+                              openMenuId === employee.id ? null : employee.id
+                            )
+                          }
+                        >
+                          {openMenuId === employee.id ? (
+                            <X className="w-5 h-5 text-gray-600" />
+                          ) : (
+                            <MoreVertical className="w-5 h-5 text-gray-600" />
+                          )}
+                        </button>
+
+                        {openMenuId === employee.id && (
+                          <ActionsMenu
+                            type="employee"
+                            user={employee}
+                            isAdminUser={isAdminUser}
+                            onView={handleViewUser}
+                            onEdit={(employee) => {
+                              setSelectedUser(employee);
+                              setShowForm(true);
+                              setOpenMenuId(null);
+                            }}
+                            onEditProfile={(employee) => {
+                              setSelectedUser(employee);
+                              setShowEditProfile(true);
+                              setOpenMenuId(null);
+                            }}
+                            onEditPassword={(employee) => {
+                              setSelectedUser(employee);
+                              setShowEditPassword(true);
+                              setOpenMenuId(null);
+                            }}
+                            onPermission={(employee) => {
+                              handleAddPermission(employee);
+                              setOpenMenuId(null);
+                            }}
+                            onToggleStatus={(employee) => {
+                              setActionType(
+                                employee.status === "IN_ACTIVE"
+                                  ? "Activate"
+                                  : "Deactivate"
+                              );
+                              setSelectedUser(employee);
+                              setShowActionModal(true);
+                              setOpenMenuId(null);
+                            }}
+                            onDelete={(employee) => {
+                              setActionType("Delete");
+                              setSelectedUser(employee);
+                              setShowActionModal(true);
+                              setOpenMenuId(null);
+                            }}
+                            onLogin={handleLogin}
+                            onClose={() => setOpenMenuId(null)}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -933,8 +1013,6 @@ const EmployeeTable = () => {
           onSubmit={handlePermissionSubmit}
           onCancel={handleClosePermissionModal}
           selectedUser={permissionUser}
-          services={services}
-          setSelectedUser={setPermissionUser}
           existingPermissions={existingPermissions}
         />
       )}

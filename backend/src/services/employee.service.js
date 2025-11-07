@@ -564,6 +564,12 @@ class EmployeeServices {
     const user = await Prisma.user.findUnique({
       where: { id: employeeId },
       include: {
+        EmployeePermissionsOwned: {
+          select: {
+            permission: true,
+            assignedAt: true,
+          },
+        },
         role: {
           select: {
             id: true,

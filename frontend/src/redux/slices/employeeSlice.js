@@ -21,6 +21,11 @@ const initialState = {
     status: "ALL",
   },
   permissions: [],
+  permissionCheck: {
+    single: null,
+    multiple: null,
+    isLoading: false,
+  },
 };
 
 const employeeSlice = createSlice({
@@ -49,6 +54,19 @@ const employeeSlice = createSlice({
       state.error = action.payload;
     },
 
+    // Permission specific states
+    permissionCheckRequest: (state) => {
+      state.permissionCheck.isLoading = true;
+    },
+    permissionCheckSuccess: (state, action) => {
+      state.permissionCheck.isLoading = false;
+      state.success = action.payload?.message || null;
+    },
+    permissionCheckFail: (state, action) => {
+      state.permissionCheck.isLoading = false;
+      state.error = action.payload;
+    },
+
     // Data management
     clearEmployeeError: (state) => {
       state.error = null;
@@ -64,6 +82,16 @@ const employeeSlice = createSlice({
     },
     setEmployeePermissions: (state, action) => {
       state.permissions = action.payload;
+    },
+    setSinglePermissionCheck: (state, action) => {
+      state.permissionCheck.single = action.payload;
+    },
+    setMultiplePermissionCheck: (state, action) => {
+      state.permissionCheck.multiple = action.payload;
+    },
+    clearPermissionCheck: (state) => {
+      state.permissionCheck.single = null;
+      state.permissionCheck.multiple = null;
     },
 
     // Update specific employee in list
@@ -117,11 +145,17 @@ export const {
   employeeSubmitRequest,
   employeeSuccess,
   employeeFail,
+  permissionCheckRequest,
+  permissionCheckSuccess,
+  permissionCheckFail,
   clearEmployeeError,
   clearEmployeeSuccess,
   setEmployees,
   setCurrentEmployee,
   setEmployeePermissions,
+  setSinglePermissionCheck,
+  setMultiplePermissionCheck,
+  clearPermissionCheck,
   updateEmployeeInList,
   updateEmployeePagination,
   setEmployeeData,
@@ -219,8 +253,6 @@ export const getEmployeeById = (employeeId) => async (dispatch) => {
     dispatch(employeeRequest());
     const { data } = await axios.get(`/employees/${employeeId}`);
 
-    console.log(data);
-
     dispatch(setCurrentEmployee(data.data.user || data.data.employee));
     dispatch(employeeSuccess(data));
     return data;
@@ -300,7 +332,7 @@ export const updateEmployeeProfileImage =
     }
   };
 
-// Update employee permissions
+// ✅ NEW: Update employee permissions
 export const updateEmployeePermissions =
   (employeeId, permissions) => async (dispatch) => {
     try {
@@ -329,7 +361,7 @@ export const updateEmployeePermissions =
     }
   };
 
-// Get employee permissions
+// ✅ NEW: Get employee permissions
 export const getEmployeePermissions = (employeeId) => async (dispatch) => {
   try {
     dispatch(employeeRequest());
@@ -343,46 +375,6 @@ export const getEmployeePermissions = (employeeId) => async (dispatch) => {
       error?.response?.data?.message ||
       error?.message ||
       "Failed to fetch employee permissions";
-    dispatch(employeeFail(errMsg));
-    throw new Error(errMsg);
-  }
-};
-
-// Check employee permission
-export const checkEmployeePermission = (permission) => async (dispatch) => {
-  try {
-    dispatch(employeeRequest());
-    const { data } = await axios.post(`/employees/check-permission`, {
-      permission,
-    });
-
-    dispatch(employeeSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to check permission";
-    dispatch(employeeFail(errMsg));
-    throw new Error(errMsg);
-  }
-};
-
-// Check multiple employee permissions
-export const checkEmployeePermissions = (permissions) => async (dispatch) => {
-  try {
-    dispatch(employeeRequest());
-    const { data } = await axios.post(`/employees/check-permissions`, {
-      permissions,
-    });
-
-    dispatch(employeeSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to check permissions";
     dispatch(employeeFail(errMsg));
     throw new Error(errMsg);
   }
@@ -423,7 +415,6 @@ export const deactivateEmployee =
     }
   };
 
-  
 // Reactivate employee
 export const reactivateEmployee =
   ({ employeeId, reason }) =>
