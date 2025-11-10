@@ -31,10 +31,10 @@ model EmployeePermission {
   permission String
   assignedBy String    @map("assigned_by")
   assignedAt DateTime  @default(now()) @map("assigned_at")
-  revokedAt  DateTime? @map("revoked_at") // ✅ Naya field add karein
-  isActive Boolean @default(true) @map("is_active")
-  assigner User    @relation("PermissionAssigner", fields: [assignedBy], references: [id])
-  user     User    @relation("EmployeePermission_userId", fields: [userId], references: [id])
+  revokedAt  DateTime? @map("revoked_at")
+  isActive   Boolean   @default(true) @map("is_active")
+  assigner   User      @relation("PermissionAssigner", fields: [assignedBy], references: [id])
+  user       User      @relation("EmployeePermission_userId", fields: [userId], references: [id])
 
   @@unique([userId, permission])
   @@index([assignedBy], map: "employee_permissions_assigned_by_fkey")
