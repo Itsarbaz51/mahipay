@@ -21,6 +21,15 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
 
+// Static business roles
+const STATIC_BUSINESS_ROLES = [
+  "ADMIN",
+  "STATE HEAD",
+  "MASTER DISTRIBUTOR",
+  "DISTRIBUTOR",
+  "RETAILER",
+];
+
 const Sidebar = () => {
   const location = useLocation();
   const dispatch = useDispatch();
@@ -32,66 +41,48 @@ const Sidebar = () => {
     dispatch(logout());
   };
 
-  const menuItems = [
+  // Base menu items structure
+  const baseMenuItems = [
     // --- MAIN ---
     {
       id: "dashboard",
       label: "Dashboard",
       icon: BarChart3,
       path: "/dashboard",
-      permissions: [
-        "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
-      ],
+      permission: "dashboard",
+      staticRoles: STATIC_BUSINESS_ROLES,
     },
     {
       id: "add-fund",
-      label: currentUser.role.name === "ADMIN" ? "Fund Request" : "Add Fund",
+      label: "Add Fund",
       icon: BadgeIndianRupee,
       path: "/request-fund",
-      permissions: [
-        "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
-      ],
+      permission: "fund request",
+      staticRoles: STATIC_BUSINESS_ROLES,
     },
     {
       id: "members",
       label: "Members",
       icon: Users,
       path: "/members",
-      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
+      permission: "members",
+      staticRoles: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
     },
     {
       id: "commission",
       label: "Commission",
       icon: Percent,
       path: "/commission",
-      permissions: [
-        "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
-      ],
+      permission: "commission",
+      staticRoles: STATIC_BUSINESS_ROLES,
     },
     {
-      id: "Transactions",
+      id: "transactions",
       label: "Transactions",
       icon: History,
       path: "/transactions",
-      permissions: [
-        "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
-      ],
+      permission: "transactions",
+      staticRoles: STATIC_BUSINESS_ROLES,
     },
 
     // --- SERVICE ---
@@ -100,7 +91,8 @@ const Sidebar = () => {
       label: "Payouts",
       icon: ArrowDownCircle,
       path: "/card-payout",
-      permissions: [
+      permission: "payout",
+      staticRoles: [
         "STATE HEAD",
         "MASTER DISTRIBUTOR",
         "DISTRIBUTOR",
@@ -114,34 +106,32 @@ const Sidebar = () => {
       label: "KYC Request",
       icon: Shield,
       path: "/kyc-request",
-      permissions: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
+      permission: "kyc request",
+      staticRoles: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
     },
     {
       id: "employee-management",
       label: "Employee Management",
       icon: Users,
       path: "/employee-management",
-      permissions: ["ADMIN"],
+      permission: "employee management",
+      staticRoles: ["ADMIN"],
     },
     {
       id: "reports",
       label: "Reports",
       icon: BarChart3,
       path: "/reports",
-      permissions: ["ADMIN"],
+      permission: "reports",
+      staticRoles: ["ADMIN"],
     },
     {
       id: "logs",
       label: "Logs",
       icon: FileCode,
       path: "/logs",
-      permissions: [
-        "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
-      ],
+      permission: "logs",
+      staticRoles: STATIC_BUSINESS_ROLES,
     },
 
     // --- SYSTEM ---
@@ -150,28 +140,51 @@ const Sidebar = () => {
       label: "Settings",
       icon: Settings,
       path: "/settings",
-      permissions: [
-        "ADMIN",
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
-      ],
+      permission: "settings",
+      staticRoles: STATIC_BUSINESS_ROLES,
     },
   ];
 
   // Safe data extraction with fallbacks
   const userData = currentUser || {};
   const role = userData.role?.name || userData.role || "USER";
+  const roleType = userData.role?.type || "business";
 
-  // Filter menu items based on user permissions
-  const filteredMenuItems = menuItems.filter((item) => {
-    return item.permissions.includes(role);
+  // FIXED: Extract employee permissions correctly from userPermissions array
+  // Your data shows userPermissions is an array of strings: ["transactions"]
+  const userPermissions = (userData.userPermissions || [])
+    .map((perm) => {
+      // Handle both string and object formats
+      if (typeof perm === "string") {
+        return perm.toLowerCase().trim();
+      } else if (perm && typeof perm === "object") {
+        return perm?.permission?.toLowerCase()?.trim() || "";
+      }
+      return "";
+    })
+    .filter((perm) => perm !== "");
+
+  // Filter menu items based on user role and permissions
+  const filteredMenuItems = baseMenuItems.filter((item) => {
+    // For static business roles
+    if (STATIC_BUSINESS_ROLES.includes(role)) {
+      return item.staticRoles.includes(role);
+    }
+    // For dynamic employee roles
+    else if (roleType === "employee") {
+      // FIXED: Check if the employee has this permission
+      const hasPermission = userPermissions.includes(
+        item.permission.toLowerCase()
+      );
+
+      return hasPermission;
+    }
+    return false;
   });
 
   // Group menu items by category for better organization
   const mainItems = filteredMenuItems.filter((item) =>
-    ["dashboard", "add-fund", "members", "commission", "Transactions"].includes(
+    ["dashboard", "add-fund", "members", "commission", "transactions"].includes(
       item.id
     )
   );
@@ -181,19 +194,7 @@ const Sidebar = () => {
   );
 
   const adminItems = filteredMenuItems.filter((item) =>
-    [
-      "request-kyc",
-      "employee-management",
-      "reports",
-      "permission",
-      "logs",
-      "Bank",
-      "fund-request",
-    ].includes(item.id)
-  );
-
-  const roleSpecificItems = filteredMenuItems.filter((item) =>
-    ["md-dashboard", "dist-dashboard", "retailer-dashboard"].includes(item.id)
+    ["request-kyc", "employee-management", "reports", "logs"].includes(item.id)
   );
 
   const systemItems = filteredMenuItems.filter((item) =>
@@ -271,6 +272,16 @@ const Sidebar = () => {
     );
   }
 
+  // Determine panel type for display
+  const getPanelType = () => {
+    if (STATIC_BUSINESS_ROLES.includes(role)) {
+      return `${role} Panel`;
+    } else if (roleType === "employee") {
+      return `${role} (Employee) Panel`;
+    }
+    return "User Panel";
+  };
+
   return (
     <div className="w-64 flex flex-col fixed h-screen border-r border-gray-300 bg-white z-50">
       {/* Header */}
@@ -281,7 +292,7 @@ const Sidebar = () => {
           </div>
           <div>
             <h2 className="text-lg font-bold">Payment System</h2>
-            <p className="text-xs text-gray-600">{role} Panel</p>
+            <p className="text-xs text-gray-600">{getPanelType()}</p>
           </div>
         </div>
       </div>
@@ -313,30 +324,32 @@ const Sidebar = () => {
               <p className="text-xs capitalize text-gray-500 truncate">
                 {username || "username"}
               </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {STATIC_BUSINESS_ROLES.includes(role)
+                  ? "Business User"
+                  : "Employee"}
+              </p>
             </div>
           </div>
 
-          {/* Wallet Section */}
-          <div className="bg-gray-100 rounded-lg p-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">Wallet Balance</span>
-              <Wallet className="h-3 w-3 text-gray-500" />
+          {/* Wallet Section - Only show for business users */}
+          {STATIC_BUSINESS_ROLES.includes(role) && (
+            <div className="bg-gray-100 rounded-lg p-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-600">Wallet Balance</span>
+                <Wallet className="h-3 w-3 text-gray-500" />
+              </div>
+              <p className="text-sm font-semibold mt-1 text-gray-800">
+                ₹{walletBalance.toLocaleString()}
+              </p>
             </div>
-            <p className="text-sm font-semibold mt-1 text-gray-800">
-              ₹{walletBalance.toLocaleString()}
-            </p>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Navigation */}
       <div className="flex-1 px-4 pb-4 overflow-y-auto">
         <MenuSection title="Main" items={mainItems} />
-
-        {/* Role Specific Dashboard */}
-        {roleSpecificItems.length > 0 && (
-          <MenuSection title={`${role} Dashboard`} items={roleSpecificItems} />
-        )}
 
         {/* Services Section */}
         {serviceItems.length > 0 && (
@@ -351,6 +364,17 @@ const Sidebar = () => {
         {/* System Section */}
         {systemItems.length > 0 && (
           <MenuSection title="System" items={systemItems} />
+        )}
+
+        {/* Empty State for Employees with no permissions */}
+        {roleType === "employee" && filteredMenuItems.length === 0 && (
+          <div className="text-center py-8">
+            <Settings className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No permissions assigned</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Contact administrator for access
+            </p>
+          </div>
         )}
       </div>
 

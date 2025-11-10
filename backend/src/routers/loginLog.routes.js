@@ -10,7 +10,7 @@ const loginLogRoutes = Router();
 loginLogRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(LoginLogsValidationSchemas.ListLoginLogsSchema),
   LoginLogController.index
 );
@@ -19,7 +19,7 @@ loginLogRoutes.post(
 loginLogRoutes.get(
   "/login-logs/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(LoginLogsValidationSchemas.GetLoginLogByIdSchema),
   LoginLogController.show
 );
@@ -28,7 +28,7 @@ loginLogRoutes.get(
 loginLogRoutes.post(
   "/login-logs",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(LoginLogsValidationSchemas.CreateLoginLogSchema),
   LoginLogController.store
 );
@@ -37,7 +37,7 @@ loginLogRoutes.post(
 loginLogRoutes.delete(
   "/login-logs/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(LoginLogsValidationSchemas.DeleteLoginLogSchema),
   LoginLogController.destroy
 );

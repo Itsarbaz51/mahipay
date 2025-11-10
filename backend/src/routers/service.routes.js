@@ -11,7 +11,7 @@ const serviceRoutes = Router();
 serviceRoutes.post(
   "/create",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   upload.single("icon"),
   validateRequest(ServiceValidationSchemas.createServiceProvider),
   ServiceProviderController.create
@@ -21,35 +21,35 @@ serviceRoutes.post(
 serviceRoutes.get(
   "/lists",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "business", "employee"]),
   ServiceProviderController.getAll
 );
 
 serviceRoutes.put(
   "/env-config/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   ServiceProviderController.updateEnvConfig
 );
 
 serviceRoutes.put(
   "/status/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   ServiceProviderController.toggleServiceStatus
 );
 
 serviceRoutes.put(
   "/api-intigration-status/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   ServiceProviderController.toggleApiIntigrationStatus
 );
 
 serviceRoutes.post(
   "/api-testing/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   ServiceProviderController.apiTestConnection
 );
 

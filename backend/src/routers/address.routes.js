@@ -14,28 +14,28 @@ const addressRoutes = Router();
 addressRoutes.get(
   "/address-show/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["employee", "business"]),
   AddressController.show
 );
 
 addressRoutes.post(
   "/address-store",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["employee", "business"]),
   AddressController.store
 );
 
 addressRoutes.put(
   "/address-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["employee", "business"]),
   AddressController.update
 );
 
 addressRoutes.delete(
   "/address-delete/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["employee", "business"]),
   AddressController.destroy
 );
 
@@ -48,21 +48,21 @@ addressRoutes.get("/state-list", StateController.index);
 addressRoutes.post(
   "/state-store",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   StateController.store
 );
 
 addressRoutes.put(
   "/state-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   StateController.update
 );
 
 addressRoutes.delete(
   "/state-delete/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   StateController.destroy
 );
 
@@ -75,21 +75,21 @@ addressRoutes.get("/city-list", CityController.index);
 addressRoutes.post(
   "/city-store",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   CityController.store
 );
 
 addressRoutes.put(
   "/city-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   CityController.update
 );
 
 addressRoutes.delete(
   "/city-delete/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   CityController.destroy
 );
 

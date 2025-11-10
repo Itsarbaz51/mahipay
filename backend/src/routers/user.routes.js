@@ -11,7 +11,7 @@ const userRoutes = Router();
 userRoutes.get(
   "/me",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   UserController.getCurrentUser
 );
 
@@ -19,11 +19,12 @@ userRoutes.get(
 userRoutes.get(
   "/role/:roleId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   UserController.getAllUsersByRole
 );
@@ -32,11 +33,12 @@ userRoutes.get(
 userRoutes.get(
   "/children/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   UserController.getAllUsersByChildrenId
 );
@@ -45,11 +47,12 @@ userRoutes.get(
 userRoutes.get(
   "/count/parent/:parentId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   UserController.getAllUsersCountByParentId
 );
@@ -58,11 +61,12 @@ userRoutes.get(
 userRoutes.get(
   "/count/children/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   UserController.getAllUsersCountByChildrenId
 );
@@ -71,11 +75,12 @@ userRoutes.get(
 userRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   UserController.getUserById
 );
@@ -85,11 +90,12 @@ userRoutes.post(
   "/register",
   upload.single("profileImage"),
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   validateRequest(UserValidationSchemas.register),
   UserController.register
@@ -99,11 +105,12 @@ userRoutes.post(
 userRoutes.put(
   "/:userId/profile",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   validateRequest(UserValidationSchemas.updateProfile),
   UserController.updateProfile
@@ -113,11 +120,12 @@ userRoutes.put(
 userRoutes.put(
   "/:userId/profile-image",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   upload.single("profileImage"),
   validateRequest(UserValidationSchemas.updateProfileImage),
@@ -128,11 +136,12 @@ userRoutes.put(
 userRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   UserController.getAllRoleTypeUsersByParentId
 );
@@ -141,6 +150,7 @@ userRoutes.get(
 userRoutes.patch(
   "/:userId/deactivate",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(UserValidationSchemas.deactivateUser),
   UserController.deactivateUser
@@ -150,6 +160,7 @@ userRoutes.patch(
 userRoutes.patch(
   "/:userId/reactivate",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(UserValidationSchemas.reactivateUser),
   UserController.reactivateUser
@@ -159,6 +170,7 @@ userRoutes.patch(
 userRoutes.delete(
   "/:userId/delete",
   AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
   validateRequest(UserValidationSchemas.deleteUser),
   UserController.deleteUser

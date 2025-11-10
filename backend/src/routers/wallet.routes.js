@@ -11,7 +11,7 @@ const walletRoutes = Router();
 walletRoutes.post(
   "/credit",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.walletCreditSchema),
   WalletController.creditWallet
@@ -21,7 +21,7 @@ walletRoutes.post(
 walletRoutes.post(
   "/debit",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.walletDebitSchema),
   WalletController.debitWallet
@@ -31,7 +31,7 @@ walletRoutes.post(
 walletRoutes.post(
   "/hold",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.holdAmountSchema),
   WalletController.holdAmount
@@ -41,7 +41,7 @@ walletRoutes.post(
 walletRoutes.post(
   "/release-hold",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.releaseHoldAmountSchema),
   WalletController.releaseHoldAmount
@@ -51,12 +51,14 @@ walletRoutes.post(
 walletRoutes.get(
   "/user/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
     "RETAILER",
+    "business",
+    "employee",
   ]),
   validateRequest(WallletValidationSchemas.getWalletSchema),
   WalletController.getWallet
@@ -66,12 +68,14 @@ walletRoutes.get(
 walletRoutes.get(
   "/user/:userId/all",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
     "RETAILER",
+    "business",
+    "employee",
   ]),
   WalletController.getUserWallets
 );
@@ -80,12 +84,14 @@ walletRoutes.get(
 walletRoutes.get(
   "/balance/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
     "RETAILER",
+    "business",
+    "employee",
   ]),
   validateRequest(WallletValidationSchemas.getWalletBalanceSchema),
   WalletController.getWalletBalance
@@ -95,12 +101,14 @@ walletRoutes.get(
 walletRoutes.get(
   "/transactions/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
     "RETAILER",
+    "business",
+    "employee",
   ]),
   validateRequest(WallletValidationSchemas.walletTransactionsSchema),
   WalletController.getWalletTransactions

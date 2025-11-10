@@ -172,8 +172,13 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      const from = location.state?.from?.pathname || "/dashboard";
-      navigate(from, { replace: true });
+      // Small delay to ensure auth state is fully updated
+      const timer = setTimeout(() => {
+        const from = location.state?.from?.pathname || "/dashboard";
+        navigate(from, { replace: true });
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, [isAuthenticated, currentUser, navigate, location]);
 

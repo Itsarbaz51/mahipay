@@ -1,10 +1,9 @@
-// EmployeeTable.js - UPDATED PERMISSIONS FIX
-import React, { useEffect, useState, useRef, useCallback } from "react";
+// EmployeeTable.js
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search,
   Phone,
   Mail,
-  Wallet,
   X,
   MoreVertical,
   Eye,
@@ -13,26 +12,17 @@ import {
   UsersRound,
   Filter,
   UserPlus,
-  FileText,
-  FileSpreadsheet,
-  Printer,
-  Copy,
-  Shield,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
-import { setCurrentUser } from "../../redux/slices/userSlice";
 
-// ✅ UPDATED: Import all employee actions from employeeSlice
+import AddMember from "../forms/AddMember";
 import {
-  getEmployeeById,
   getAllEmployeesByParentId,
   deactivateEmployee,
   reactivateEmployee,
   deleteEmployee,
   updateEmployeePermissions,
-  getEmployeePermissions,
   clearEmployeeError,
   clearEmployeeSuccess,
 } from "../../redux/slices/employeeSlice";
@@ -50,487 +40,287 @@ import PageHeader from "../ui/PageHeader";
 import AddEmployeePermissions from "../forms/AddEmployeePermissions";
 
 const EmployeeTable = () => {
+  const dispatch = useDispatch();
+  const { employees, isLoading, pagination, error, success } = useSelector(
+    (state) => state.employees
+  );
+  const currentUser = useSelector((state) => state.auth.currentUser);
+
+  // State management
   const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [showViewProfile, setShowViewProfile] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit] = useState(10);
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [showActionModal, setShowActionModal] = useState(false);
-  const [actionType, setActionType] = useState("");
+  const [showPasswords, setShowPasswords] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [actionType, setActionType] = useState("");
+
+  // Modal states
+  const [showViewProfile, setShowViewProfile] = useState(false);
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
-  const [showPasswords, setShowPasswords] = useState({});
-  const [showPins, setShowPins] = useState({});
-
-  const dispatch = useDispatch();
-  const searchTimeoutRef = useRef(null);
-  const initialLoadRef = useRef(false);
-
-  // --- Permission Modal States ---
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [permissionUser, setPermissionUser] = useState(null);
-  const [existingPermissions, setExistingPermissions] = useState([]);
   const [permissionMode, setPermissionMode] = useState("add");
 
-  // ✅ NEW: Store individual employee permissions
-  const [employeePermissionsMap, setEmployeePermissionsMap] = useState({});
-
-  // ✅ UPDATED: Use employee state with proper structure
-  const employeesState = useSelector((state) => state.employees || {});
-  const { permissionCheck } = employeesState;
-
-  // ✅ CURRENT LOGGED-IN USER ka data get karo
-  const authState = useSelector((state) => state.auth || {});
-  const currentLoggedInUser = authState.currentUser || {};
-  const currentUserRole = currentLoggedInUser.role?.name || "";
+  // Derived values
+  const currentUserRole = currentUser?.role?.name || "";
   const isAdminUser = currentUserRole === "ADMIN";
+  const totalPages = pagination?.totalPages || 0;
+  const totalEmployees = pagination?.total || 0;
 
-  const {
-    employees = [],
-    isLoading = false,
-    currentEmployee: viewedEmployee = null,
-    pagination = {
-      page: 1,
-      limit: 10,
-      total: 0,
-      totalPages: 0,
-    },
-    error: employeeError,
-    success: employeeSuccess,
-    // ❌ REMOVED: We'll use local state instead of global permissions
-  } = employeesState;
+  // Filter employees based on search
+  const filteredEmployees = useMemo(() => {
+    if (!search) return employees;
 
-  const currentPage = pagination.page || 1;
-  const totalPages = pagination.totalPages || 0;
-  const totalEmployees = pagination.total || 0;
-  const limit = pagination.limit || 10;
+    const searchLower = search.toLowerCase();
+    return employees.filter(
+      (employee) =>
+        employee.firstName?.toLowerCase().includes(searchLower) ||
+        employee.lastName?.toLowerCase().includes(searchLower) ||
+        employee.email?.toLowerCase().includes(searchLower) ||
+        employee.username?.toLowerCase().includes(searchLower) ||
+        employee.phoneNumber?.includes(search)
+    );
+  }, [employees, search]);
 
-  // ✅ UPDATED: Use employee-specific load function
-  const loadEmployees = useCallback(
-    async (page = 1, searchTerm = "", forceRefresh = false) => {
-      try {
-        const params = {
-          page,
-          limit,
-          sort: "desc",
-          status: "ALL",
-        };
-
-        if (searchTerm && searchTerm.trim() !== "") {
-          params.search = searchTerm;
-        }
-
-        if (forceRefresh) {
-          params.timestamp = Date.now();
-        }
-
-        await dispatch(getAllEmployeesByParentId(params));
-      } catch (error) {
-        console.error("Failed to load employees:", error);
-        toast.error(error.message || "Failed to load employees");
-      }
-    },
-    [dispatch, limit]
-  );
-
-  // ✅ UPDATED: Page change handler
-  const handlePageChange = useCallback(
-    (page) => {
-      if (page >= 1 && page <= totalPages) {
-        loadEmployees(page, search);
-      }
-    },
-    [totalPages, loadEmployees, search]
-  );
-
-  // ✅ UPDATED: Manual refresh
-  const handleManualRefresh = useCallback(() => {
-    loadEmployees(1, search, true);
-    toast.info("Refreshing data...");
-  }, [loadEmployees, search]);
-
-  // Toast handling - UPDATED for employee slice
+  // Load employees on component mount and page change
   useEffect(() => {
-    if (employeeError) {
-      toast.error(employeeError);
-      dispatch(clearEmployeeError());
-    }
+    loadEmployees();
+  }, [currentPage, limit]);
 
-    if (employeeSuccess) {
-      const lowerSuccess = employeeSuccess.toLowerCase();
-      const isGenericSuccess = ![
-        "registered",
-        "updated",
-        "created",
-        "added",
-        "activated",
-        "deactivated",
-      ].some((word) => lowerSuccess.includes(word));
-
-      if (isGenericSuccess) {
-        toast.success(employeeSuccess);
-      }
+  // Handle success/error messages
+  useEffect(() => {
+    if (success) {
+      toast.success(success);
       dispatch(clearEmployeeSuccess());
     }
-  }, [employeeError, employeeSuccess, dispatch]);
-
-  // ✅ UPDATED: Initial load only once
-  useEffect(() => {
-    if (!initialLoadRef.current) {
-      initialLoadRef.current = true;
-      loadEmployees();
+    if (error) {
+      toast.error(error);
+      dispatch(clearEmployeeError());
     }
-  }, [loadEmployees]);
+  }, [success, error, dispatch]);
 
-  // ✅ UPDATED: Search with debouncing
-  useEffect(() => {
-    if (!initialLoadRef.current) return;
+  const loadEmployees = useCallback(() => {
+    dispatch(
+      getAllEmployeesByParentId({
+        page: currentPage,
+        limit,
+        search: search || undefined,
+      })
+    );
+  }, [dispatch, currentPage, limit, search]);
 
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      loadEmployees(1, search);
-    }, 500);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [search, loadEmployees]);
-
-  // ✅ UPDATED: Permission effect - using employee permissions
-  useEffect(() => {
-    if (showPermissionModal && permissionUser?.id) {
-      fetchEmployeePermissions(permissionUser.id);
-    }
-  }, [dispatch, showPermissionModal, permissionUser]);
-
-  // ✅ NEW: Separate function to fetch employee permissions
-  const fetchEmployeePermissions = async (employeeId) => {
-    try {
-      const result = await dispatch(getEmployeePermissions(employeeId));
-
-      // ✅ Handle different response structures
-      const permissions =
-        result?.data?.permissions ||
-        result?.permissions ||
-        result?.data?.finalPermissions ||
-        [];
-
-      if (permissions && permissions.length > 0) {
-        setExistingPermissions(permissions);
-        setPermissionMode("edit");
-
-        // ✅ Store permissions in local map for display
-        setEmployeePermissionsMap((prev) => ({
-          ...prev,
-          [employeeId]: permissions,
-        }));
-      } else {
-        setExistingPermissions([]);
-        setPermissionMode("add");
-
-        // ✅ Ensure empty array for this employee
-        setEmployeePermissionsMap((prev) => ({
-          ...prev,
-          [employeeId]: [],
-        }));
-      }
-    } catch (error) {
-      console.error("Failed to fetch employee permissions:", error);
-      setExistingPermissions([]);
-      setPermissionMode("add");
-    }
+  const handleManualRefresh = () => {
+    loadEmployees();
   };
 
-  // ✅ UPDATED: Open Permission Modal
-  const handleAddPermission = async (user) => {
-    setPermissionUser(user);
-    setShowPermissionModal(true);
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
-  // ✅ UPDATED: Submit Permission - using employee permissions
-  const handlePermissionSubmit = async (permissions) => {
-    if (!permissionUser) return;
-
-    try {
-      const permissionsArray = Array.isArray(permissions) ? permissions : [];
-
-      await dispatch(
-        updateEmployeePermissions(permissionUser.id, permissionsArray)
-      );
-
-      // ✅ Update local permissions map after successful update
-      setEmployeePermissionsMap((prev) => ({
-        ...prev,
-        [permissionUser.id]: permissionsArray,
-      }));
-
-      toast.success(
-        `Permissions ${
-          permissionMode === "add" ? "added" : "updated"
-        } successfully!`
-      );
-      handleClosePermissionModal();
-    } catch (error) {
-      toast.error(error.message || "Failed to update permissions");
-    }
-  };
-
-  // Close Modal
-  const handleClosePermissionModal = () => {
-    setShowPermissionModal(false);
-    setPermissionUser(null);
-    setPermissionMode("add");
-    setExistingPermissions([]);
-  };
-
-  // ✅ UPDATED: Get permissions for specific employee from local map
-  const getEmployeeSpecificPermissions = (employeeId) => {
-    return employeePermissionsMap[employeeId] || [];
-  };
-
-  // ✅ NEW: Load permissions for all employees when data loads
-  useEffect(() => {
-    if (employees.length > 0 && isAdminUser) {
-      // Load permissions for each employee
-      employees.forEach((employee) => {
-        if (!employeePermissionsMap[employee.id]) {
-          // Fetch permissions only if not already loaded
-          dispatch(getEmployeePermissions(employee.id))
-            .then((result) => {
-              const permissions =
-                result?.data?.permissions ||
-                result?.permissions ||
-                result?.data?.finalPermissions ||
-                [];
-
-              setEmployeePermissionsMap((prev) => ({
-                ...prev,
-                [employee.id]: permissions,
-              }));
-            })
-            .catch((error) => {
-              console.error(
-                `Failed to load permissions for employee ${employee.id}:`,
-                error
-              );
-              // Set empty array if failed to load
-              setEmployeePermissionsMap((prev) => ({
-                ...prev,
-                [employee.id]: [],
-              }));
-            });
-        }
-      });
-    }
-  }, [employees, isAdminUser, dispatch]);
-
-  // Role colors and display names
-  const getRoleColor = (roleName) => {
-    const role = roleName?.toUpperCase();
-    switch (role) {
-      case "STATE HEAD":
-        return "bg-purple-100 text-purple-800 border-purple-300";
-      case "STATE HOLDER":
-        return "bg-purple-100 text-purple-800 border-purple-300";
-      case "MASTER DISTRIBUTOR":
-        return "bg-blue-100 text-blue-800 border-blue-300";
-      case "DISTRIBUTOR":
-        return "bg-green-100 text-green-800 border-green-300";
-      case "AGENT":
-        return "bg-amber-100 text-amber-800 border-amber-300";
-      case "RETAILER":
-        return "bg-orange-100 text-orange-800 border-orange-300";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-300";
-    }
-  };
-
-  const getRoleDisplayName = (roleName) => {
-    const role = roleName?.toUpperCase();
-    switch (role) {
-      case "STATE HEAD":
-        return "State Head";
-      case "STATE HOLDER":
-        return "State Holder";
-      case "MASTER DISTRIBUTOR":
-        return "Master Distributor";
-      case "DISTRIBUTOR":
-        return "Distributor";
-      case "AGENT":
-        return "Agent";
-      case "RETAILER":
-        return "Retailer";
-      default:
-        return roleName || "Unknown";
-    }
-  };
-
-  const togglePasswordVisibility = (userId) => {
+  const togglePasswordVisibility = (employeeId) => {
     setShowPasswords((prev) => ({
       ...prev,
-      [userId]: !prev[userId],
+      [employeeId]: !prev[employeeId],
     }));
   };
 
-  const handleLogin = async (user) => {
-    if (!user?.email || !user?.password) return;
-
-    const payload = {
-      emailOrUsername: user.email || user.username,
-      password: user.password,
-    };
-
-    try {
-      await dispatch(login(payload));
-      toast.success(`Logged in as ${user.username}`);
-    } catch (err) {
-      console.error("Login failed:", err);
-      toast.error("Login failed!");
-    }
+  // FIXED: Added setSelectedUser to handleViewUser
+  const handleViewUser = (employee) => {
+    setSelectedUser(employee); // This line was missing
+    setShowViewProfile(true);
   };
 
-  // ✅ UPDATED: Use employee-specific actions with proper parameters
-  const confirmAction = async (reason) => {
-    if (actionType && selectedUser) {
-      try {
-        const finalReason = reason?.trim() || `${actionType}d by admin`;
-
-        if (actionType === "Deactivate") {
-          await dispatch(
-            deactivateEmployee({
-              employeeId: selectedUser.id,
-              reason: finalReason,
-            })
-          );
-        } else if (actionType === "Activate") {
-          await dispatch(
-            reactivateEmployee({
-              employeeId: selectedUser.id,
-              reason: finalReason,
-            })
-          );
-        } else if (actionType === "Delete") {
-          await dispatch(
-            deleteEmployee({
-              employeeId: selectedUser.id,
-              reason: finalReason,
-            })
-          );
-        }
-
-        toast.success(`Employee ${actionType.toLowerCase()}d successfully!`);
-
-        setTimeout(() => {
-          handleManualRefresh();
-        }, 500);
-      } catch (error) {
-        console.error(`Failed to ${actionType.toLowerCase()} employee:`, error);
-        toast.error(
-          error.message || `Failed to ${actionType.toLowerCase()} employee`
-        );
-      }
-    }
-    setShowActionModal(false);
-    setSelectedUser(null);
-    setActionType("");
-  };
-
-  // View user - UPDATED for employee
-  const handleViewUser = async (user) => {
-    try {
-      await dispatch(getEmployeeById(user.id));
-      setShowViewProfile(true);
-      setOpenMenuId(null);
-    } catch (error) {
-      console.error("Failed to load employee details:", error);
-      dispatch(setCurrentUser(user));
-      setShowViewProfile(true);
-      setOpenMenuId(null);
-    }
-  };
-
-  // Form handlers
   const handleFormClose = () => {
     setShowForm(false);
     setSelectedUser(null);
   };
 
   const handleFormSuccess = () => {
-    setShowForm(false);
-    setSelectedUser(null);
-    handleManualRefresh();
-    toast.success(
-      selectedUser
-        ? "Employee updated successfully!"
-        : "Employee added successfully!"
-    );
+    handleFormClose();
+    loadEmployees();
   };
 
   const handleEditProfileSuccess = () => {
     setShowEditProfile(false);
     setSelectedUser(null);
-    handleManualRefresh();
-    toast.success("Profile image updated successfully!");
+    loadEmployees();
   };
 
   const handleCredentialsSuccess = () => {
     setShowEditPassword(false);
     setSelectedUser(null);
-    handleManualRefresh();
-    toast.success("Credentials updated successfully!");
   };
 
-  // Filter employees safely
-  const filteredEmployees = Array.isArray(employees)
-    ? employees.filter(
-        (employee) =>
-          employee.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-          employee.lastName?.toLowerCase().includes(search.toLowerCase()) ||
-          employee.email?.toLowerCase().includes(search.toLowerCase()) ||
-          employee.phoneNumber?.toLowerCase().includes(search.toLowerCase())
-      )
-    : [];
+  const handleAddPermission = (employee) => {
+    setPermissionUser(employee);
+    setPermissionMode("add");
+    setShowPermissionModal(true);
+  };
 
-  // Export actions
-  const exportActions = [
-    { name: "Copy", icon: Copy },
-    { name: "CSV", icon: FileText },
-    { name: "Excel", icon: FileSpreadsheet },
-    { name: "PDF", icon: FileText },
-    { name: "Print", icon: Printer },
-  ];
+  const handleEditPermission = (employee) => {
+    setPermissionUser(employee);
+    setPermissionMode("edit");
+    setShowPermissionModal(true);
+  };
 
-  // Avatar color function
+  const handlePermissionSubmit = async (permissions) => {
+    if (!permissionUser) return;
+
+    try {
+      await dispatch(updateEmployeePermissions(permissionUser.id, permissions));
+      setShowPermissionModal(false);
+      setPermissionUser(null);
+      loadEmployees();
+    } catch (error) {
+      toast.error("Failed to update permissions");
+    }
+  };
+
+  const handleClosePermissionModal = () => {
+    setShowPermissionModal(false);
+    setPermissionUser(null);
+  };
+
+  const handleLogin = async (employee) => {
+    try {
+      await dispatch(
+        login({
+          username: employee.username,
+          password: employee.password,
+        })
+      );
+      toast.success(`Logged in as ${employee.firstName}`);
+    } catch (error) {
+      toast.error("Login failed");
+    }
+  };
+
+  const confirmAction = async (reason) => {
+    if (!selectedUser) return;
+
+    try {
+      switch (actionType) {
+        case "Activate":
+          await dispatch(
+            reactivateEmployee({
+              employeeId: selectedUser.id,
+              reason,
+            })
+          );
+          break;
+        case "Deactivate":
+          await dispatch(
+            deactivateEmployee({
+              employeeId: selectedUser.id,
+              reason,
+            })
+          );
+          break;
+        case "Delete":
+          await dispatch(
+            deleteEmployee({
+              employeeId: selectedUser.id,
+              reason,
+            })
+          );
+          break;
+        default:
+          break;
+      }
+      setShowActionModal(false);
+      setSelectedUser(null);
+      loadEmployees();
+    } catch (error) {
+      // Error handled by slice
+    }
+  };
+
+  // Utility functions
   const getAvatarColor = (name) => {
     const colors = [
       "bg-blue-500",
       "bg-green-500",
       "bg-purple-500",
+      "bg-orange-500",
       "bg-red-500",
-      "bg-yellow-500",
-      "bg-indigo-500",
-      "bg-pink-500",
       "bg-teal-500",
     ];
     const index = name?.charCodeAt(0) % colors.length || 0;
     return colors[index];
   };
 
-  // Get initials for avatar
   const getInitials = (firstName, lastName) => {
     const first = firstName?.[0] || "";
     const last = lastName?.[0] || "";
-    return `${first}${last}`.toUpperCase() || "U";
+    return `${first}${last}`.toUpperCase();
+  };
+
+  const getRoleColor = (roleName) => {
+    const roleMap = {
+      "STATE HEAD": "bg-purple-100 text-purple-800 border-purple-300",
+      "STATE HOLDER": "bg-purple-100 text-purple-800 border-purple-300",
+      "MASTER DISTRIBUTOR": "bg-blue-100 text-blue-800 border-blue-300",
+      DISTRIBUTOR: "bg-green-100 text-green-800 border-green-300",
+      AGENT: "bg-amber-100 text-amber-800 border-amber-300",
+      RETAILER: "bg-orange-100 text-orange-800 border-orange-300",
+    };
+    return (
+      roleMap[roleName?.toUpperCase()] ||
+      "bg-gray-100 text-gray-800 border-gray-300"
+    );
+  };
+
+  const getRoleDisplayName = (roleName) => {
+    const roleMap = {
+      "STATE HEAD": "State Head",
+      "STATE HOLDER": "State Holder",
+      "MASTER DISTRIBUTOR": "Master Distributor",
+      DISTRIBUTOR: "Distributor",
+      AGENT: "Agent",
+      RETAILER: "Retailer",
+    };
+    return roleMap[roleName?.toUpperCase()] || roleName || "Unknown";
+  };
+
+  const getStatusDisplay = (status) => {
+    const statusMap = {
+      IN_ACTIVE: {
+        label: "Inactive",
+        class: "bg-red-100 text-red-800 border-red-300",
+      },
+      ACTIVE: {
+        label: "Active",
+        class: "bg-green-100 text-green-800 border-green-300",
+      },
+      DELETE: {
+        label: "Deleted",
+        class: "bg-gray-100 text-gray-800 border-gray-300",
+      },
+    };
+    return (
+      statusMap[status] || {
+        label: status || "Unknown",
+        class: "bg-yellow-100 text-yellow-800 border-yellow-300",
+      }
+    );
+  };
+
+  // Extract active permissions from employee data
+  const getEmployeePermissions = (employee) => {
+    if (!employee?.EmployeePermissionsOwned) return [];
+    return employee.EmployeePermissionsOwned.filter(
+      (perm) => perm.isActive
+    ).map((perm) => perm.permission);
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
         <PageHeader
           breadcrumb={["Dashboard", "Employee Management"]}
@@ -538,24 +328,9 @@ const EmployeeTable = () => {
           description="Manage your team members and employee records"
         />
         <div className="flex gap-3 mt-4 sm:mt-0">
-          <div className="flex gap-2">
-            {exportActions.map((action) => (
-              <button
-                key={action.name}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors text-sm"
-                title={action.name}
-              >
-                <action.icon className="h-4 w-4" />
-                <span className="ml-1 hidden sm:inline">{action.name}</span>
-              </button>
-            ))}
-          </div>
           <ButtonField
             name="Add Employee"
-            isOpen={() => {
-              setSelectedUser(null);
-              setShowForm(true);
-            }}
+            isOpen={() => setShowForm(true)}
             icon={UserPlus}
             css
           />
@@ -584,13 +359,11 @@ const EmployeeTable = () => {
               />
             </div>
 
-            {/* Filter Button */}
             <button className="inline-flex items-center px-4 py-3 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
               <Filter className="h-4 w-4 mr-2" />
               Filters
             </button>
 
-            {/* Refresh Button */}
             <button
               onClick={handleManualRefresh}
               disabled={isLoading}
@@ -626,7 +399,7 @@ const EmployeeTable = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 ROLE
               </th>
-              {currentUserRole === "ADMIN" && (
+              {isAdminUser && (
                 <>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     PASSWORD
@@ -636,7 +409,6 @@ const EmployeeTable = () => {
                   </th>
                 </>
               )}
-
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 STATUS
               </th>
@@ -649,13 +421,13 @@ const EmployeeTable = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {isLoading ? (
               <tr>
-                <td colSpan={currentUserRole === "ADMIN" ? 8 : 6}>
+                <td colSpan={isAdminUser ? 8 : 6}>
                   <EmptyState type="loading" />
                 </td>
               </tr>
             ) : filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={currentUserRole === "ADMIN" ? 8 : 6}>
+                <td colSpan={isAdminUser ? 8 : 6}>
                   <EmptyState
                     type={search ? "search" : "empty"}
                     search={search}
@@ -664,9 +436,8 @@ const EmployeeTable = () => {
               </tr>
             ) : (
               filteredEmployees.map((employee, index) => {
-                const employeePerms = getEmployeeSpecificPermissions(
-                  employee.id
-                );
+                const statusInfo = getStatusDisplay(employee.status);
+                const employeePermissions = getEmployeePermissions(employee);
 
                 return (
                   <tr
@@ -736,9 +507,8 @@ const EmployeeTable = () => {
                       </span>
                     </td>
 
-                    {currentUserRole === "ADMIN" && (
+                    {isAdminUser && (
                       <>
-                        {/* Password Column */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-2">
                             <span className="text-sm font-mono">
@@ -764,53 +534,39 @@ const EmployeeTable = () => {
                           </div>
                         </td>
 
-                        {/* ✅ FIXED: Permissions Column - Now shows correct permissions per employee */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-1">
-                            {employeePerms
-                              .slice(0, 2)
-                              .map((permission, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex px-2 py-1 rounded text-xs bg-green-100 text-green-800 border border-green-300"
-                                >
-                                  {permission.toUpperCase()}
+                          {employeePermissions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {employeePermissions
+                                .slice(0, 3)
+                                .map((permission, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded border border-blue-300"
+                                  >
+                                    {permission.toUpperCase()}
+                                  </span>
+                                ))}
+                              {employeePermissions.length > 3 && (
+                                <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded border border-gray-300">
+                                  +{employeePermissions.length - 3}
                                 </span>
-                              ))}
-                            {employeePerms.length > 2 && (
-                              <span className="inline-flex px-2 py-1 rounded text-xs bg-gray-100 text-gray-600 border border-gray-300">
-                                +{employeePerms.length - 2} more
-                              </span>
-                            )}
-                            {employeePerms.length === 0 && (
-                              <span className="inline-flex px-2 py-1 rounded text-xs bg-gray-100 text-gray-500 border border-gray-300">
-                                No permissions
-                              </span>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-500">
+                              No permissions
+                            </span>
+                          )}
                         </td>
                       </>
                     )}
 
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
-                          employee.status === "IN_ACTIVE"
-                            ? "bg-red-100 text-red-800 border-red-300"
-                            : employee.status === "ACTIVE"
-                            ? "bg-green-100 text-green-800 border-green-300"
-                            : employee.status === "DELETE"
-                            ? "bg-gray-100 text-gray-800 border-gray-300"
-                            : "bg-yellow-100 text-yellow-800 border-yellow-300"
-                        }`}
+                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${statusInfo.class}`}
                       >
-                        {employee.status === "IN_ACTIVE"
-                          ? "Inactive"
-                          : employee.status === "ACTIVE"
-                          ? "Active"
-                          : employee.status === "DELETE"
-                          ? "Deleted"
-                          : employee.status || "Unknown"}
+                        {statusInfo.label}
                       </span>
                     </td>
 
@@ -852,10 +608,11 @@ const EmployeeTable = () => {
                               setShowEditPassword(true);
                               setOpenMenuId(null);
                             }}
-                            onPermission={(employee) => {
-                              handleAddPermission(employee);
-                              setOpenMenuId(null);
-                            }}
+                            onPermission={
+                              employeePermissions.length > 0
+                                ? handleEditPermission
+                                : handleAddPermission
+                            }
                             onToggleStatus={(employee) => {
                               setActionType(
                                 employee.status === "IN_ACTIVE"
@@ -893,17 +650,11 @@ const EmployeeTable = () => {
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
               Active:{" "}
-              {
-                employees.filter((employee) => employee.status === "ACTIVE")
-                  .length
-              }
+              {employees.filter((emp) => emp.status === "ACTIVE").length}
             </div>
             <div className="text-sm text-gray-600">
               Inactive:{" "}
-              {
-                employees.filter((employee) => employee.status === "IN_ACTIVE")
-                  .length
-              }
+              {employees.filter((emp) => emp.status === "IN_ACTIVE").length}
             </div>
           </div>
         </div>
@@ -918,19 +669,17 @@ const EmployeeTable = () => {
         />
       )}
 
-      {/* All Modals */}
-      {showViewProfile && (
+      {showViewProfile && selectedUser && (
         <UserProfileView
-          userData={viewedEmployee || selectedUser}
+          userId={selectedUser.id}
           isAdminUser={isAdminUser}
           onClose={() => {
             setShowViewProfile(false);
-            dispatch(setCurrentUser(null));
+            setSelectedUser(null);
           }}
-          type={"employee"}
+          type="employee"
         />
       )}
-
       {previewImage && (
         <div
           className="fixed inset-0 bg-black/70 flex justify-center items-center z-50"
@@ -978,7 +727,7 @@ const EmployeeTable = () => {
             onSuccess={handleFormSuccess}
             editData={selectedUser}
             isAdmin={isAdminUser}
-            type={"employee"}
+            type="employee"
           />
         </div>
       )}
@@ -1013,7 +762,8 @@ const EmployeeTable = () => {
           onSubmit={handlePermissionSubmit}
           onCancel={handleClosePermissionModal}
           selectedUser={permissionUser}
-          existingPermissions={existingPermissions}
+          existingPermissions={permissionUser.EmployeePermissionsOwned || []}
+          isLoading={isLoading}
         />
       )}
     </div>

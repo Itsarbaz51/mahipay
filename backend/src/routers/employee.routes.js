@@ -11,7 +11,7 @@ const employeeRoutes = Router();
 employeeRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   EmployeeController.getAllEmployeesByParentId
 );
 
@@ -19,7 +19,7 @@ employeeRoutes.get(
 employeeRoutes.get(
   "/:employeeId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   EmployeeController.getEmployeeById
 );
 
@@ -28,7 +28,7 @@ employeeRoutes.post(
   "/register",
   upload.single("profileImage"),
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(EmployeeValidationSchemas.register),
   EmployeeController.register
 );
@@ -37,7 +37,7 @@ employeeRoutes.post(
 employeeRoutes.put(
   "/:employeeId/permissions",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(EmployeeValidationSchemas.updatePermissions),
   EmployeeController.updatePermissions
 );
@@ -46,7 +46,7 @@ employeeRoutes.put(
 employeeRoutes.put(
   "/:employeeId/profile",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(EmployeeValidationSchemas.updateProfile),
   EmployeeController.updateProfile
 );
@@ -55,7 +55,7 @@ employeeRoutes.put(
 employeeRoutes.put(
   "/:employeeId/profile-image",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   upload.single("profileImage"),
   validateRequest(EmployeeValidationSchemas.updateProfileImage),
   EmployeeController.updateProfileImage
@@ -65,7 +65,7 @@ employeeRoutes.put(
 employeeRoutes.get(
   "/:employeeId/permissions",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   EmployeeController.getPermissions
 );
 
@@ -73,7 +73,7 @@ employeeRoutes.get(
 employeeRoutes.patch(
   "/:employeeId/deactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(EmployeeValidationSchemas.deactivateEmployee),
   EmployeeController.deactivateEmployee
 );
@@ -82,7 +82,7 @@ employeeRoutes.patch(
 employeeRoutes.patch(
   "/:employeeId/reactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(EmployeeValidationSchemas.reactivateEmployee),
   EmployeeController.reactivateEmployee
 );
@@ -91,7 +91,7 @@ employeeRoutes.patch(
 employeeRoutes.delete(
   "/:employeeId/delete",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(EmployeeValidationSchemas.deleteEmployee),
   EmployeeController.deleteEmployee
 );
@@ -100,7 +100,7 @@ employeeRoutes.delete(
 employeeRoutes.post(
   "/check-permission",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["employee", "business"]),
+  AuthMiddleware.authorize(["employee", "business"]),
   validateRequest(EmployeeValidationSchemas.checkPermission),
   EmployeeController.checkPermission
 );
@@ -109,7 +109,7 @@ employeeRoutes.post(
 employeeRoutes.post(
   "/check-permissions",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["employee"]),
+  AuthMiddleware.authorize(["employee"]),
   validateRequest(EmployeeValidationSchemas.checkPermissions),
   EmployeeController.checkPermissions
 );

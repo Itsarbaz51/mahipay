@@ -8,6 +8,15 @@ export const ROLE_TYPES = {
   EMPLOYEE: "employee",
 };
 
+// Predefined business roles (jo system mein fixed hain)
+const PREDEFINED_BUSINESS_ROLES = [
+  "ADMIN",
+  "STATE HEAD",
+  "MASTER DISTRIBUTOR",
+  "DISTRIBUTOR",
+  "RETAILER",
+];
+
 class AuthMiddleware {
   static isAuthenticated = asyncHandler(async (req, res, next) => {
     const token =
@@ -54,56 +63,83 @@ class AuthMiddleware {
     return next();
   });
 
-  // Business roles ke liye authorization
+  // Unified authorization middleware
+  static authorize = (allowedAccess = []) => {
+    // Validate input array
+    if (!Array.isArray(allowedAccess)) {
+      throw new Error("Authorization rules must be an array");
+    }
+
+    // Check for duplicates and validate entries
+    const seen = new Set();
+    const validRoleTypes = Object.values(ROLE_TYPES);
+
+    for (const item of allowedAccess) {
+      if (seen.has(item)) {
+        throw new Error(
+          `Duplicate entry found in authorization rules: ${item}`
+        );
+      }
+      seen.add(item);
+
+      // Validate if item is either a predefined business role or a valid role type
+      if (
+        !PREDEFINED_BUSINESS_ROLES.includes(item) &&
+        !validRoleTypes.includes(item)
+      ) {
+        throw new Error(
+          `Invalid authorization entry: ${item}. Must be either a predefined business role or valid role type.`
+        );
+      }
+    }
+
+    return asyncHandler(async (req, res, next) => {
+      const userRole = req.user?.role;
+      const userRoleType = req.user?.roleType;
+
+      if (!userRole || !userRoleType) {
+        throw ApiError.forbidden(
+          "Access denied: User role information missing"
+        );
+      }
+
+      // Check if user has access based on either role name or role type
+      const hasAccess = allowedAccess.some((accessItem) => {
+        // If accessItem is a role type, check against user's role type
+        if (Object.values(ROLE_TYPES).includes(accessItem)) {
+          return userRoleType === accessItem;
+        }
+        // If accessItem is a role name, check against user's role name
+        else {
+          return userRole === accessItem;
+        }
+      });
+
+      if (!hasAccess) {
+        const formattedAccess = allowedAccess.map((item) =>
+          Object.values(ROLE_TYPES).includes(item)
+            ? `${item} (role type)`
+            : item
+        );
+
+        throw ApiError.forbidden(
+          `Access denied. Required: ${formattedAccess.join(", ")}. Your role: ${userRole} (${userRoleType})`
+        );
+      }
+
+      return next();
+    });
+  };
+
+  // Backward compatibility ke liye existing methods
   static authorizeBusinessRoles = (allowedRoles = []) =>
-    asyncHandler(async (req, res, next) => {
-      const userRole = req.user?.role;
-      const userRoleType = req.user?.roleType;
+    this.authorize(allowedRoles);
 
-      if (!userRole || userRoleType !== ROLE_TYPES.BUSINESS) {
-        throw ApiError.forbidden("Access restricted to business users only");
-      }
-
-      if (!allowedRoles.includes(userRole)) {
-        throw ApiError.forbidden(
-          `Required business roles: ${allowedRoles.join(", ")}, Your role: ${userRole}`
-        );
-      }
-
-      return next();
-    });
-
-  // Employee roles ke liye authorization
   static authorizeEmployeeRoles = (allowedRoles = []) =>
-    asyncHandler(async (req, res, next) => {
-      const userRole = req.user?.role;
-      const userRoleType = req.user?.roleType;
+    this.authorize([...allowedRoles, ROLE_TYPES.EMPLOYEE]);
 
-      if (!userRole || userRoleType !== ROLE_TYPES.EMPLOYEE) {
-        throw ApiError.forbidden("Access restricted to employees only");
-      }
-
-      if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-        throw ApiError.forbidden(
-          `Required employee roles: ${allowedRoles.join(", ")}, Your role: ${userRole}`
-        );
-      }
-
-      return next();
-    });
-
-  // Role type based authorization
   static authorizeRoleTypes = (allowedRoleTypes = []) =>
-    asyncHandler(async (req, res, next) => {
-      const userRoleType = req.user?.roleType;
-
-      if (!allowedRoleTypes.includes(userRoleType)) {
-        throw ApiError.forbidden(
-          `Required role types: ${allowedRoleTypes.join(", ")}, Your role type: ${userRoleType}`
-        );
-      }
-
-      return next();
-    });
+    this.authorize(allowedRoleTypes);
 }
+
 export default AuthMiddleware;

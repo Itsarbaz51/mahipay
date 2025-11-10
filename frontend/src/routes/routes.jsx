@@ -35,6 +35,7 @@ import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
 import RequestKYC from "../pages/RequestKYC.jsx";
 import Logs from "../pages/Logs.jsx";
 import VerifyResetPassword from "../pages/VerifyResetPassword.jsx";
+import NoPermissionsPage from "../pages/NoPermissionsPage.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -91,6 +92,14 @@ export const createRouter = () => {
           element={
             <ProtectedRoute>
               <UnauthorizedPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="permission-denied"
+          element={
+            <ProtectedRoute>
+              <NoPermissionsPage />
             </ProtectedRoute>
           }
         />

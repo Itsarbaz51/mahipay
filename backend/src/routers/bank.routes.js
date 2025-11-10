@@ -13,7 +13,7 @@ const bankRoutes = Router();
 bankRoutes.post(
   "/bank-list",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   AddBankController.index
 );
 
@@ -21,7 +21,7 @@ bankRoutes.post(
 bankRoutes.get(
   "/get-all-my",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   AddBankController.getAllMyBanks
 );
 
@@ -29,7 +29,7 @@ bankRoutes.get(
 bankRoutes.get(
   "/bank-show/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   AddBankController.show
 );
 
@@ -37,7 +37,7 @@ bankRoutes.get(
 bankRoutes.post(
   "/store-bank",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   upload.single("bankProofFile"),
   validateRequest(BankValidationSchemas.BankDetailSchema),
   AddBankController.store
@@ -47,7 +47,7 @@ bankRoutes.post(
 bankRoutes.put(
   "/bank-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   upload.single("bankProofFile"),
   validateRequest(BankValidationSchemas.BankDetailUpdateSchema),
   AddBankController.update
@@ -57,7 +57,7 @@ bankRoutes.put(
 bankRoutes.delete(
   "/bank-delete/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   AddBankController.destroy
 );
 
@@ -66,7 +66,7 @@ bankRoutes.delete(
 bankRoutes.put(
   "/bank-verify",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   validateRequest(BankValidationSchemas.VerificationBankSchema),
   AddBankController.verify
 );

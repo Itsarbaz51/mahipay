@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   User,
   Mail,
@@ -19,75 +19,177 @@ import {
   Building,
   UserCheck,
   Key,
+  CreditCard,
+  Banknote,
 } from "lucide-react";
+import { useDispatch } from "react-redux";
+import { getUserById } from "../../redux/slices/userSlice";
+import { getEmployeeById } from "../../redux/slices/employeeSlice";
 
 export default function UserProfileView({
   isAdminUser,
-  userData,
+  userId,
   onClose,
-  type = "business",
+  type,
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showTransactionPin, setShowTransactionPin] = useState(false);
-
-  // Handle different response structures and types
-  const user = userData?.data?.user || userData?.user || userData;
+  const [userData, setUserData] = useState(null);
+  const [error, setError] = useState(null);
 
   // Determine user type and adjust data structure accordingly
   const isEmployee = type === "employee";
-  const userTypeLabel = isEmployee ? "Employee" : "business";
-  const userTypeIcon = isEmployee ? Building : UserCheck;
+  const userTypeLabel = isEmployee ? "Employee" : "Business";
+  const dispatch = useDispatch();
 
-  // Adapt data structure based on type
-  const adaptedUser = {
-    // Common fields
-    id: user?.id,
-    firstName: user?.firstName,
-    lastName: user?.lastName,
-    username: user?.username,
-    email: user?.email,
-    phoneNumber: user?.phoneNumber,
-    profileImage: user?.profileImage,
-    status: user?.status,
-    isKycVerified: user?.isKycVerified,
-    isAuthorized: user?.isAuthorized,
-    hierarchyLevel: user?.hierarchyLevel,
-    hierarchyPath: user?.hierarchyPath,
-    parentId: user?.parentId,
-    parent: user?.parent,
-    children: user?.children,
-    createdAt: user?.createdAt,
-    updatedAt: user?.updatedAt,
-    emailVerifiedAt: user?.emailVerifiedAt,
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setError(null);
 
-    // Security fields (only for admin)
-    password: user?.password,
-    transactionPin: user?.transactionPin,
+        let result;
+        if (isEmployee) {
+          result = await dispatch(getEmployeeById(userId));
+        } else if (type === "business") {
+          result = await dispatch(getUserById(userId));
+        }
 
-    // Role information - adapt based on type
-    role:
-      user?.role ||
-      (isEmployee
-        ? { name: "Employee", level: user?.hierarchyLevel }
-        : user?.role),
+        // Handle different response structures
+        if (result?.payload?.data?.user) {
+          // If data is nested under payload.data.user
+          setUserData(result.payload.data.user);
+        } else if (result?.payload?.data) {
+          // If data is nested under payload.data
+          setUserData(result.payload.data);
+        } else if (result?.data?.user) {
+          // If data is directly under result.data.user
+          setUserData(result.data.user);
+        } else if (result?.data) {
+          // If data is directly under result.data
+          setUserData(result.data);
+        } else if (result?.payload) {
+          // If data is under payload
+          setUserData(result.payload);
+        } else {
+          throw new Error("No data received");
+        }
+      } catch (err) {
+        console.error("Error in fetchUserData:", err);
+        setError(err.message || "Failed to fetch user data");
+      }
+    };
 
-    // Wallet information
-    wallets: user?.wallets || (user?.wallet ? [user.wallet] : []),
+    if (userId) {
+      fetchUserData();
+    }
+  }, [userId, isEmployee, type, dispatch]); // Added 'type' to dependencies
 
-    // ✅ UPDATED: Employee permissions - extract from EmployeePermissionsOwned
-    permissions: user?.EmployeePermissionsOwned
-      ? user.EmployeePermissionsOwned.map((item) => item.permission)
-      : user?.permissions || [],
+  // Fixed data adaptation function
+  const adaptUserData = (rawData) => {
+    if (!rawData) {
+      return null;
+    }
 
-    // ✅ NEW: Store full permissions data for detailed view
-    permissionsData: user?.EmployeePermissionsOwned || [],
+    // For employee data from your API
+    if (isEmployee) {
+      return {
+        // Common fields
+        id: rawData?.id,
+        firstName: rawData?.firstName,
+        lastName: rawData?.lastName,
+        username: rawData?.username,
+        email: rawData?.email,
+        phoneNumber: rawData?.phoneNumber,
+        profileImage: rawData?.profileImage,
+        status: rawData?.status,
+        isKycVerified: rawData?.isKycVerified,
+        isAuthorized: rawData?.isAuthorized,
+        hierarchyLevel: rawData?.hierarchyLevel,
+        hierarchyPath: rawData?.hierarchyPath,
+        parentId: rawData?.parentId,
+        parent: rawData?.parent,
+        children: rawData?.children,
+        createdAt: rawData?.createdAt,
+        updatedAt: rawData?.updatedAt,
+        emailVerifiedAt: rawData?.emailVerifiedAt,
+        deletedAt: rawData?.deletedAt,
+        deactivationReason: rawData?.deactivationReason,
 
-    // Type-specific fields
-    employeeId: isEmployee ? user?.employeeId : null,
-    employeeCode: isEmployee ? user?.employeeCode : null,
-    department: isEmployee ? user?.department : null,
-    designation: isEmployee ? user?.designation : null,
+        // Security fields
+        password: rawData?.password,
+        transactionPin: rawData?.transactionPin,
+
+        // Role information
+        role: rawData?.role || {
+          name: "Employee",
+          level: rawData?.hierarchyLevel,
+        },
+
+        // Employee-specific fields
+        employeeId: rawData?.id, // Using user ID as employee ID
+        employeeCode: rawData?.username, // Using username as employee code
+        department: rawData?.role?.name || "Not specified",
+        designation: rawData?.role?.name || "Employee",
+
+        // Permissions - EmployeePermissionsOwned से लें
+        permissions:
+          rawData?.EmployeePermissionsOwned?.filter(
+            (perm) => perm.isActive
+          )?.map((item) => item.permission) || [],
+
+        permissionsData: rawData?.EmployeePermissionsOwned || [],
+
+        // Wallet information (empty for employees)
+        wallets: [],
+      };
+    } else {
+      return {
+        // Common fields
+        id: rawData?.id,
+        firstName: rawData?.firstName,
+        lastName: rawData?.lastName,
+        username: rawData?.username,
+        email: rawData?.email,
+        phoneNumber: rawData?.phoneNumber,
+        profileImage: rawData?.profileImage,
+        status: rawData?.status,
+        isKycVerified: rawData?.isKycVerified,
+        isAuthorized: rawData?.isAuthorized,
+        hierarchyLevel: rawData?.hierarchyLevel,
+        hierarchyPath: rawData?.hierarchyPath,
+        parentId: rawData?.parentId,
+        parent: rawData?.parent,
+        children: rawData?.children,
+        createdAt: rawData?.createdAt,
+        updatedAt: rawData?.updatedAt,
+        emailVerifiedAt: rawData?.emailVerifiedAt,
+        deletedAt: rawData?.deletedAt,
+        deactivationReason: rawData?.deactivationReason,
+
+        // Security fields
+        password: rawData?.password,
+        transactionPin: rawData?.transactionPin,
+
+        // Role information
+        role: rawData?.role,
+
+        // Wallet information
+        wallets: rawData?.wallets || [],
+
+        // KYC information
+        kycInfo: rawData?.kycInfo,
+
+        // Bank information
+        bankInfo: rawData?.bankInfo,
+
+        // Permissions
+        permissions: rawData?.userPermissions || [],
+        permissionsData: rawData?.userPermissions || [],
+      };
+    }
   };
+
+  const adaptedUser = adaptUserData(userData);
 
   // --- Utility Functions ---
   const formatDate = (dateString) => {
@@ -120,6 +222,7 @@ export default function UserProfileView({
       PENDING: "bg-yellow-100 text-yellow-700 border-yellow-300",
       IN_ACTIVE: "bg-red-100 text-red-700 border-red-300",
       SUSPENDED: "bg-orange-100 text-orange-700 border-orange-300",
+      DELETE: "bg-red-100 text-red-700 border-red-300",
     };
     const label =
       status === "IN_ACTIVE"
@@ -128,6 +231,8 @@ export default function UserProfileView({
         ? "Active"
         : status === "SUSPENDED"
         ? "Suspended"
+        : status === "DELETE"
+        ? "Deleted"
         : status;
     const Icon = status === "ACTIVE" ? CheckCircle : XCircle;
 
@@ -176,6 +281,25 @@ export default function UserProfileView({
   const sectionTitleClass =
     "text-xl font-extrabold text-gray-800 mb-4 border-b-2 border-cyan-100 pb-2 flex items-center gap-2";
 
+  // Error state
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50">
+        <div className="bg-white rounded-2xl p-8 text-center max-w-md">
+          <XCircle className="text-red-500 mx-auto mb-4" size={48} />
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Error</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={onClose}
+            className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Employee-specific fields
   const EmployeeSpecificInfo = () => {
     if (!isEmployee) return null;
@@ -186,43 +310,43 @@ export default function UserProfileView({
           <Building className="text-cyan-500" size={24} /> Employee Details
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {adaptedUser.employeeId && (
+          {adaptedUser?.employeeId && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <label className="text-xs font-medium text-gray-500 uppercase">
                 Employee ID
               </label>
               <p className="text-gray-900 mt-1 font-mono text-sm font-semibold">
-                {adaptedUser.employeeId}
+                {adaptedUser?.employeeId}
               </p>
             </div>
           )}
-          {adaptedUser.employeeCode && (
+          {adaptedUser?.employeeCode && (
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <label className="text-xs font-medium text-gray-500 uppercase">
                 Employee Code
               </label>
               <p className="text-gray-900 mt-1 font-mono text-sm font-semibold">
-                {adaptedUser.employeeCode}
+                {adaptedUser?.employeeCode}
               </p>
             </div>
           )}
-          {adaptedUser.department && (
+          {adaptedUser?.department && (
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase">
                 Department
               </label>
               <p className="text-gray-900 mt-1 font-semibold text-base">
-                {adaptedUser.department}
+                {adaptedUser?.department}
               </p>
             </div>
           )}
-          {adaptedUser.designation && (
+          {adaptedUser?.designation && (
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase">
                 Designation
               </label>
               <p className="text-gray-900 mt-1 font-semibold text-base">
-                {adaptedUser.designation}
+                {adaptedUser?.designation}
               </p>
             </div>
           )}
@@ -231,15 +355,14 @@ export default function UserProfileView({
     );
   };
 
-  // ✅ UPDATED: Employee Permissions Section with detailed view
+  // Employee Permissions Section
   const EmployeePermissionsSection = () => {
     if (!isEmployee || !isAdminUser) return null;
 
-    const permissions = adaptedUser.permissions || [];
+    const permissions = adaptedUser?.permissions || [];
 
     return (
       <div className={detailCard + " p-6 bg-white shadow-lg rounded-xl"}>
-        {/* Header Section with Border */}
         <div className="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
           <h3
             className={
@@ -250,42 +373,35 @@ export default function UserProfileView({
             <Key className="text-cyan-600 mr-2" size={24} />
             Employee Permissions
           </h3>
-          {/* Optional: Button to Manage Permissions here */}
         </div>
 
-        {permissions.length > 0 ? (
+        {permissions?.length > 0 ? (
           <div>
-            {/* Summary Badge for Total Permissions */}
             <div className="flex items-center justify-between mb-5">
               <p className="text-base text-gray-600">
                 Total permissions assigned to this employee:
               </p>
               <span className="inline-flex px-4 py-1.5 bg-cyan-50 text-cyan-700 rounded-full text-base font-bold border border-cyan-200 shadow-sm">
-                {permissions.length} Permission
-                {permissions.length > 1 ? "s" : ""}
+                {permissions?.length} Permission
+                {permissions?.length > 1 ? "s" : ""}
               </span>
             </div>
 
-            {/* Permissions List Grid - Simplified and Focused */}
             <h4 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wider">
               Assigned Permissions
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {permissions.map((permission, index) => (
-                // Better visual distinction and hover for individual badge container
+              {permissions?.map((permission, index) => (
                 <div
                   key={index}
                   className="bg-gray-50 p-3 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-cyan-50 hover:border-cyan-300"
                 >
-                  {/* Assuming PermissionBadge component renders the permission name visually */}
                   <PermissionBadge permission={permission} />
-                  <span>{permission.assignedAt}</span>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          /* Enhanced Empty State Design */
           <div className="text-center py-10 px-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50">
             <Key className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <h4 className="text-xl font-semibold text-gray-800 mb-2">
@@ -295,12 +411,47 @@ export default function UserProfileView({
               This employee currently has no specific permissions. Assign roles
               or permissions to define their access.
             </p>
-            {/* Optional: Add an "Assign Permissions" Button */}
-            {/* <button className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500">
-        Assign Permissions
-      </button> */}
           </div>
         )}
+      </div>
+    );
+  };
+
+  // Get appropriate icon based on user type
+  const userTypeIcon = isEmployee ? Building : UserCheck;
+
+  // Deactivation/Deletion Info
+  const DeactivationInfo = () => {
+    if (!adaptedUser?.deletedAt && !adaptedUser?.deactivationReason)
+      return null;
+
+    return (
+      <div className={detailCard}>
+        <h3 className={sectionTitleClass}>
+          <XCircle className="text-red-500" size={24} /> Account Status
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {adaptedUser?.deletedAt && (
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                Deleted At
+              </label>
+              <p className="text-gray-900 mt-1 font-semibold text-base">
+                {formatDate(adaptedUser?.deletedAt)}
+              </p>
+            </div>
+          )}
+          {adaptedUser?.deactivationReason && (
+            <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+              <label className="text-xs font-medium text-gray-500 uppercase">
+                Reason
+              </label>
+              <p className="text-gray-900 mt-1 font-semibold text-base">
+                {adaptedUser?.deactivationReason}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -358,7 +509,7 @@ export default function UserProfileView({
                   @{adaptedUser?.username}
                   {isEmployee && adaptedUser?.employeeCode && (
                     <span className="text-gray-500 ml-2">
-                      ({adaptedUser.employeeCode})
+                      ({adaptedUser?.employeeCode})
                     </span>
                   )}
                 </p>
@@ -375,9 +526,13 @@ export default function UserProfileView({
                     </span>
                   )}
 
-                  {adaptedUser?.isAuthorized && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold border border-purple-300 transition-all duration-200 hover:bg-purple-200">
-                      <Shield size={14} /> Authorized
+                  {adaptedUser?.emailVerifiedAt ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold border border-green-300 transition-all duration-200 hover:bg-green-200">
+                      <CheckCircle size={14} /> Email Verified
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-semibold border border-gray-300 transition-all duration-200 hover:bg-gray-200">
+                      <XCircle size={14} /> Email Not Verified
                     </span>
                   )}
 
@@ -391,10 +546,10 @@ export default function UserProfileView({
                     </span>
                   )}
 
-                  {/* ✅ UPDATED: Permissions Count Badge for Employees */}
-                  {isEmployee && isAdminUser && adaptedUser.permissions && (
+                  {/* Permissions Count Badge for Employees */}
+                  {isEmployee && isAdminUser && adaptedUser?.permissions && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-semibold border border-orange-300 transition-all duration-200 hover:bg-orange-200">
-                      <Key size={14} /> {adaptedUser.permissions.length}{" "}
+                      <Key size={14} /> {adaptedUser?.permissions?.length}{" "}
                       Permissions
                     </span>
                   )}
@@ -403,10 +558,13 @@ export default function UserProfileView({
             </div>
           </div>
 
-          {/* Employee Specific Info */}
-          <EmployeeSpecificInfo />
+          {/* Deactivation Info */}
+          <DeactivationInfo />
 
-          {/* ✅ UPDATED: Employee Permissions Section */}
+          {/* Type Specific Info */}
+          {isEmployee && <EmployeeSpecificInfo />}
+
+          {/* Employee Permissions Section */}
           <EmployeePermissionsSection />
 
           {/* Quick Stats Row */}
@@ -466,7 +624,7 @@ export default function UserProfileView({
                   <User className="text-cyan-500" size={24} /> General Details
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {/* User ID (Highlighting its importance) */}
+                  {/* User ID */}
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <label className="text-xs font-medium text-gray-500 uppercase flex items-center gap-1">
                       <Hash size={14} /> Unique {userTypeLabel} ID

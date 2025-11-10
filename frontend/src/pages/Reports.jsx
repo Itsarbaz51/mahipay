@@ -15,34 +15,76 @@ import PageHeader from "../components/ui/PageHeader";
 import StateCard from "../components/ui/StateCard";
 import { useSelector } from "react-redux";
 
-const Reports = ({  transactions, users }) => {
+const Reports = ({ transactions, users }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const { currentUser } = useSelector((state) => state.auth);
+
+  // Helper function to get role name consistently
+  const getRoleName = (role) => {
+    if (!role) return "";
+    return typeof role === "string" ? role : role?.name || "";
+  };
+
+  // Helper function to get role display name
+  const getRoleDisplayName = (role) => {
+    const roleName = getRoleName(role);
+
+    switch (roleName) {
+      case "ADMIN":
+        return "Super STATE HEAD";
+      case "STATE HEAD":
+        return "State Head";
+      default:
+        return (
+          roleName?.charAt(0)?.toUpperCase() +
+            roleName?.slice(1)?.toLowerCase() || "User"
+        );
+    }
+  };
+
+  // Helper function to get role color
+  const getRoleColor = (role) => {
+    const roleName = getRoleName(role);
+
+    switch (roleName) {
+      case "ADMIN":
+        return "bg-orange-100 text-orange-600 border border-orange-200";
+      case "STATE HEAD":
+        return "bg-blue-100 text-blue-600 border border-blue-200";
+      default:
+        return "bg-green-100 text-green-600 border border-green-200";
+    }
+  };
 
   const getReportData = () => {
     let reportUsers = [];
 
-    if (currentUser.role.name === "ADMIN") {
-      reportUsers = users;
-    } else if (currentUser.role.name === "admin") {
-      reportUsers = users.filter(
+    const currentUserRole = getRoleName(currentUser.role);
+
+    if (currentUserRole === "ADMIN") {
+      reportUsers = users || [];
+    } else if (currentUserRole === "admin") {
+      reportUsers = (users || []).filter(
         (u) => u.parent_id === currentUser.id || u.id === currentUser.id
       );
     } else {
       reportUsers = [currentUser];
     }
 
-    return reportUsers?.map((user) => {
-      const userTransactions = transactions?.filter(
+    return reportUsers.map((user) => {
+      const userTransactions = (transactions || []).filter(
         (t) => t.user_id === user.id
       );
+
       const payin = userTransactions
-        ?.filter((t) => t.type === "payin" && t.status === "success")
-        ?.reduce((sum, t) => sum + t.amount, 0);
+        .filter((t) => t.type === "payin" && t.status === "success")
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
       const payout = userTransactions
-        ?.filter((t) => t.type === "payout" && t.status === "success")
-        ?.reduce((sum, t) => sum + t.amount, 0);
-      const commission = userTransactions?.reduce(
+        .filter((t) => t.type === "payout" && t.status === "success")
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+      const commission = userTransactions.reduce(
         (sum, t) => sum + (t.commission || 0),
         0
       );
@@ -53,19 +95,20 @@ const Reports = ({  transactions, users }) => {
         payout,
         commission,
         netBalance: payin - payout,
-        transactionCount: userTransactions?.length,
+        transactionCount: userTransactions.length,
       };
     });
   };
 
   const reportData = getReportData();
-  const filteredReportData = reportData?.filter(
+
+  const filteredReportData = reportData.filter(
     (data) =>
-      data.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      data.user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      data.user.name?.toLowerCase().includes(searchTerm?.toLowerCase()) ||
+      data.user.email?.toLowerCase().includes(searchTerm?.toLowerCase())
   );
 
-  const totals = reportData?.reduce(
+  const totals = reportData.reduce(
     (acc, curr) => ({
       payin: acc.payin + curr.payin,
       payout: acc.payout + curr.payout,
@@ -77,6 +120,7 @@ const Reports = ({  transactions, users }) => {
   );
 
   const getInitials = (name) => {
+    if (!name) return "UU";
     return name
       .split(" ")
       .map((n) => n[0])
@@ -96,19 +140,8 @@ const Reports = ({  transactions, users }) => {
       "bg-pink-500",
       "bg-teal-500",
     ];
-    const index = name.charCodeAt(0) % colors?.length;
+    const index = (name?.charCodeAt(0) || 0) % colors.length;
     return colors[index];
-  };
-
-  const getRoleColor = (role) => {
-    switch (role) {
-      case "ADMIN":
-        return "bg-orange-100 text-orange-600";
-      case "STATE HEAD":
-        return "bg-blue-100 text-blue-600";
-      default:
-        return "bg-green-100 text-green-600";
-    }
   };
 
   const statCards = [
@@ -164,7 +197,7 @@ const Reports = ({  transactions, users }) => {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards?.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <StateCard
             key={index}
             title={stat.title}
@@ -242,7 +275,7 @@ const Reports = ({  transactions, users }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredReportData?.map((data, index) => (
+              {filteredReportData.map((data, index) => (
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -255,10 +288,10 @@ const Reports = ({  transactions, users }) => {
                       </div>
                       <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900">
-                          {data.user.name}
+                          {data.user.name || "Unknown User"}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {data.user.email}
+                          {data.user.email || "No email"}
                         </div>
                       </div>
                     </div>
@@ -269,10 +302,7 @@ const Reports = ({  transactions, users }) => {
                         data.user.role
                       )}`}
                     >
-                      {data.user.role === "ADMIN"
-                        ? "Super STATE HEAD"
-                        : data.user.role.charAt(0).toUpperCase() +
-                          data.user.role.slice(1)}
+                      {getRoleDisplayName(data.user.role)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -340,16 +370,16 @@ const Reports = ({  transactions, users }) => {
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-300 flex items-center justify-between">
           <div className="text-sm text-gray-700">
-            Showing {filteredReportData?.length} of {reportData?.length} users
+            Showing {filteredReportData.length} of {reportData.length} users
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
               Profitable Users:{" "}
-              {filteredReportData?.filter((data) => data.netBalance > 0)?.length}
+              {filteredReportData.filter((data) => data.netBalance > 0).length}
             </div>
             <div className="text-sm text-gray-600">
               Loss Users:{" "}
-              {filteredReportData?.filter((data) => data.netBalance < 0)?.length}
+              {filteredReportData.filter((data) => data.netBalance < 0).length}
             </div>
           </div>
         </div>

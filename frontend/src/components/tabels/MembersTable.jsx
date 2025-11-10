@@ -395,16 +395,8 @@ const MembersTable = () => {
 
   // View user
   const handleViewUser = async (user) => {
-    try {
-      await dispatch(getUserById(user?.id));
-      setShowViewProfile(true);
-      setOpenMenuId(null);
-    } catch (error) {
-      console.error("Failed to load user details:", error);
-      dispatch(setCurrentUser(user));
-      setShowViewProfile(true);
-      setOpenMenuId(null);
-    }
+    setSelectedUser(user);
+    setShowViewProfile(true);
   };
 
   // Form handlers
@@ -808,15 +800,15 @@ const MembersTable = () => {
       )}
 
       {/* Profile Modal */}
-      {showViewProfile && (
+      {showViewProfile && selectedUser && (
         <UserProfileView
-          userData={viewedUser || selectedUser}
+          userId={selectedUser.id}
           isAdminUser={isAdminUser}
           onClose={() => {
             setShowViewProfile(false);
             dispatch(setCurrentUser(null));
           }}
-          type={"business"}
+          type="business"
         />
       )}
 

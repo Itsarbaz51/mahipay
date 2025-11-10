@@ -1,5 +1,5 @@
 // AddEmployeePermissions.js
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const AddEmployeePermissions = ({
   mode,
@@ -13,63 +13,73 @@ const AddEmployeePermissions = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    // Set existing permissions when component mounts or mode changes
-    if (existingPermissions && Array.isArray(existingPermissions)) {
-      setPermissions(existingPermissions);
-    } else {
-      setPermissions([]);
-    }
-  }, [existingPermissions, mode]);
+  // Safe permissions extraction from API response
+  const safePermissions = useCallback(() => {
+    if (!existingPermissions || !Array.isArray(existingPermissions)) return [];
 
-  const handleRemovePermission = (permissionToRemove) => {
-    setPermissions((prev) => prev.filter((p) => p !== permissionToRemove));
-  };
+    return existingPermissions
+      .filter((perm) => perm.isActive && perm.permission)
+      .map((perm) => perm.permission);
+  }, [existingPermissions]);
+
+  // Common permission suggestions
+  const COMMON_PERMISSIONS = [
+    "dashboard",
+    "transactions",
+    "commission",
+    "reports",
+    "kyc request",
+    "members",
+    "settings",
+    "profile",
+    "logs",
+    "employee management"
+  ];
+
+  const MAX_PERMISSIONS = 20;
+
+  useEffect(() => {
+    setPermissions(safePermissions());
+  }, [safePermissions]);
 
   const handleAddPermission = (permission) => {
-    if (!permissions.includes(permission) && permissions.length < 20) {
+    if (permissions.length >= MAX_PERMISSIONS) {
+      setError(`Maximum ${MAX_PERMISSIONS} permissions allowed`);
+      return;
+    }
+
+    if (!permissions.includes(permission)) {
       setPermissions((prev) => [...prev, permission]);
       setError("");
     }
   };
 
+  const handleRemovePermission = (permission) => {
+    setPermissions((prev) => prev.filter((p) => p !== permission));
+    setError("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
 
-    if (permissions.length === 0) {
-      setError("Please add at least one permission");
-      return;
-    }
-
-    if (permissions.length > 20) {
-      setError("Cannot assign more than 20 permissions");
-      return;
-    }
+    // Removed the minimum permission requirement check
 
     setIsSubmitting(true);
+    setError("");
 
     try {
-      // Ensure permissions is always an array, even if empty
-      const permissionsToSubmit = Array.isArray(permissions) ? permissions : [];
-
-      // Validate that we have permissions to submit
-      if (permissionsToSubmit.length === 0) {
-        throw new Error("No valid permissions to submit");
-      }
-
-      await onSubmit(permissionsToSubmit);
-      // Success handling is done in parent component
-    } catch (error) {
-      console.error("Failed to submit permissions:", error);
-      setError(error.message || "Failed to update permissions");
+      await onSubmit(permissions);
+    } catch (err) {
+      setError(err.message || "Failed to update permissions");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Ensure permissions is always an array for rendering
-  const safePermissions = Array.isArray(permissions) ? permissions : [];
+  const isPermissionDisabled = (permission) =>
+    permissions.includes(permission) ||
+    permissions.length >= MAX_PERMISSIONS ||
+    isSubmitting;
 
   return (
     <div className="fixed inset-0 backdrop-blur-xs bg-black/40 flex items-center justify-center p-4 z-50">
@@ -83,8 +93,9 @@ const AddEmployeePermissions = ({
             </h3>
             <button
               onClick={onCancel}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
               disabled={isSubmitting}
+              type="button"
             >
               <svg
                 className="w-6 h-6"
@@ -102,7 +113,6 @@ const AddEmployeePermissions = ({
             </button>
           </div>
 
-          {/* Error Message */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm">{error}</p>
@@ -110,7 +120,7 @@ const AddEmployeePermissions = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* User Information (Read-only) */}
+            {/* User Information */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Employee
@@ -131,29 +141,28 @@ const AddEmployeePermissions = ({
             {/* Permissions Section */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Permissions *
+                Permissions
                 <span className="text-xs text-gray-500 ml-2">
-                  (Max 20 permissions allowed)
+                  (Max {MAX_PERMISSIONS} permissions allowed)
                 </span>
               </label>
 
-              {/* Selected Permissions */}
-              {safePermissions.length > 0 ? (
+              {permissions.length > 0 ? (
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-600 mb-2">
-                    Selected Permissions ({safePermissions.length}):
+                    Selected Permissions ({permissions.length}):
                   </label>
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border border-gray-200 rounded-md">
-                    {safePermissions.map((permission, index) => (
+                    {permissions.map((permission, index) => (
                       <span
-                        key={index}
+                        key={`${permission}-${index}`}
                         className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 border border-blue-300"
                       >
                         {permission.toUpperCase()}
                         <button
                           type="button"
                           onClick={() => handleRemovePermission(permission)}
-                          className="ml-2 text-blue-600 hover:text-blue-800 transition-colors"
+                          className="ml-2 text-blue-600 hover:text-blue-800 transition-colors disabled:opacity-50"
                           disabled={isSubmitting}
                         >
                           ×
@@ -170,9 +179,9 @@ const AddEmployeePermissions = ({
                 </div>
               )}
 
-              {safePermissions.length >= 20 && (
+              {permissions.length >= MAX_PERMISSIONS && (
                 <div className="text-xs text-red-500 mt-1">
-                  Maximum 20 permissions reached
+                  Maximum {MAX_PERMISSIONS} permissions reached
                 </div>
               )}
             </div>
@@ -183,28 +192,14 @@ const AddEmployeePermissions = ({
                 Click to add permissions:
               </label>
               <div className="flex flex-wrap gap-2">
-                {[
-                  "dashboard",
-                  "transactions",
-                  "commission",
-                  "reports",
-                  "kyc request",
-                  "members",
-                  "settings",
-                  "profile",
-                  "logs",
-                ].map((commonPermission) => (
+                {COMMON_PERMISSIONS.map((commonPermission) => (
                   <button
                     key={commonPermission}
                     type="button"
                     onClick={() => handleAddPermission(commonPermission)}
-                    disabled={
-                      safePermissions.includes(commonPermission) ||
-                      safePermissions.length >= 20 ||
-                      isSubmitting
-                    }
+                    disabled={isPermissionDisabled(commonPermission)}
                     className={`px-2 py-1 text-xs rounded border transition-colors ${
-                      safePermissions.includes(commonPermission)
+                      isPermissionDisabled(commonPermission)
                         ? "bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed"
                         : "bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100"
                     }`}
@@ -220,17 +215,15 @@ const AddEmployeePermissions = ({
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 transition-colors"
                 disabled={isSubmitting}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-                disabled={
-                  isSubmitting || isLoading || safePermissions.length === 0
-                }
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center transition-colors"
+                disabled={isSubmitting || isLoading}
               >
                 {isSubmitting ? (
                   <>
