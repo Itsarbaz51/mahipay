@@ -11,10 +11,11 @@ import {
   User,
   ArrowUpDown,
   Building2,
+  X,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useDebounce } from "use-debounce";
-import { getLoginLogs } from "../redux/slices/loginLogsSlice";
+import { getLoginLogs } from "../redux/slices/logsSlice";
 import { getAllRoles } from "../redux/slices/roleSlice";
 
 const ITEMS_PER_PAGE = 10;
@@ -48,6 +49,27 @@ const LoginLogs = () => {
     dispatch(getAllRoles());
   }, [dispatch]);
 
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      selectedDevice !== "" ||
+      selectedRole !== "" ||
+      selectedSort !== "" ||
+      selectedSortBy !== "" ||
+      searchTerm !== ""
+    );
+  }, [selectedDevice, selectedRole, selectedSort, selectedSortBy, searchTerm]);
+
+  // Clear all filters
+  const clearAllFilters = useCallback(() => {
+    setSelectedDevice("");
+    setSelectedRole("");
+    setSelectedSort("");
+    setSelectedSortBy("");
+    setSearchTerm("");
+    setCurrentPage(1);
+  }, []);
+
   // Fetch logs
   const fetchLoginLogs = useCallback(
     async (showLoading = false) => {
@@ -57,10 +79,9 @@ const LoginLogs = () => {
           page: currentPage,
           limit: ITEMS_PER_PAGE,
           search: debouncedSearch,
-          deviceType: selectedDevice || "all", // Ensure it's never undefined
+          deviceType: selectedDevice || "all",
           roleId: selectedRole !== "all" ? selectedRole : undefined,
           sort: selectedSort,
-          sortBy: selectedSortBy,
         };
 
         await dispatch(getLoginLogs(params));
@@ -245,7 +266,7 @@ const LoginLogs = () => {
   };
 
   return (
-    <div className="">
+    <div>
       {/* Summary cards */}
       {summary?.totalLogs !== undefined && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -424,7 +445,6 @@ const LoginLogs = () => {
             </div>
 
             {/* Sort */}
-            {/* Sort */}
             <div className="relative">
               <button
                 onClick={() => setSortOpen(!sortOpen)}
@@ -467,6 +487,17 @@ const LoginLogs = () => {
               )}
             </div>
 
+            {/* Clear Filters Button - Only show when filters are active */}
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="inline-flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+              >
+                <X className="h-4 w-4" />
+                Clear Filters
+              </button>
+            )}
+
             {/* Refresh */}
             <button
               onClick={handleRefresh}
@@ -485,7 +516,8 @@ const LoginLogs = () => {
         {(selectedDevice !== "all" ||
           selectedRole !== "all" ||
           selectedSortBy !== "createdAt" ||
-          selectedSort !== "desc") && (
+          selectedSort !== "desc" ||
+          searchTerm) && (
           <div className="px-6 py-3 border-b border-slate-200 bg-blue-50">
             <div className="flex items-center gap-2 text-sm">
               <span className="text-slate-600">Active filters:</span>
@@ -518,6 +550,17 @@ const LoginLogs = () => {
                   Sort: {getSortLabel()}
                   <button
                     onClick={() => handleSortChange("desc", "createdAt")}
+                    className="hover:text-blue-900"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {searchTerm && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
+                  Search: {searchTerm}
+                  <button
+                    onClick={() => setSearchTerm("")}
                     className="hover:text-blue-900"
                   >
                     ×
@@ -596,7 +639,7 @@ const LoginLogs = () => {
                             {log.user?.role?.name || "N/A"}
                           </div>
                           <div className="text-xs text-slate-500">
-                            Level {log.user?.role?.level || "N/A"}
+                            Level {log.user?.role?.level || 0}
                           </div>
                         </div>
                       </div>
@@ -609,7 +652,7 @@ const LoginLogs = () => {
                           ) : log.roleType === "business" ? (
                             <Building2 className="h-4 w-4" />
                           ) : (
-                            <User className="h-4 w-4" /> // default icon if roleType is missing
+                            <User className="h-4 w-4" />
                           )}
                         </div>
                         <div>
@@ -672,11 +715,6 @@ const LoginLogs = () => {
         {/* Footer & Pagination */}
         <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <span className="text-sm text-slate-600">
-              Showing {pagination?.showingFrom || 0} to{" "}
-              {pagination?.showingTo || 0} of {pagination?.totalItems || 0} logs
-            </span>
-
             {renderPagination()}
 
             <span className="text-xs text-slate-500">

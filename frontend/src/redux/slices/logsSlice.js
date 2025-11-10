@@ -14,7 +14,7 @@ const initialState = {
   success: null,
 };
 
-const loginLogsSlice = createSlice({
+const logsSlice = createSlice({
   name: "loginLogs",
   initialState,
   reducers: {
@@ -55,9 +55,9 @@ export const {
   logDetailSuccess,
   logsFail,
   resetLogs,
-} = loginLogsSlice.actions;
+} = logsSlice.actions;
 
-export default loginLogsSlice.reducer;
+export default logsSlice.reducer;
 
 // ------------------ Fetch all login logs (admin) --------------------------
 export const getLoginLogs =
@@ -73,12 +73,6 @@ export const getLoginLogs =
         deviceType: params.deviceType || "all", // YEH LINE FIX KAREN
         roleId: params.roleId || "",
         sort: params.sort || "desc",
-        sortBy: params.sortBy || "createdAt",
-        userId: params.userId || undefined,
-        startDate: params.startDate || undefined,
-        endDate: params.endDate || undefined,
-        browser: params.browser || undefined,
-        os: params.os || undefined,
       };
 
       // Remove undefined values but keep empty strings for roleId
@@ -97,7 +91,6 @@ export const getLoginLogs =
       dispatch(logsListSuccess(data));
       return data;
     } catch (error) {
-
       const errMsg =
         error?.response?.data?.message ||
         error?.response?.data.error ||
@@ -108,15 +101,48 @@ export const getLoginLogs =
     }
   };
 
-// ------------------ Fetch a single login log by ID --------------------------
-export const getLoginLogById = (id) => async (dispatch) => {
-  try {
-    dispatch(logsRequest());
-    const { data } = await axios.get(`/api/logs/login-log-detail/${id}`);
-    dispatch(logDetailSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(logsFail(errMsg));
-  }
-};
+// ------------------ Fetch all audit logs (admin & users) --------------------------
+
+export const getAuditLogs =
+  (params = {}) =>
+  async (dispatch) => {
+    try {
+      dispatch(logsRequest());
+
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+
+      // Add all parameters to query string
+      Object.entries({
+        page: params.page || 1,
+        limit: params.limit || 10,
+        search: params.search || "",
+        deviceType: params.deviceType || "all",
+        roleId: params.roleId || "",
+        sort: params.sort || "desc",
+        sortBy: params.sortBy || "createdAt",
+        userId: params.userId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        browser: params.browser,
+        os: params.os,
+      }).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          queryParams.append(key, value);
+        }
+      });
+
+      const { data } = await axios.post(`/audit-logs`, queryParams);
+
+      dispatch(logsListSuccess(data));
+      return data;
+    } catch (error) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "Failed to fetch audit logs";
+      dispatch(logsFail(errMsg));
+      throw error;
+    }
+  };

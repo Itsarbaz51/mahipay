@@ -67,7 +67,6 @@ model User {
   deletedAt                     DateTime?            @map("deleted_at")
   deactivationReason            String?              @map("user_deactivation_reason") @db.LongText
   apiEntities                   ApiEntity[]
-  auditLogs                     AuditLog[]
   bankAccounts                  BankDetail[]
   commissionEarningsCreated     CommissionEarning[]  @relation("CommissionEarningCreatedBy")
   commissionsGiven              CommissionEarning[]  @relation("CommissionEarningFromUser")
@@ -76,7 +75,6 @@ model User {
   commissionTargets             CommissionSetting[]  @relation("CommissionTargetUser")
   EmployeePermissionsGiven      EmployeePermission[] @relation("PermissionAssigner")
   EmployeePermissionsOwned      EmployeePermission[] @relation("EmployeePermission_userId")
-  loginLogs                     LoginLogs[]
   piiConsents                   PiiConsent[]
   createdRoles                  Role[]               @relation("RoleCreatedBy")
   systemSettings                SystemSetting[]
@@ -276,6 +274,9 @@ model CommissionSetting {
   tdsPercent      Decimal?         @map("tds_percent") @db.Decimal(5, 2)
   applyGST        Boolean          @default(false)
   gstPercent      Decimal?         @map("gst_percent") @db.Decimal(5, 2)
+  applySurcharge  Boolean          @default(false) @map("apply_surcharge")
+  surchargeType   CommissionType?  @map("surcharge_type")
+  surchargeAmount Decimal?         @map("surcharge_amount") @db.Decimal(12, 2)
   createdBy       String           @map("created_by")
   isActive        Boolean          @default(true) @map("is_active")
   effectiveFrom   DateTime         @default(now())
@@ -306,6 +307,7 @@ model CommissionEarning {
   commissionType   CommissionType   @map("commission_type")
   tdsAmount        BigInt?          @map("tds_amount")
   gstAmount        BigInt?          @map("gst_amount")
+  surchargeAmount  BigInt?          @map("surcharge_amount")
   netAmount        BigInt           @map("net_amount")
   metadata         Json?
   createdBy        String           @map("created_by")
@@ -417,25 +419,6 @@ model SystemSetting {
   @@map("settings")
 }
 
-model LoginLogs {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  domainName String   @map("domain_name")
-  ipAddress  String   @map("ip_address")
-  userAgent  String?  @map("user_agent")
-  location   String?  @map("location") @db.LongText
-  latitude   Float?   @map("latitude")
-  longitude  Float?   @map("longitude")
-  createdAt  DateTime @default(now()) @map("created_at")
-  roleType   String?
-  accuracy   Float?   @map("accuracy")
-  user       User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([latitude, longitude])
-  @@map("login_logs")
-}
-
 model Transaction {
   id                 String              @id @default(uuid())
   referenceId        String?             @map("reference_id")
@@ -532,22 +515,6 @@ model Refund {
 
   @@index([transactionId], map: "refunds_transaction_id_fkey")
   @@map("refunds")
-}
-
-model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String?
-  action     String   @db.VarChar(500)
-  entityType String?  @db.VarChar(100)
-  entityId   String?
-  ipAddress  String?  @db.VarChar(45)
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  user       User?    @relation(fields: [userId], references: [id])
-
-  @@index([entityType, entityId])
-  @@index([userId], map: "audit_logs_userId_fkey")
-  @@map("audit_logs")
 }
 
 model PiiConsent {

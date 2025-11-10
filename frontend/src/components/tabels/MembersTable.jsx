@@ -43,7 +43,7 @@ import {
   getPermissionById,
   upsertPermission,
 } from "../../redux/slices/permissionSlice";
-import { getServicesActive } from "../../redux/slices/serviceSlice";
+import { allServices } from "../../redux/slices/serviceSlice";
 import { login } from "../../redux/slices/authSlice";
 
 const MembersTable = () => {
@@ -218,7 +218,7 @@ const MembersTable = () => {
   // Service providers effect
   useEffect(() => {
     if (showPermissionModal) {
-      dispatch(getServicesActive());
+      dispatch(allServices());
     }
   }, [showPermissionModal, dispatch]);
 

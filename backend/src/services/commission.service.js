@@ -17,6 +17,9 @@ export class CommissionSettingService {
       tdsPercent,
       applyGST,
       gstPercent,
+      applySurcharge,
+      surchargeType,
+      surchargeAmount,
       effectiveFrom,
       effectiveTo,
     } = data;
@@ -51,6 +54,17 @@ export class CommissionSettingService {
       if (!userExists) throw ApiError.notFound("Target user not found");
     }
 
+    if (applySurcharge && !surchargeAmount) {
+      throw ApiError.badRequest(
+        "surchargeAmount is required when applySurcharge is true"
+      );
+    }
+    if (applySurcharge && !surchargeType) {
+      throw ApiError.badRequest(
+        "surchargeType is required when applySurcharge is true"
+      );
+    }
+
     // Check for existing active commission setting
     const existing = await Prisma.commissionSetting.findFirst({
       where: {
@@ -75,6 +89,10 @@ export class CommissionSettingService {
       tdsPercent: tdsPercent ? tdsPercent.toString() : null,
       applyGST: applyGST || false,
       gstPercent: gstPercent ? gstPercent.toString() : null,
+      applySurcharge: applySurcharge || false,
+      surchargeType: applySurcharge ? surchargeType : null,
+      surchargeAmount:
+        applySurcharge && surchargeAmount ? surchargeAmount.toString() : null,
       effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
       effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
       createdBy,
@@ -247,6 +265,7 @@ export class CommissionEarningService {
       commissionType,
       tdsAmount = 0,
       gstAmount = 0,
+      surchargeAmount = 0,
       netAmount,
       metadata,
       createdBy,
@@ -289,6 +308,7 @@ export class CommissionEarningService {
         commissionType,
         tdsAmount: BigInt(tdsAmount),
         gstAmount: BigInt(gstAmount),
+        surchargeAmount: BigInt(surchargeAmount),
         netAmount: BigInt(netAmount),
         metadata: metadata || null,
         createdBy,
@@ -434,6 +454,7 @@ export class CommissionEarningService {
         commissionAmount: true,
         tdsAmount: true,
         gstAmount: true,
+        surchargeAmount: true,
         netAmount: true,
         commissionType: true,
         createdAt: true,
@@ -453,6 +474,10 @@ export class CommissionEarningService {
     );
     const totalGST = earnings.reduce(
       (sum, e) => sum + Number(e.gstAmount || 0),
+      0
+    );
+    const totalSurcharge = earnings.reduce(
+      (sum, e) => sum + Number(e.surchargeAmount || 0),
       0
     );
     const totalNet = earnings.reduce((sum, e) => sum + Number(e.netAmount), 0);
@@ -478,6 +503,7 @@ export class CommissionEarningService {
       totalTDS,
       totalGST,
       totalNet,
+      totalSurcharge,
       transactionCount: earnings.length,
       earningsByService,
     };

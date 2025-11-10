@@ -70,8 +70,6 @@ class StateController {
       );
   });
   static store = asyncHandler(async (req, res) => {
-    console.log(req.body);
-
     const validatedData = await AddressValidationSchemas.State.parseAsync(
       req.body
     );

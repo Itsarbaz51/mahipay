@@ -8,9 +8,11 @@ import {
   sendCredentialsEmail,
   sendPasswordResetEmail,
 } from "../utils/sendCredentialsEmail.js";
+import AuditLogService from "./auditLog.service.js";
+import LoginLogService from "./loginLog.service.js";
 
 class AuthServices {
-  static async login(payload, req) {
+  static async login(payload, req, res) {
     const { emailOrUsername, password, latitude, longitude, accuracy } =
       payload;
 
@@ -109,7 +111,7 @@ class AuthServices {
       }
     }
 
-    // Create login log
+    // Create login log data
     const loginData = {
       userId: user.id,
       domainName: req.hostname,
@@ -125,18 +127,19 @@ class AuthServices {
       loginData.location = clientLocation.address;
       loginData.accuracy = accuracy;
     }
+    
+    await LoginLogService.createLoginLog(loginData);
 
-    await Prisma.loginLogs.create({ data: loginData });
-
-    // Create audit log
-    await Prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: "LOGIN",
-        metadata: {
-          roleType: user.role.type,
-          roleName: user.role.name,
-        },
+    await AuditLogService.createAuditLog({
+      userId: user.id,
+      action: "LOGIN_SUCCESS",
+      entityType: "AUTH",
+      entityId: user.id,
+      ipAddress: req.ip,
+      metadata: {
+        ...Helper.generateCommonMetadata(req, res),
+        roleType: user.role.type,
+        roleName: user.role.name,
       },
     });
 

@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { InputField } from "../ui/InputField";
+import ButtonField from "../ui/ButtonField";
+import CloseBtn from "../ui/CloseBtn";
 
 const AddPermission = ({
   mode,
@@ -190,25 +193,11 @@ const AddPermission = ({
                 ? `Add ${mode === "role" ? "Role" : "User"} Permission`
                 : `Edit ${mode === "role" ? "Role" : "User"} Permission`}
             </h3>
-            <button
-              onClick={onCancel}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-              disabled={isSubmitting}
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+            <CloseBtn
+              isClose={onCancel}
+              disabled={isSubmitting || isLoading}
+              title="Close dialog"
+            />
           </div>
 
           {/* ✅ Error Message */}
@@ -281,7 +270,7 @@ const AddPermission = ({
                             type="button"
                             onClick={() => handleServiceRemove(serviceId)}
                             className="ml-2 text-blue-600 hover:text-blue-800 transition-colors"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isLoading}
                           >
                             ×
                           </button>
@@ -294,7 +283,9 @@ const AddPermission = ({
 
               {/* Service Search Input */}
               <div className="relative" ref={serviceSearchRef}>
-                <input
+                <InputField
+                  label=""
+                  name="serviceSearch"
                   type="text"
                   value={serviceSearchTerm}
                   onChange={(e) => {
@@ -302,9 +293,9 @@ const AddPermission = ({
                     setShowServiceSuggestions(true);
                   }}
                   onFocus={() => setShowServiceSuggestions(true)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Search services by name..."
                   disabled={isSubmitting || isLoading}
+                  required={false}
                 />
 
                 {isLoading && (
@@ -322,6 +313,7 @@ const AddPermission = ({
                           key={service.id}
                           onClick={() => handleServiceSelect(service)}
                           className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          disabled={isSubmitting || isLoading}
                         >
                           <div className="font-medium text-gray-900">
                             {service.type || service.name}
@@ -367,7 +359,7 @@ const AddPermission = ({
                       handleInputChange("canView", e.target.checked)
                     }
                     className="rounded text-blue-600 focus:ring-blue-500"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLoading}
                   />
                   <span className="text-sm font-medium text-gray-700">
                     Can View
@@ -382,7 +374,7 @@ const AddPermission = ({
                       handleInputChange("canEdit", e.target.checked)
                     }
                     className="rounded text-blue-600 focus:ring-blue-500"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLoading}
                   />
                   <span className="text-sm font-medium text-gray-700">
                     Can Edit
@@ -397,7 +389,7 @@ const AddPermission = ({
                       handleInputChange("canSetCommission", e.target.checked)
                     }
                     className="rounded text-blue-600 focus:ring-blue-500"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLoading}
                   />
                   <span className="text-sm font-medium text-gray-700">
                     Can Set Commission
@@ -408,30 +400,26 @@ const AddPermission = ({
 
             {/* Form Actions */}
             <div className="flex space-x-3 pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={onCancel}
+              <CloseBtn
+                isClose={onCancel}
+                disabled={isSubmitting || isLoading}
+                title="Cancel"
+                variant="text"
                 className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                disabled={isSubmitting}
               >
                 Cancel
-              </button>
-              <button
+              </CloseBtn>
+              <ButtonField
+                name={
+                  currentMode === "add"
+                    ? `Add ${mode === "role" ? "Role" : "User"} Permission`
+                    : `Update ${mode === "role" ? "Role" : "User"} Permission`
+                }
                 type="submit"
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-                disabled={isSubmitting || isLoading}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Processing...
-                  </>
-                ) : currentMode === "add" ? (
-                  `Add ${mode === "role" ? "Role" : "User"} Permission`
-                ) : (
-                  `Update ${mode === "role" ? "Role" : "User"} Permission`
-                )}
-              </button>
+                isOpen={handleSubmit}
+                isLoading={isSubmitting || isLoading}
+                btncss="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              />
             </div>
           </form>
         </div>

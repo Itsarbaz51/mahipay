@@ -103,13 +103,19 @@ class KycServices {
 
     const frontendData = kycs.map((kyc) => {
       const pii = kyc.piiConsents.map((p) => {
-        if (p.piiType === "PAN")
+        const decrypted = CryptoService.decrypt(p.piiHash);
+        if (p.piiType === "PAN") {
           return {
             type: "PAN",
-            value: p.piiHash.slice(0, 2) + "XXX" + p.piiHash.slice(-3),
+            value: decrypted.slice(0, 2) + "-XXX-XXX-" + decrypted.slice(-2),
           };
-        if (p.piiType === "AADHAAR")
-          return { type: "AADHAAR", value: "XXXX-XXXX-" + p.piiHash.slice(-4) };
+        }
+        if (p.piiType === "AADHAAR") {
+          return {
+            type: "AADHAAR",
+            value: "XXXX-XXXX-" + decrypted.slice(-4),
+          };
+        }
         return { type: p.piiType, value: "******" };
       });
 
@@ -121,6 +127,7 @@ class KycServices {
           email: kyc.user.email,
           phone: kyc.user.phoneNumber,
           photo: kyc.photo || null,
+          username: kyc.user.username,
         },
         parent: {
           username: kyc.user.parent?.username || "N/A",
@@ -156,7 +163,7 @@ class KycServices {
 
   static async showUserKyc(id, requestingUser) {
     const kyc = await Prisma.userKyc.findFirst({
-      where: { id },
+      where: { OR: [{ id }, { userId: id }] },
       include: {
         address: {
           select: {
@@ -190,6 +197,12 @@ class KycServices {
     });
 
     if (!kyc) throw ApiError.notFound("KYC not found");
+
+    if (
+       requestingUser.id !== kyc.userId 
+    ) {
+      throw ApiError.unauthorized("Unauthorized access");
+    }
 
     const kycWithRelations = kyc;
 

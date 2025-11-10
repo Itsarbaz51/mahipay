@@ -6,6 +6,8 @@ import {
 } from "../redux/slices/settingSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
+import { InputField } from "../components/ui/InputField";
+import { FileUpload } from "../components/ui/FileUpload";
 
 const MainSetting = () => {
   const dispatch = useDispatch();
@@ -128,18 +130,6 @@ const MainSetting = () => {
     }
   };
 
-  const removeFile = (fieldName) => {
-    if (fieldName === "companyLogo") {
-      setLogoPreview("");
-      setLogoFile(null);
-      setFormData((prev) => ({ ...prev, companyLogo: "" }));
-    } else if (fieldName === "favIcon") {
-      setFaviconPreview("");
-      setFaviconFile(null);
-      setFormData((prev) => ({ ...prev, favIcon: "" }));
-    }
-  };
-
   // ✅ HELPER: Convert input into FormData
   const buildFormData = (payload) => {
     const formData = new FormData();
@@ -179,6 +169,7 @@ const MainSetting = () => {
 
     return formData;
   };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -203,117 +194,51 @@ const MainSetting = () => {
               </h2>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="companyName"
-                    value={formData.companyName}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="Enter company name"
-                  />
-                </div>
+                <InputField
+                  label="Company Name"
+                  name="companyName"
+                  value={formData.companyName}
+                  onChange={handleChange}
+                  placeholder="Enter company name"
+                  required={true}
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Email
-                  </label>
-                  <input
-                    type="email"
-                    name="companyEmail"
-                    value={formData.companyEmail}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="company@example.com"
-                  />
-                </div>
+                <InputField
+                  label="Company Email"
+                  name="companyEmail"
+                  type="email"
+                  value={formData.companyEmail}
+                  onChange={handleChange}
+                  placeholder="company@example.com"
+                  required={false}
+                />
               </div>
 
               {/* Logo Upload */}
               <div className="mt-6 grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Logo
-                  </label>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex-1 flex flex-col items-center justify-center px-4 py-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition">
-                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                      <span className="text-sm text-gray-600 text-center">
-                        Click to upload logo
-                        <br />
-                        <span className="text-xs text-gray-500">
-                          JPEG, PNG, GIF, WebP, SVG (Max 5MB)
-                        </span>
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileChange(e, "companyLogo")}
-                        className="hidden"
-                      />
-                    </label>
-                    {logoPreview && (
-                      <div className="relative">
-                        <img
-                          src={logoPreview}
-                          alt="Logo preview"
-                          className="w-20 h-20 object-contain rounded border"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeFile("companyLogo")}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <FileUpload
+                  label="Company Logo"
+                  name="companyLogo"
+                  accept="image/*"
+                  icon={Upload}
+                  onChange={(e) => handleFileChange(e, "companyLogo")}
+                  filePreview={logoPreview}
+                  file={logoFile}
+                  error={null}
+                  isPreFilled={!!formData.companyLogo}
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Favicon
-                  </label>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex-1 flex flex-col items-center justify-center px-4 py-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 transition">
-                      <Upload className="w-8 h-8 mb-2 text-gray-400" />
-                      <span className="text-sm text-gray-600 text-center">
-                        Click to upload favicon
-                        <br />
-                        <span className="text-xs text-gray-500">
-                          JPEG, PNG, GIF, WebP, SVG (Max 5MB)
-                        </span>
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileChange(e, "favIcon")}
-                        className="hidden"
-                      />
-                    </label>
-                    {faviconPreview && (
-                      <div className="relative">
-                        <img
-                          src={faviconPreview}
-                          alt="Favicon preview"
-                          className="w-20 h-20 object-contain rounded border"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeFile("favIcon")}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <FileUpload
+                  label="Favicon"
+                  name="favIcon"
+                  accept="image/*"
+                  icon={Upload}
+                  onChange={(e) => handleFileChange(e, "favIcon")}
+                  filePreview={faviconPreview}
+                  file={faviconFile}
+                  error={null}
+                  isPreFilled={!!formData.favIcon}
+                />
               </div>
             </div>
 
@@ -324,33 +249,25 @@ const MainSetting = () => {
               </h2>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="phoneNumber"
-                    value={formData.phoneNumber}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="+91 1234567890"
-                  />
-                </div>
+                <InputField
+                  label="Phone Number"
+                  name="phoneNumber"
+                  type="tel"
+                  value={formData.phoneNumber}
+                  onChange={handleChange}
+                  placeholder="+91 1234567890"
+                  required={false}
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    WhatsApp Number
-                  </label>
-                  <input
-                    type="tel"
-                    name="whtsappNumber"
-                    value={formData.whtsappNumber}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="+91 1234567890"
-                  />
-                </div>
+                <InputField
+                  label="WhatsApp Number"
+                  name="whtsappNumber"
+                  type="tel"
+                  value={formData.whtsappNumber}
+                  onChange={handleChange}
+                  placeholder="+91 1234567890"
+                  required={false}
+                />
               </div>
             </div>
 
@@ -361,43 +278,36 @@ const MainSetting = () => {
               </h2>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Website URL
-                  </label>
-                  <input
-                    type="url"
-                    name="websiteUrl"
-                    value={formData.websiteUrl}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="https://example.com"
-                  />
-                </div>
+                <InputField
+                  label="Website URL"
+                  name="websiteUrl"
+                  type="url"
+                  value={formData.websiteUrl}
+                  onChange={handleChange}
+                  placeholder="https://example.com"
+                  required={false}
+                />
 
                 <div className="grid md:grid-cols-2 gap-6">
                   {[
-                    "facebookUrl",
-                    "instagramUrl",
-                    "twitterUrl",
-                    "linkedinUrl",
-                  ].map((field) => (
-                    <div key={field}>
-                      <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
-                        {field.replace("Url", " URL")}
-                      </label>
-                      <input
-                        type="url"
-                        name={field}
-                        value={formData[field]}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder={`https://${field.replace(
-                          "Url",
-                          ".com/..."
-                        )}`}
-                      />
-                    </div>
+                    { field: "facebookUrl", label: "Facebook URL" },
+                    { field: "instagramUrl", label: "Instagram URL" },
+                    { field: "twitterUrl", label: "Twitter URL" },
+                    { field: "linkedinUrl", label: "LinkedIn URL" },
+                  ].map(({ field, label }) => (
+                    <InputField
+                      key={field}
+                      label={label}
+                      name={field}
+                      type="url"
+                      value={formData[field]}
+                      onChange={handleChange}
+                      placeholder={`https://${field.replace(
+                        "Url",
+                        ".com/..."
+                      )}`}
+                      required={false}
+                    />
                   ))}
                 </div>
               </div>

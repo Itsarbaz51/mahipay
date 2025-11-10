@@ -21,7 +21,8 @@ class AuthController {
   static login = asyncHandler(async (req, res) => {
     const { user, accessToken, refreshToken } = await AuthServices.login(
       req.body,
-      req
+      req,
+      res
     );
 
     // Serialize and remove sensitive fields

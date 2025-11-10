@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   User,
   Users,
@@ -10,10 +10,10 @@ import {
   Camera,
   CheckCircle,
   AlertCircle,
-  ChevronDown,
   Shield,
   Ban,
   Clock,
+  LogOut,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -27,209 +27,12 @@ import {
   updatekycSubmit,
 } from "../../redux/slices/kycSlice";
 import { toast } from "react-toastify";
-import { verifyAuth } from "../../redux/slices/authSlice";
-
-// ---------- InputField ----------
-const InputField = ({
-  label,
-  name,
-  type = "text",
-  placeholder,
-  required = true,
-  icon: Icon,
-  value,
-  onChange,
-  error,
-  maxLength,
-  inputMode,
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <div className="relative">
-      {Icon && (
-        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-          <Icon size={18} />
-        </div>
-      )}
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        inputMode={inputMode}
-        className={`w-full ${
-          Icon ? "pl-10" : "pl-4"
-        } pr-4 py-3 bg-gray-50 border-2 ${
-          error ? "border-red-500" : "border-gray-200"
-        } rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all`}
-      />
-    </div>
-    {error && (
-      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-        <AlertCircle size={12} />
-        {error}
-      </p>
-    )}
-  </div>
-);
-
-// ---------- DropdownField ----------
-const DropdownField = ({
-  label,
-  name,
-  required = true,
-  icon: Icon,
-  value,
-  onChange,
-  options = [],
-  error,
-  placeholder = "Select an option",
-  disabled = false,
-}) => (
-  <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-2">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
-    <div className="relative">
-      {Icon && (
-        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 z-10">
-          <Icon size={18} />
-        </div>
-      )}
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-        className={`w-full ${
-          Icon ? "pl-10" : "pl-4"
-        } pr-10 py-3 bg-gray-50 border-2 ${
-          error ? "border-red-500" : "border-gray-200"
-        } rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all appearance-none cursor-pointer ${
-          disabled ? "bg-gray-100 cursor-not-allowed" : ""
-        }`}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option?.id} value={option?.id}>
-            {option.stateName || option.cityName}
-          </option>
-        ))}
-      </select>
-      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-        <ChevronDown size={18} />
-      </div>
-    </div>
-    {error && (
-      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-        <AlertCircle size={12} />
-        {error}
-      </p>
-    )}
-  </div>
-);
-
-// ---------- FileUpload ----------
-const FileUpload = ({
-  label,
-  name,
-  accept = "image/*,.pdf",
-  icon: Icon,
-  onChange,
-  filePreview,
-  file,
-  error,
-  isPreFilled = false,
-}) => {
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-2">
-        {label} <span className="text-red-500">*</span>
-      </label>
-      <div
-        className={`relative border-2 border-dashed ${
-          error && !isPreFilled ? "border-red-500" : "border-gray-300"
-        } rounded-lg p-6 hover:border-cyan-500 transition-colors cursor-pointer bg-gray-50`}
-      >
-        <input
-          type="file"
-          name={name}
-          accept={accept}
-          onChange={onChange}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-        <div className="text-center">
-          {filePreview ? (
-            <div className="space-y-2">
-              {/* Improved PDF Preview Logic */}
-              {filePreview === "PDF" ||
-              (file && file.type === "application/pdf") ? (
-                <div className="flex flex-col items-center justify-center gap-2 p-3">
-                  <div className="relative">
-                    <FileText size={40} className="text-red-500" />
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                      PDF
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-semibold text-sm text-gray-800 truncate max-w-[140px]">
-                      {file?.name || `${label}.pdf`}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {file
-                        ? `Size: ${(file.size / 1024).toFixed(1)}KB`
-                        : "PDF Document"}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <img
-                  src={filePreview}
-                  alt="Preview"
-                  className="max-h-32 mx-auto rounded-lg shadow-md"
-                />
-              )}
-              <p className="text-xs text-green-600 flex items-center justify-center gap-1">
-                <CheckCircle size={12} />
-                {isPreFilled
-                  ? "File pre-filled from previous submission"
-                  : "File uploaded successfully"}
-              </p>
-              {isPreFilled && (
-                <p className="text-xs text-blue-600">
-                  Click to upload new file
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Icon className="mx-auto text-gray-400" size={32} />
-              <p className="text-sm text-gray-600">
-                <span className="text-cyan-600 font-semibold">
-                  Click to upload
-                </span>{" "}
-                or drag and drop
-              </p>
-              <p className="text-xs text-gray-500">
-                PNG, JPG or PDF (max 150KB)
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-      {error && !isPreFilled && (
-        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-          <AlertCircle size={12} />
-          {error}
-        </p>
-      )}
-    </div>
-  );
-};
+import { verifyAuth, logoutUser } from "../../redux/slices/authSlice";
+import { InputField } from "../ui/InputField";
+import { FileUpload } from "../ui/FileUpload";
+import { DropdownField } from "../ui/DropdownField";
+import ButtonField from "../ui/ButtonField";
+import CloseBtn from "../ui/CloseBtn";
 
 // ---------- KYC Status Card ----------
 const KYCStatusCard = ({ kycDetail }) => {
@@ -282,26 +85,28 @@ const KYCStatusCard = ({ kycDetail }) => {
     <div
       className={`border-2 ${config.borderColor} ${config.bgColor} rounded-2xl p-6 mb-6`}
     >
-      <div className="flex items-center gap-4">
-        <div className={`p-3 rounded-full ${config.bgColor}`}>
-          <StatusIcon className={config.color} size={32} />
-        </div>
-        <div className="flex-1">
-          <h3 className={`text-xl font-bold ${config.color} mb-2`}>
-            {config.title}
-          </h3>
-          <p className="text-gray-700 mb-3">{config.message}</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-full ${config.bgColor}`}>
+            <StatusIcon className={config.color} size={32} />
+          </div>
+          <div className="flex-1">
+            <h3 className={`text-xl font-bold ${config.color} mb-2`}>
+              {config.title}
+            </h3>
+            <p className="text-gray-700 mb-3">{config.message}</p>
 
-          {kycDetail.status === "REJECT" && (
-            <div className="mt-4">
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
-              >
-                Resubmit KYC
-              </button>
-            </div>
-          )}
+            {kycDetail.status === "REJECT" && (
+              <div className="mt-4">
+                <ButtonField
+                  name="Resubmit KYC"
+                  type="button"
+                  isOpen={() => window.location.reload()}
+                  btncss="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -355,6 +160,11 @@ export default function AddProfileKYC() {
 
   const { currentUser } = useSelector((state) => state.auth);
 
+  // Logout handler
+  const handleLogout = () => {
+    dispatch(logoutUser());
+  };
+
   useEffect(() => {
     const fetchKYCData = async () => {
       try {
@@ -402,25 +212,29 @@ export default function AddProfileKYC() {
     [addressState.cityList]
   );
 
-  // Helper functions to find state and city IDs by name
-  const findStateIdByName = (stateName) => {
-    if (!stateName) return "";
-    const state = stateList.find(
-      (s) =>
-        s.stateName?.toLowerCase().trim() === stateName?.toLowerCase().trim()
-    );
-    return state ? state.id : "";
-  };
+  const findStateIdByName = useCallback(
+    (stateName) => {
+      if (!stateName) return "";
+      const state = stateList.find(
+        (s) =>
+          s.stateName?.toLowerCase().trim() === stateName?.toLowerCase().trim()
+      );
+      return state ? state.id : "";
+    },
+    [stateList]
+  );
+  const findCityIdByName = useCallback(
+    (cityName) => {
+      if (!cityName) return "";
+      const city = cityList.find(
+        (c) =>
+          c.cityName?.toLowerCase().trim() === cityName?.toLowerCase().trim()
+      );
+      return city ? city.id : "";
+    },
+    [cityList]
+  );
 
-  const findCityIdByName = (cityName) => {
-    if (!cityName) return "";
-    const city = cityList.find(
-      (c) => c.cityName?.toLowerCase().trim() === cityName?.toLowerCase().trim()
-    );
-    return city ? city.id : "";
-  };
-
-  // Filter cities based on selected state
   const filteredCities = useMemo(() => {
     if (!formData.stateId) return cityList;
     return cityList.filter(
@@ -428,7 +242,6 @@ export default function AddProfileKYC() {
     );
   }, [cityList, formData.stateId]);
 
-  // Fixed Pre-fill logic for rejected KYC
   useEffect(() => {
     if (kycDetail && kycDetail.status === "REJECT") {
       // Convert state and city names to IDs
@@ -528,7 +341,7 @@ export default function AddProfileKYC() {
         }));
       }
     }
-  }, [kycDetail, stateList, cityList]);
+  }, [kycDetail, findStateIdByName, findCityIdByName]);
 
   const handleInputChange = (e) => {
     let value = e.target.value;
@@ -779,7 +592,7 @@ export default function AddProfileKYC() {
       }
 
       // Refresh KYC data
-      dispatch(getbyId(currentUser?.kycInfo?.latestKyc?.id));
+      dispatch(getbyId(currentUser?.id));
     } catch (err) {
       toast.error(err?.message || "Submission failed");
     } finally {
@@ -794,7 +607,6 @@ export default function AddProfileKYC() {
     { number: 4, title: "Upload Files", icon: Upload },
   ];
 
-  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
@@ -806,31 +618,50 @@ export default function AddProfileKYC() {
     );
   }
 
-  // Don't show form if KYC is APPROVE or PENDING
   if (kycDetail && kycDetail.status !== "REJECT") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
+          {/* Header with Logout Button */}
           <div className="bg-gradient-to-r from-cyan-500 to-purple-600 rounded-2xl shadow-xl p-8 mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <Shield className="text-white" size={32} />
-              <h1 className="text-3xl font-bold text-white">
-                KYC Verification
-              </h1>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <Shield className="text-white" size={32} />
+                <div>
+                  <h1 className="text-3xl font-bold text-white">
+                    KYC Verification
+                  </h1>
+                  <p className="text-cyan-50">Your KYC verification status</p>
+                </div>
+              </div>
             </div>
-            <p className="text-cyan-50">Your KYC verification status</p>
           </div>
 
           {/* KYC Status Card */}
-          <KYCStatusCard kycDetail={kycDetail} />
+          <KYCStatusCard kycDetail={kycDetail} onLogout={handleLogout} />
+          <ButtonField
+            name="Logout"
+            type="button"
+            icon={LogOut}
+            isOpen={handleLogout}
+            btncss="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+          />
 
           {/* Additional info for VERIFIED KYC */}
           {kycDetail.status === "VERIFIED" && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                KYC Details
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  KYC Details
+                </h3>
+                <ButtonField
+                  name="Logout"
+                  type="button"
+                  icon={LogOut}
+                  isOpen={handleLogout}
+                  btncss="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+                />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Name</p>
@@ -866,26 +697,31 @@ export default function AddProfileKYC() {
     );
   }
 
-  // Show KYC form only if no KYC exists or status is REJECT
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
+        {/* Header with Logout Button */}
         <div className="bg-gradient-to-r from-cyan-500 to-purple-600 rounded-2xl shadow-xl p-8 mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Shield className="text-white" size={32} />
-            <h1 className="text-3xl font-bold text-white">KYC Verification</h1>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Shield className="text-white" size={32} />
+              <div>
+                <h1 className="text-3xl font-bold text-white">
+                  KYC Verification
+                </h1>
+                <p className="text-cyan-50">
+                  {kycDetail?.status === "REJECT"
+                    ? "Please correct your KYC information and resubmit"
+                    : "Complete your KYC to access all features"}
+                </p>
+              </div>
+            </div>
           </div>
-          <p className="text-cyan-50">
-            {kycDetail?.status === "REJECT"
-              ? "Please correct your KYC information and resubmit"
-              : "Complete your KYC to access all features"}
-          </p>
         </div>
 
         {/* Show reject reason if KYC was rejected */}
         {kycDetail?.status === "REJECT" && (
-          <KYCStatusCard kycDetail={kycDetail} />
+          <KYCStatusCard kycDetail={kycDetail} onLogout={handleLogout} />
         )}
 
         {/* Progress */}
@@ -1130,34 +966,48 @@ export default function AddProfileKYC() {
             </div>
           )}
 
-          {/* Navigation Buttons */}
-          <div className="flex justify-between mt-6">
-            {currentStep > 1 ? (
-              <button
-                onClick={handleBack}
-                className="px-6 py-2 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300 transition"
-              >
-                Back
-              </button>
-            ) : (
-              <div />
-            )}
-            {currentStep < 4 ? (
-              <button
-                onClick={handleNext}
-                className="px-6 py-2 bg-cyan-600 text-white rounded-lg font-semibold hover:bg-cyan-700 transition"
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
-              >
-                {submitting ? "Submitting..." : "Submit"}
-              </button>
-            )}
+          {/* Navigation Buttons with Logout */}
+          <div className="flex justify-between items-center mt-6">
+            <div className="flex gap-4">
+              <ButtonField
+                name="Logout"
+                type="button"
+                icon={LogOut}
+                isOpen={handleLogout}
+                btncss="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+              />
+            </div>
+
+            <div className="flex gap-4">
+              {currentStep > 1 ? (
+                <CloseBtn
+                  isClose={handleBack}
+                  title="Back"
+                  variant="text"
+                  className="px-6 py-2 bg-gray-200 rounded-lg font-semibold hover:bg-gray-300 transition"
+                >
+                  Back
+                </CloseBtn>
+              ) : (
+                <div />
+              )}
+              {currentStep < 4 ? (
+                <ButtonField
+                  name="Next"
+                  type="button"
+                  isOpen={handleNext}
+                  btncss="px-6 py-2 bg-cyan-600 text-white rounded-lg font-semibold hover:bg-cyan-700 transition"
+                />
+              ) : (
+                <ButtonField
+                  name={submitting ? "Submitting..." : "Submit"}
+                  type="button"
+                  isOpen={handleSubmit}
+                  isLoading={submitting}
+                  btncss="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-not-allowed"
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

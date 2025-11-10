@@ -14,27 +14,27 @@ import Home from "../pages/landing/Home";
 import About from "../pages/landing/About";
 import Contact from "../pages/landing/Contact";
 import Login from "../pages/auth/Login";
+import PrivacyPolicy from "../pages/landing/Privacypolicy";
+import TermsConditions from "../pages/landing/Terms&conditions";
 
 // 🔹 Protected Pages
 import Dashboard from "../pages/Dashboard";
-import TransactionHistory from "../components/tabels/TransactionHistory.jsx";
+import TransactionHistory from "../pages/TransactionsPage.jsx";
 import Reports from "../pages/Reports";
-import PayoutTable from "../components/tabels/PayoutTable";
-import EmployeeTable from "../components/tabels/EmployeeTable";
-import MembersTable from "../components/tabels/MembersTable";
-import WalletTable from "../components/tabels/Wallet";
-import AddProfileKYC from "../components/forms/AddProfileKYC";
-import Settings from "../components/Settings";
+import Settings from "../pages/Settings.jsx";
 import CommissionManagement from "../pages/CommissionManagement";
 import CardPayout from "../pages/services/CardPayout";
 import UserProfilePage from "../pages/UserProfilePage.jsx";
-import PrivacyPolicy from "../pages/landing/Privacypolicy";
-import TermsConditions from "../pages/landing/Terms&conditions";
 import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";
-import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
 import RequestKYC from "../pages/RequestKYC.jsx";
 import Logs from "../pages/Logs.jsx";
 import VerifyResetPassword from "../pages/VerifyResetPassword.jsx";
+import AddProfileKYC from "../components/forms/AddProfileKYC";
+
+import EmployeeTable from "../components/tabels/EmployeeTable";
+import MembersTable from "../components/tabels/MembersTable";
+import WalletTable from "../components/tabels/Wallet";
+import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -61,7 +61,6 @@ export const createRouter = () => {
         >
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="transactions" element={<TransactionHistory />} />
-          <Route path="payout" element={<PayoutTable />} />
           <Route path="commission" element={<CommissionManagement />} />
           <Route path="reports" element={<Reports />} />
           <Route path="request-fund" element={<FundRequestTable />} />

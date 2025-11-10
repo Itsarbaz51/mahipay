@@ -27,8 +27,6 @@ class S3Service {
   }
 
   async upload(localFilePath, category) {
-    console.log(localFilePath);
-    
     try {
       if (!localFilePath) {
         console.error("No file path provided.");

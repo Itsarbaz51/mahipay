@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { Upload, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload } from "lucide-react";
+import { InputField } from "../ui/InputField";
+import { DropdownField } from "../ui/DropdownField";
+import { FileUpload } from "../ui/FileUpload";
+import ButtonField from "../ui/ButtonField";
+import CloseBtn from "../ui/CloseBtn";
 
 const AddBank = ({
   accountForm = {},
@@ -10,8 +15,10 @@ const AddBank = ({
   editingAccountId,
   accountTypes = [],
   errors = {},
+  isLoading = false,
 }) => {
   const [preview, setPreview] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (editingAccountId && accountForm.bankProofFile) {
@@ -27,9 +34,15 @@ const AddBank = ({
     }
   }, [accountForm.bankProofFile]);
 
-  const handleRemovePreview = () => {
-    setPreview(null);
-    onChange({ target: { name: "bankProofFile", value: null } });
+  const handleSubmit = async () => {
+    if (isSubmitting || isLoading) return;
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -41,169 +54,104 @@ const AddBank = ({
         <p>{accountForm?.bankRejectionReason}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Account Holder Name *
-            </label>
-            <input
-              name="accountHolder"
-              value={accountForm?.accountHolder || ""}
-              onChange={onChange}
-              placeholder="Enter account holder name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            {errors.accountHolder && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.accountHolder}
-              </p>
-            )}
-          </div>
+          {/* Account Holder Name */}
+          <InputField
+            label="Account Holder Name"
+            name="accountHolder"
+            value={accountForm?.accountHolder || ""}
+            onChange={onChange}
+            placeholder="Enter account holder name"
+            error={errors.accountHolder}
+            disabled={isSubmitting || isLoading}
+          />
 
           {/* Account Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Account Number *
-            </label>
-            <input
-              type="text"
-              name="accountNumber"
-              value={accountForm?.accountNumber || ""}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, "");
-                if (value.length <= 18)
-                  onChange({ target: { name: "accountNumber", value } });
-              }}
-              placeholder="Enter account number"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            {errors.accountNumber && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.accountNumber}
-              </p>
-            )}
-          </div>
+          <InputField
+            label="Account Number"
+            name="accountNumber"
+            type="text"
+            value={accountForm?.accountNumber || ""}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "");
+              if (value.length <= 18)
+                onChange({ target: { name: "accountNumber", value } });
+            }}
+            placeholder="Enter account number"
+            error={errors.accountNumber}
+            maxLength={18}
+            inputMode="numeric"
+            disabled={isSubmitting || isLoading}
+          />
 
           {/* Phone Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone Number *
-            </label>
-            <input
-              type="text"
-              name="phoneNumber"
-              value={accountForm?.phoneNumber || ""}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, "");
-                if (value.length <= 10)
-                  onChange({ target: { name: "phoneNumber", value } });
-              }}
-              placeholder="10-digit phone number"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            {errors.phoneNumber && (
-              <p className="text-red-500 text-xs mt-1">{errors.phoneNumber}</p>
-            )}
-          </div>
+          <InputField
+            label="Phone Number"
+            name="phoneNumber"
+            type="text"
+            value={accountForm?.phoneNumber || ""}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "");
+              if (value.length <= 10)
+                onChange({ target: { name: "phoneNumber", value } });
+            }}
+            placeholder="10-digit phone number"
+            error={errors.phoneNumber}
+            maxLength={10}
+            inputMode="numeric"
+            disabled={isSubmitting || isLoading}
+          />
 
           {/* Account Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Account Type *
-            </label>
-            <select
-              name="accountType"
-              value={accountForm?.accountType || ""}
-              onChange={onChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {accountTypes.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-            {errors.accountType && (
-              <p className="text-red-500 text-xs mt-1">{errors.accountType}</p>
-            )}
-          </div>
+          <DropdownField
+            label="Account Type"
+            name="accountType"
+            value={accountForm?.accountType || ""}
+            onChange={onChange}
+            options={accountTypes.map((type) => ({
+              id: type.value,
+              stateName: type.label,
+            }))}
+            error={errors.accountType}
+            placeholder="Select account type"
+            disabled={isSubmitting || isLoading}
+          />
 
           {/* IFSC Code */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              IFSC Code *
-            </label>
-            <input
-              name="ifscCode"
-              value={accountForm?.ifscCode || ""}
-              onChange={onChange}
-              placeholder="Enter IFSC code"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
-            />
-            {errors.ifscCode && (
-              <p className="text-red-500 text-xs mt-1">{errors.ifscCode}</p>
-            )}
-          </div>
+          <InputField
+            label="IFSC Code"
+            name="ifscCode"
+            value={accountForm?.ifscCode || ""}
+            onChange={onChange}
+            placeholder="Enter IFSC code"
+            error={errors.ifscCode}
+            disabled={isSubmitting || isLoading}
+          />
 
           {/* Bank Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Bank Name *
-            </label>
-            <input
-              name="bankName"
-              value={accountForm?.bankName || ""}
-              onChange={onChange}
-              placeholder="Enter bank name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            {errors.bankName && (
-              <p className="text-red-500 text-xs mt-1">{errors.bankName}</p>
-            )}
-          </div>
+          <InputField
+            label="Bank Name"
+            name="bankName"
+            value={accountForm?.bankName || ""}
+            onChange={onChange}
+            placeholder="Enter bank name"
+            error={errors.bankName}
+            disabled={isSubmitting || isLoading}
+          />
 
           {/* 🔹 Bank Proof Document */}
           <div className="col-span-1 md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Bank Proof Document {editingAccountId ? "" : "*"}
-            </label>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
-                <Upload className="h-4 w-4 mr-2 text-gray-500" />
-                <span className="text-sm text-gray-600 truncate">
-                  {accountForm?.bankProofFile
-                    ? accountForm?.bankProofFile.name
-                    : "Choose file..."}
-                </span>
-                <input
-                  type="file"
-                  onChange={onFileChange}
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                />
-              </label>
-
-              {preview && (
-                <div className="relative">
-                  <img
-                    src={preview}
-                    alt="Preview"
-                    className="w-20 h-20 object-cover rounded-md border border-gray-200"
-                  />
-                  <button
-                    onClick={handleRemovePreview}
-                    className="absolute -top-2 -right-2 bg-white border border-gray-300 rounded-full p-0.5 hover:bg-gray-100"
-                    title="Remove"
-                  >
-                    <X className="w-4 h-4 text-gray-500" />
-                  </button>
-                </div>
-              )}
-            </div>
-            {errors.bankProofFile && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.bankProofFile}
-              </p>
-            )}
+            <FileUpload
+              label="Bank Proof Document"
+              name="bankProofFile"
+              accept=".pdf,.jpg,.jpeg,.png"
+              icon={Upload}
+              onChange={onFileChange}
+              filePreview={preview}
+              file={accountForm?.bankProofFile}
+              error={errors.bankProofFile}
+              isPreFilled={editingAccountId && accountForm.bankProofFile}
+              disabled={isSubmitting || isLoading}
+            />
           </div>
 
           {/* Primary Checkbox */}
@@ -215,6 +163,7 @@ const AddBank = ({
                 checked={accountForm?.isPrimary || false}
                 onChange={onChange}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={isSubmitting || isLoading}
               />
               <span className="ml-2 text-sm font-medium text-gray-700">
                 Set as Primary Account
@@ -225,18 +174,21 @@ const AddBank = ({
 
         {/* Buttons */}
         <div className="flex gap-3 mt-6">
-          <button
-            onClick={onSubmit}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            {editingAccountId ? "Update Account" : "Add Account"}
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          <ButtonField
+            name={editingAccountId ? "Update Account" : "Add Account"}
+            type="button"
+            isOpen={handleSubmit}
+            isLoading={isSubmitting || isLoading}
+            btncss="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          />
+          <CloseBtn
+            isClose={onCancel}
+            disabled={isSubmitting || isLoading}
+            title="Cancel"
+            variant="text"
           >
             Cancel
-          </button>
+          </CloseBtn>
         </div>
       </div>
     </div>

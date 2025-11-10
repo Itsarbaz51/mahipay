@@ -1,221 +1,173 @@
-import asyncHandler from "../utils/AsyncHandler.js";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { auditLogger } from "../utils/logger.js";
+import { ApiError } from "../utils/ApiError.js";
+import fs from "fs";
+import readline from "readline";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
 
 class AuditLogService {
-  // Get all audit logs with filters and pagination
-  static async getAuditLogs({ page = 1, limit = 10, filters = {} } = {}) {
-    try {
-      const skip = (page - 1) * limit;
-
-      const where = this.buildWhereClause(filters);
-
-      const [auditLogs, totalCount] = await Promise.all([
-        prisma.auditLog.findMany({
-          where,
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phoneNumber: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          skip,
-          take: limit,
-        }),
-        prisma.auditLog.count({ where }),
-      ]);
-
-      return {
-        auditLogs,
-        pagination: {
-          page,
-          limit,
-          totalCount,
-          totalPages: Math.ceil(totalCount / limit),
-          hasNext: page * limit < totalCount,
-          hasPrev: page > 1,
-        },
-      };
-    } catch (error) {
-      throw new Error(`Failed to fetch audit logs: ${error.message}`);
-    }
-  }
-
-  // Get audit log by ID
-  static async getAuditLogById(id) {
-    try {
-      return await prisma.auditLog.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-            },
-          },
-        },
-      });
-    } catch (error) {
-      throw new Error(`Failed to fetch audit log: ${error.message}`);
-    }
-  }
-
-  // Create new audit log
-  static async createAuditLog(auditLogData) {
-    try {
-      const { userId, action, entityType, entityId, ipAddress, metadata } =
-        auditLogData;
-
-      return await prisma.auditLog.create({
-        data: {
-          userId,
-          action,
-          entityType,
-          entityId,
-          ipAddress,
-          metadata: metadata || {},
-          createdAt: new Date(),
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-            },
-          },
-        },
-      });
-    } catch (error) {
-      throw new Error(`Failed to create audit log: ${error.message}`);
-    }
-  }
-
-  // Delete specific audit log
-  static async deleteAuditLog(id) {
-    try {
-      return await prisma.auditLog.delete({
-        where: { id },
-      });
-    } catch (error) {
-      if (error.code === "P2025") {
-        return null; // Record not found
-      }
-      throw new Error(`Failed to delete audit log: ${error.message}`);
-    }
-  }
-
-  // Delete old audit logs (for your 30-day auto cleanup)
-  static async deleteOldAuditLogs(days = 30) {
-    try {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - days);
-
-      const result = await prisma.auditLog.deleteMany({
-        where: {
-          createdAt: {
-            lt: cutoffDate,
-          },
-        },
-      });
-
-      return {
-        deletedCount: result.count,
-        cutoffDate: cutoffDate.toISOString(),
-      };
-    } catch (error) {
-      throw new Error(`Failed to delete old audit logs: ${error.message}`);
-    }
-  }
-
-  // Get audit logs by user
-  static async getAuditLogsByUser(userId, { page = 1, limit = 10 } = {}) {
-    return await this.getAuditLogs({
-      page,
-      limit,
-      filters: { userId },
-    });
-  }
-
-  // Get audit logs by entity
-  static async getAuditLogsByEntity(
-    entityType,
-    entityId,
-    { page = 1, limit = 10 } = {}
-  ) {
-    return await this.getAuditLogs({
-      page,
-      limit,
-      filters: { entityType, entityId },
-    });
-  }
-
-  // Get audit logs by action
-  static async getAuditLogsByAction(action, { page = 1, limit = 10 } = {}) {
-    return await this.getAuditLogs({
-      page,
-      limit,
-      filters: { action },
-    });
-  }
-
-  // Build where clause for Prisma
-  static buildWhereClause(filters) {
-    const where = {};
-
-    if (filters.userId) where.userId = filters.userId;
-    if (filters.entityType) where.entityType = filters.entityType;
-    if (filters.entityId) where.entityId = filters.entityId;
-    if (filters.action) where.action = filters.action;
-    if (filters.ipAddress) where.ipAddress = filters.ipAddress;
-
-    if (filters.createdAt) {
-      where.createdAt = {};
-      if (filters.createdAt.gte)
-        where.createdAt.gte = new Date(filters.createdAt.gte);
-      if (filters.createdAt.lte)
-        where.createdAt.lte = new Date(filters.createdAt.lte);
-    }
-
-    return where;
-  }
-
-  // Utility method to log actions (use this throughout your app)
-  static async logAction({
-    userId,
+  static async createAuditLog({
+    userId = null,
     action,
-    entityType,
-    entityId,
-    ipAddress,
+    entityType = null,
+    entityId = null,
+    ipAddress = null,
     metadata = {},
   }) {
     try {
-      return await this.createAuditLog({
+      const auditData = {
+        id: uuidv4(),
         userId,
         action,
         entityType,
         entityId,
         ipAddress,
         metadata,
-      });
+      };
+
+      auditLogger.info(auditData);
+
+      return {
+        success: true,
+        data: auditData,
+        message: "Audit log created successfully",
+      };
     } catch (error) {
-      console.error("Failed to create audit log:", error);
-      // Don't throw error to avoid breaking main operations
-      return null;
+      throw ApiError.internal("Failed to create audit log");
+    }
+  }
+  static async getAuditLogs({
+    page = 1,
+    limit = 10,
+    filters = {},
+    userRole = null,
+    userId = null,
+  } = {}) {
+    try {
+      const logFilePath = path.join(process.cwd(), "logs", "auditlogs.log");
+
+      if (!fs.existsSync(logFilePath)) {
+        return {
+          result: [],
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalCount: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+            showingFrom: 0,
+            showingTo: 0,
+            totalItems: 0,
+          },
+        };
+      }
+
+      const logs = [];
+      const fileStream = fs.createReadStream(logFilePath, { encoding: "utf8" });
+
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        try {
+          const log = JSON.parse(line);
+          logs.push(log);
+        } catch {
+          continue;
+        }
+      }
+
+      let filteredLogs = logs;
+
+      // Apply user-based filtering
+      if (userRole?.toUpperCase() !== "ADMIN" && userId) {
+        filteredLogs = logs.filter((log) => {
+          const logUserId = log.message?.userId || log.userId;
+          return logUserId && logUserId.toString() === userId.toString();
+        });
+      }
+
+      // Apply additional filters if provided
+      if (filters.action) {
+        filteredLogs = filteredLogs.filter((log) =>
+          log.action?.toLowerCase().includes(filters.action.toLowerCase())
+        );
+      }
+
+      if (filters.resource) {
+        filteredLogs = filteredLogs.filter((log) =>
+          log.resource?.toLowerCase().includes(filters.resource.toLowerCase())
+        );
+      }
+
+      if (filters.startDate && filters.endDate) {
+        const startDate = new Date(filters.startDate);
+        const endDate = new Date(filters.endDate);
+        filteredLogs = filteredLogs.filter((log) => {
+          const logDate = new Date(log.timestamp);
+          return logDate >= startDate && logDate <= endDate;
+        });
+      }
+
+      let enrichedLogs = [...filteredLogs];
+
+      // Sorting
+      const sortBy = filters.sortBy || "timestamp";
+      const sortOrder = filters.sortOrder || "desc";
+
+      enrichedLogs.sort((a, b) => {
+        let aValue = a[sortBy];
+        let bValue = b[sortBy];
+
+        // Handle date sorting
+        if (sortBy === "timestamp") {
+          aValue = new Date(aValue);
+          bValue = new Date(bValue);
+        }
+
+        // Handle string sorting case-insensitively
+        if (typeof aValue === "string" && typeof bValue === "string") {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
+        }
+
+        if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+        if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+        return 0;
+      });
+
+      // Pagination calculation
+      const currentPage = Math.max(1, parseInt(page));
+      const pageSize = Math.max(1, Math.min(parseInt(limit), 100));
+      const totalItems = enrichedLogs.length;
+      const totalPages = Math.ceil(totalItems / pageSize);
+
+      const skip = (currentPage - 1) * pageSize;
+      const paginatedLogs = enrichedLogs.slice(skip, skip + pageSize);
+
+      const pagination = {
+        page: currentPage,
+        limit: pageSize,
+        totalCount: totalItems,
+        totalPages: totalPages,
+        hasNext: currentPage < totalPages,
+        hasPrev: currentPage > 1,
+        showingFrom: totalItems > 0 ? skip + 1 : 0,
+        showingTo: totalItems > 0 ? Math.min(skip + pageSize, totalItems) : 0,
+        totalItems: totalItems,
+      };
+
+      // Return clean object without array index properties showing
+      return {
+        paginatedLogs,
+        pagination,
+      };
+    } catch (error) {
+      throw ApiError.internal(`Failed to fetch audit logs: ${error.message}`);
     }
   }
 }

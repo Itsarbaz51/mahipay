@@ -66,7 +66,6 @@ class ServiceProviderController {
   static updateEnvConfig = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { envConfig, subServices } = req.body;
-    console.log(req.body);
 
     if (!id) {
       throw ApiError.badRequest("Service Provider ID is required");

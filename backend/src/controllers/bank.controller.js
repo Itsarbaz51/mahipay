@@ -3,7 +3,6 @@ import { BankDetailService } from "../services/bank.service.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
-
 // ===================== USER BANK CONTROLLER =====================
 
 export class AddBankController {
@@ -14,7 +13,13 @@ export class AddBankController {
     if (!userId || !role)
       throw ApiError.unauthorized("User not authenticated or role missing");
 
-    const { search, status, page = "1", limit = "10", sort = "desc" } = req.body;
+    const {
+      search,
+      status,
+      page = "1",
+      limit = "10",
+      sort = "desc",
+    } = req.body;
 
     const sortOrder = sort === "asc" ? "asc" : "desc";
 
@@ -25,14 +30,16 @@ export class AddBankController {
       limit: Number(limit),
       sort: sortOrder,
       status,
-      search
+      search,
     };
 
     const data = await BankDetailService.index(params);
 
     return res
       .status(200)
-      .json(ApiResponse.success(data, "Bank details fetched successfully", 200));
+      .json(
+        ApiResponse.success(data, "Bank details fetched successfully", 200)
+      );
   });
 
   static getAllMyBanks = asyncHandler(async (req, res) => {
@@ -43,14 +50,15 @@ export class AddBankController {
 
     return res
       .status(200)
-      .json(ApiResponse.success(data, "All bank details fetched successfully", 200));
+      .json(
+        ApiResponse.success(data, "All bank details fetched successfully", 200)
+      );
   });
 
   static show = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
-    console.log("req.params", req.params)
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("ID missing");
 
@@ -64,7 +72,7 @@ export class AddBankController {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
-    const file = req.file
+    const file = req.file;
 
     const data = await BankDetailService.store({
       ...req.body,
@@ -86,7 +94,7 @@ export class AddBankController {
 
     if (!id) throw ApiError.internal("Bank detail ID is required");
 
-    const files = req.files
+    const files = req.files;
     const data = await BankDetailService.update(id, userId, {
       ...req.body,
       bankProofFile: files?.bankProofFile?.[0],
@@ -115,8 +123,7 @@ export class AddBankController {
   });
 
   static verify = asyncHandler(async (req, res) => {
-
-    const { id, status, bankRejectionReason } = req.body
+    const { id, status, bankRejectionReason } = req.body;
     const userId = req.user?.id;
 
     if (!id) throw ApiError.badRequest("Bank ID is required");
@@ -127,9 +134,14 @@ export class AddBankController {
       bankRejectionReason: bankRejectionReason ?? null,
     });
 
-    return res.status(200).json(
-      ApiResponse.success(updatedBank, "Bank verification updated successfully",)
-    );
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(
+          updatedBank,
+          "Bank verification updated successfully"
+        )
+      );
   });
 }
 

@@ -65,7 +65,6 @@ export class RolePermissionService {
   static async getRolePermissions(roleId) {
     if (!roleId) throw ApiError.badRequest("Role ID is required");
 
-
     const permissions = await Prisma.rolePermission.findMany({
       where: { roleId },
       include: {
@@ -108,7 +107,6 @@ export class RolePermissionService {
       where: { roleId_serviceId: { roleId, serviceId } },
     });
     return deleted;
-
   }
 }
 
@@ -168,7 +166,6 @@ export class UserPermissionService {
       results.push(result);
     }
 
-
     return results;
   }
 
@@ -178,8 +175,13 @@ export class UserPermissionService {
     }
 
     const permissions = await Prisma.userPermission.findMany({
-      where: { userId },
-      include: {
+      where: {
+        userId,
+        canView: true,
+      },
+      select: {
+        id: true,
+        canView: true,
         service: {
           select: {
             id: true,
@@ -204,7 +206,6 @@ export class UserPermissionService {
       throw ApiError.notFound("No permissions found for this user");
     }
 
-
     return permissions;
   }
 
@@ -223,9 +224,6 @@ export class UserPermissionService {
       where: { userId_serviceId: { userId, serviceId } },
     });
 
-
-
     return deleted;
-
   }
 }

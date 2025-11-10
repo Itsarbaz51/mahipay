@@ -23,7 +23,7 @@ roleRoutes.get(
 roleRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorizeRoleTypes(["business"]),
   RoleController.getAllRoles
 );
 

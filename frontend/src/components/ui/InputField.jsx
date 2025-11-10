@@ -1,58 +1,48 @@
 import { AlertCircle } from "lucide-react";
 
-function InputField({
+export const InputField = ({
+  label,
   name,
-  inputType,
-  placeholderName,
-  handleChange,
-  valueData,
+  type = "text",
+  placeholder,
+  required = true,
   icon: Icon,
+  value,
+  onChange,
   error,
-  required = false,
   maxLength,
-  min,
-  max,
-}) {
-  return (
-    <div>
-      {/* Label with Icon */}
-      <label
-        htmlFor={name}
-        className="flex items-center text-sm font-medium text-gray-700 mb-2"
-      >
-        {Icon && <Icon className="h-4 w-4 mr-2 text-gray-500" />}
-        {placeholderName}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-
-      {/* Input */}
-      <input
-        id={name}
-        type={inputType}
-        name={name}
-        placeholder={placeholderName}
-        value={valueData}
-        onChange={handleChange}
-        required={required}
-        maxLength={maxLength}
-        min={min}
-        max={max}
-        className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
-          error
-            ? "border-red-300 focus:border-red-500"
-            : "border-gray-200 focus:border-blue-500"
-        } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
-      />
-
-      {/* Error */}
-      {error && (
-        <p className="flex items-center mt-2 text-sm text-red-600">
-          <AlertCircle className="h-4 w-4 mr-1" />
-          {error}
-        </p>
+  inputMode,
+}) => (
+  <div>
+    <label className="block text-sm font-semibold text-gray-700 mb-2">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+          <Icon size={18} />
+        </div>
       )}
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        className={`w-full ${
+          Icon ? "pl-10" : "pl-4"
+        } pr-4 py-3 bg-gray-50 border-2 ${
+          error ? "border-red-500" : "border-gray-200"
+        } rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all`}
+      />
     </div>
-  );
-}
-
-export default InputField;
+    {error && (
+      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+        <AlertCircle size={12} />
+        {error}
+      </p>
+    )}
+  </div>
+);

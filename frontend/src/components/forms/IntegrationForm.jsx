@@ -62,8 +62,8 @@ const SubServiceToggle = React.memo(({ subService, onToggle }) => {
 // ✅ SERVICE-SPECIFIC FIELD CONFIGURATIONS
 const SERVICE_FIELD_CONFIGS = {
   RAZORPAY: [
-    { placeholder: "API Key", keyHint: "rzp_test_..." },
-    { placeholder: "API Key Secret", keyHint: "Secret key" },
+    { placeholder: "RAZORPAY_KEY_ID", keyHint: "rzp_test_..." },
+    { placeholder: "RAZORPAY_KEY_SECRET", keyHint: "Secret key" },
   ],
   AEPS: [
     { placeholder: "Aadhaar API Key", keyHint: "Aadhaar Key" },
@@ -131,7 +131,7 @@ function EnvVariableInput({
             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
           />
           <p className="text-xs text-gray-500 mt-1">
-            {fieldConfig.placeholder}
+            Add: {fieldConfig.placeholder}
           </p>
         </div>
         <div className="col-span-7">

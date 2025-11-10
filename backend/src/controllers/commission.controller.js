@@ -92,7 +92,7 @@ export class CommissionSettingController {
   static deactivate = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    if(!id) throw ApiError.badRequest("Id is required")
+    if (!id) throw ApiError.badRequest("Id is required");
 
     const setting =
       await CommissionSettingService.deactivateCommissionSetting(id);

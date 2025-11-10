@@ -1,6 +1,6 @@
 import { Edit, X, MoreVertical } from "lucide-react";
 import EmptyState from "../ui/EmptyState";
-import {useSelector} from "react-redux"
+import { useSelector } from "react-redux";
 
 const CommissionTable = ({
   commissions = [],
@@ -46,7 +46,7 @@ const CommissionTable = ({
     },
   ];
 
-  const { currentUser} = useSelector((state) => state.auth)
+  const { currentUser } = useSelector((state) => state.auth);
 
   return (
     <div className="bg-white w-full rounded-xl h-full shadow-lg border border-gray-300 overflow-x-auto">
@@ -75,19 +75,35 @@ const CommissionTable = ({
               Min/Max
             </th>
             <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
+              Surcharge
+            </th>
+            <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
               TDS/GST
             </th>
-           {currentUser.role.name === "ADMIN" &&  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
-              Actions
-            </th>}
+            {currentUser.role.name === "ADMIN" && (
+              <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
+                Actions
+              </th>
+            )}
           </tr>
         </thead>
 
         <tbody className="divide-y divide-gray-100">
           {isLoading ? (
-            <EmptyState type="loading" />
+            <tr>
+              <td colSpan={10}>
+                <EmptyState type="loading" />
+              </td>
+            </tr>
           ) : commissions.length === 0 ? (
-            <EmptyState type={search ? "search" : "empty"} search={search} />
+            <tr>
+              <td colSpan={10}>
+                <EmptyState
+                  type={search ? "search" : "empty"}
+                  search={search}
+                />
+              </td>
+            </tr>
           ) : (
             commissions.map((commission, index) => (
               <tr
@@ -151,7 +167,7 @@ const CommissionTable = ({
 
                 <td className="px-6 py-5">
                   <div className="text-sm font-semibold">
-                    {commission.commissionType === "PERCENT"
+                    {commission.commissionType === "PERCENTAGE"
                       ? `${commission.commissionValue}%`
                       : `₹${commission.commissionValue}`}
                   </div>
@@ -161,6 +177,14 @@ const CommissionTable = ({
                   <div className="space-y-1">
                     <div>Min: ₹{commission.minAmount || "0"}</div>
                     <div>Max: ₹{commission.maxAmount || "∞"}</div>
+                  </div>
+                </td>
+
+                <td className="px-6 py-5">
+                  <div className="text-sm font-semibold">
+                    {commission.surchargeType === "PERCENTAGE"
+                      ? `${commission.surchargeAmount}%`
+                      : `₹${commission.surchargeAmount}`}
                   </div>
                 </td>
 
@@ -178,43 +202,45 @@ const CommissionTable = ({
                   </div>
                 </td>
 
-                {currentUser.role.name === "ADMIN" && <td className="px-6 py-5 text-center relative">
-                  <div className="inline-block relative">
-                    <button
-                      className="p-2 rounded-full hover:bg-gray-100"
-                      onClick={() =>
-                        onMenuToggle(
-                          openMenuId === commission.id ? null : commission.id
-                        )
-                      }
-                    >
-                      {openMenuId === commission.id ? (
-                        <X className="w-5 h-5 text-gray-600" />
-                      ) : (
-                        <MoreVertical className="w-5 h-5 text-gray-600" />
-                      )}
-                    </button>
+                {currentUser.role.name === "ADMIN" && (
+                  <td className="px-6 py-5 text-center relative">
+                    <div className="inline-block relative">
+                      <button
+                        className="p-2 rounded-full hover:bg-gray-100"
+                        onClick={() =>
+                          onMenuToggle(
+                            openMenuId === commission.id ? null : commission.id
+                          )
+                        }
+                      >
+                        {openMenuId === commission.id ? (
+                          <X className="w-5 h-5 text-gray-600" />
+                        ) : (
+                          <MoreVertical className="w-5 h-5 text-gray-600" />
+                        )}
+                      </button>
 
-                    {openMenuId === commission.id && (
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-                        {commissionActions.map((action, index) => (
-                          <button
-                            key={index}
-                            onClick={() => {
-                              action.onClick(commission);
-                            }}
-                            className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            <action.icon
-                              className={`w-4 h-4 mr-3 ${action.color}`}
-                            />
-                            {action.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </td>}
+                      {openMenuId === commission.id && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                          {commissionActions.map((action, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                action.onClick(commission);
+                              }}
+                              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                              <action.icon
+                                className={`w-4 h-4 mr-3 ${action.color}`}
+                              />
+                              {action.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))
           )}

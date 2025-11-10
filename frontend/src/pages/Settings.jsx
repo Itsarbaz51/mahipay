@@ -7,12 +7,12 @@ import {
 import { useState } from "react";
 import { useSelector } from "react-redux";
 
-import MainSettings from "../pages/MainSetting";
-import CompanyAccounts from "../pages/CompanyAccounts";
-import ManageServices from "../pages/ManageServices";
-import RoleManager from "./RoleManager";
-import PageHeader from "./ui/PageHeader";
-import ApiIntegration from "../pages/ApiIntigration";
+import MainSettings from "./MainSetting";
+import CompanyAccounts from "./CompanyAccounts";
+import ManageServices from "./ManageServices";
+import RoleManager from "../components/RoleManager";
+import PageHeader from "../components/ui/PageHeader";
+import ApiIntegration from "./ApiIntigration";
 
 const Settings = () => {
   const { currentUser = {} } = useSelector((state) => state.auth);

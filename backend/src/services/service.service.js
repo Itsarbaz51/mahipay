@@ -1,10 +1,8 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
 import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
-import axios from "axios";
 import { TestingAPI } from "./testing/testingAPIs.js";
 
 export class ServiceProviderService {

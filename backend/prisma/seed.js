@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { CryptoService } from "../src/utils/cryptoService.js";
+import { ServiceProviderService } from "../src/services/service.service.js";
 
 const prisma = new PrismaClient();
 
@@ -188,27 +189,22 @@ async function main() {
   console.log("\n🏢 Creating service providers...");
 
   const serviceProviders = [
-    { code: "AEPS_BULKPE", name: "BulkPE AEPS" },
-    { code: "BBPS_PAYTM", name: "PayTM BBPS" },
+    {
+      code: "RAZORPAY",
+      name: "Razorpay",
+      description: "connect razorpay",
+      keyValueInputNumber: 2,
+    },
+    {
+      code: "BBPS_PAYTM",
+      name: "PayTM BBPS",
+      description: "connect bbps",
+      keyValueInputNumber: 4,
+    },
   ];
 
   for (const provider of serviceProviders) {
-    await prisma.serviceProvider.upsert({
-      where: { code: provider.code },
-      update: {},
-      create: {
-        name: provider.name,
-        code: provider.code,
-        isActive: true,
-        hierarchyLevel: "0",
-        hierarchyPath: "0",
-        envConfig: {
-          apiKey: "demo_key",
-          baseUrl: "https://api.demo.com/v1",
-          timeout: 30000,
-        },
-      },
-    });
+    await ServiceProviderService.create(provider);
     console.log(`✅ Service provider created: ${provider.name}`);
   }
 

@@ -1,4 +1,3 @@
-import React from "react";
 import { useSelector } from "react-redux";
 
 function ButtonField({ isOpen, name, icon: Icon, type, isDisabled, btncss }) {

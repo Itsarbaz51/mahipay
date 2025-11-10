@@ -99,6 +99,7 @@ class Helper {
       "commissionAmount",
       "tdsAmount",
       "gstAmount",
+      "surchargeAmount",
       "netAmount",
       "minAmount",
       "maxAmount",
@@ -114,7 +115,12 @@ class Helper {
     });
 
     // Convert Decimal to Number
-    const decimalFields = ["commissionValue", "tdsPercent", "gstPercent"];
+    const decimalFields = [
+      "commissionValue",
+      "tdsPercent",
+      "gstPercent",
+      "surchargeAmount",
+    ];
     decimalFields.forEach((field) => {
       if (serialized[field] !== undefined && serialized[field] !== null) {
         serialized[field] = Number(serialized[field]);
@@ -265,6 +271,92 @@ class Helper {
     }
 
     return pin;
+  }
+
+  static generateCommonMetadata(req, res, duration = null) {
+    const metadata = {
+      // Request details
+      method: req.method,
+      url: req.originalUrl,
+
+      // Response details
+      statusCode: res.statusCode,
+      statusMessage: res.statusMessage,
+
+      // Performance
+      ...(duration && { durationMs: duration.toFixed(2) }),
+
+      // Request data
+      ...(Object.keys(req.params).length > 0 && { params: req.params }),
+      ...(Object.keys(req.query).length > 0 && { query: req.query }),
+    };
+
+    if (req.headers["user-agent"]) {
+      metadata.userAgent = {
+        raw: req.headers["user-agent"].substring(0, 200),
+        browser: this.extractBrowserInfo(req.headers["user-agent"]),
+        device: this.extractDeviceInfo(req.headers["user-agent"]),
+      };
+    }
+
+    return metadata;
+  }
+
+  static extractBrowserInfo(userAgent) {
+    const browserInfo = {};
+
+    // More comprehensive browser detection
+    const browserPatterns = [
+      { pattern: /Chrome\/(\d+\.\d+)/, name: "Chrome" },
+      { pattern: /Firefox\/(\d+\.\d+)/, name: "Firefox" },
+      { pattern: /Safari\/(\d+\.\d+)/, name: "Safari" },
+      { pattern: /Edg\/(\d+\.\d+)/, name: "Edge" },
+      { pattern: /OPR\/(\d+\.\d+)/, name: "Opera" },
+    ];
+
+    for (const { pattern, name } of browserPatterns) {
+      const match = userAgent.match(pattern);
+      if (match) {
+        browserInfo.name = name;
+        browserInfo.version = match[1];
+        break;
+      }
+    }
+
+    return Object.keys(browserInfo).length > 0 ? browserInfo : undefined;
+  }
+
+  static extractDeviceInfo(userAgent) {
+    const deviceInfo = {};
+
+    // Enhanced device detection
+    if (/Mobile|Android|iPhone|iPad/.test(userAgent)) {
+      deviceInfo.type = /Tablet|iPad/.test(userAgent) ? "Tablet" : "Mobile";
+    } else {
+      deviceInfo.type = "Desktop";
+    }
+
+    // OS detection
+    const osPatterns = [
+      { pattern: /Android (\d+\.\d+)/, os: "Android", version: true },
+      { pattern: /iPhone OS (\d+_\d+)/, os: "iOS", version: true },
+      { pattern: /Windows NT (\d+\.\d+)/, os: "Windows", version: true },
+      { pattern: /Mac OS X (\d+[._]\d+)/, os: "macOS", version: true },
+      { pattern: /Linux/, os: "Linux", version: false },
+    ];
+
+    for (const { pattern, os, version } of osPatterns) {
+      const match = userAgent.match(pattern);
+      if (match) {
+        deviceInfo.os = os;
+        if (version) {
+          deviceInfo.osVersion = match[1].replace(/_/g, ".");
+        }
+        break;
+      }
+    }
+
+    return Object.keys(deviceInfo).length > 0 ? deviceInfo : undefined;
   }
 }
 

@@ -37,7 +37,7 @@ const CompanyAccounts = () => {
   const [editingAccountId, setEditingAccountId] = useState(null);
   const [showAccountForm, setShowAccountForm] = useState(false);
 
-  const { myBankList } = useSelector((state) => state.bank);
+  const { myBankList, isLoading } = useSelector((state) => state.bank);
 
   useEffect(() => {
     dispatch(getAllMyBanks());
@@ -352,6 +352,7 @@ const CompanyAccounts = () => {
             onSubmit={editingAccountId ? handleEditAccount : handleAddAccount}
             onCancel={resetForm}
             editingAccountId={editingAccountId}
+            isLoading={isLoading}
           />
         )}
       </div>

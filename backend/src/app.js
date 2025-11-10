@@ -6,7 +6,6 @@ import { StaticRoutes } from "./routers/staticRoutes.js";
 import { requestId } from "./middlewares/requestId.middleware.js";
 import { rateLimiterMiddleware } from "./middlewares/rateLimiter.middleware.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
-import { auditLogger } from "./middlewares/auditLogger.js";
 import { IdempotencyService } from "./services/idempotencyKey.service.js";
 
 const app = express();
@@ -34,7 +33,6 @@ app.use(cookieParser());
 app.use(helmet());
 app.use(requestId);
 app.use(rateLimiterMiddleware);
-app.use(auditLogger);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", requestId: req.requestId });

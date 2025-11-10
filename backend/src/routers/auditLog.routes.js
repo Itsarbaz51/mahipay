@@ -1,10 +1,14 @@
-// import { Router } from "express";
+import express from "express";
+import AuditLogsController from "../controllers/auditLog.controller.js";
+import AuthMiddleware from "../middlewares/auth.middleware.js";
 
-// const auditLogRoutes = Router();
+const router = express.Router();
 
-// auditLogRoutes.get("");
-// auditLogRoutes.post("");
-// auditLogRoutes.put("");
-// auditLogRoutes.delete("");
+router.post(
+  "/",
+  AuthMiddleware.isAuthenticated,
+  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuditLogsController.getAuditLogs
+);
 
-// export default auditLogRoutes;
+export default router;

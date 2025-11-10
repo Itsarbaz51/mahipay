@@ -334,6 +334,10 @@ const ProfileTable = () => {
                           <Mail className="w-4 h-4 mr-2 text-gray-400" />
                           {kyc.profile?.email || "N/A"}
                         </div>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <UsersRound className="w-3 h-3 mr-1" />@
+                          {kyc.profile?.username || ""}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {kyc.documents?.map((doc, i) => (
