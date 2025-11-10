@@ -35,6 +35,7 @@ import EmployeeTable from "../components/tabels/EmployeeTable";
 import MembersTable from "../components/tabels/MembersTable";
 import WalletTable from "../components/tabels/Wallet";
 import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
+import NoPermissionsPage from "../pages/NoPermissionsPage.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(
@@ -90,6 +91,14 @@ export const createRouter = () => {
           element={
             <ProtectedRoute>
               <UnauthorizedPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="permission-denied"
+          element={
+            <ProtectedRoute>
+              <NoPermissionsPage />
             </ProtectedRoute>
           }
         />

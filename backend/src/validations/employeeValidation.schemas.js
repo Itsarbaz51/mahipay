@@ -59,7 +59,6 @@ class EmployeeValidationSchemas {
     return z.object({
       permissions: z
         .array(z.string())
-        .min(1, "At least one permission is required")
         .max(20, "Cannot assign more than 20 permissions"),
     });
   }

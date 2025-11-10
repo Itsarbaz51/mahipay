@@ -10,11 +10,12 @@ const roleRoutes = Router();
 roleRoutes.get(
   "/type/:type",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   RoleController.getAllRolesByType
 );
@@ -23,18 +24,19 @@ roleRoutes.get(
 roleRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   RoleController.getAllRoles
 );
 
 roleRoutes.get(
   "/business",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   RoleController.getBusinessRoles
 );
@@ -43,7 +45,7 @@ roleRoutes.get(
 roleRoutes.get(
   "/employee",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   RoleController.getEmployeeRoles
 );
 
@@ -51,11 +53,12 @@ roleRoutes.get(
 roleRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   RoleController.getRolebyId
 );
@@ -64,7 +67,7 @@ roleRoutes.get(
 roleRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(RoleValidationSchemas.createRole),
   RoleController.createRole
 );
@@ -73,7 +76,7 @@ roleRoutes.post(
 roleRoutes.put(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   validateRequest(RoleValidationSchemas.updateRole),
   RoleController.updateRole
 );
@@ -82,7 +85,7 @@ roleRoutes.put(
 roleRoutes.delete(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN"]),
   RoleController.deleteRole
 );
 

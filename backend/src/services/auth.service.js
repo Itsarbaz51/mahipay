@@ -87,6 +87,9 @@ class AuthServices {
         user.id
       );
       tokenPayload.permissions = permissions;
+
+      // Also include permissions in user object for frontend
+      user.userPermissions = permissions;
     }
 
     const accessToken = Helper.generateAccessToken(tokenPayload);
@@ -147,166 +150,202 @@ class AuthServices {
   }
 
   static async getUserById(userId, currentUser = null) {
-    const user = await Prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: {
-          select: {
-            id: true,
-            name: true,
-            level: true,
-            description: true,
-            type: true,
+    try {
+      const user = await Prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          role: {
+            select: {
+              id: true,
+              name: true,
+              level: true,
+              description: true,
+              type: true,
+            },
           },
-        },
-        wallets: true,
-        parent: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
+          wallets: true,
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
           },
-        },
-        children: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phoneNumber: true,
-            profileImage: true,
-            status: true,
-            createdAt: true,
+          children: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+              status: true,
+              createdAt: true,
+            },
           },
-        },
-        kycs: {
-          include: {
-            address: {
-              include: {
-                state: {
-                  select: {
-                    id: true,
-                    stateName: true,
-                    stateCode: true,
-                    createdAt: true,
-                    updatedAt: true,
+          kycs: {
+            include: {
+              address: {
+                include: {
+                  state: {
+                    select: {
+                      id: true,
+                      stateName: true,
+                      stateCode: true,
+                      createdAt: true,
+                      updatedAt: true,
+                    },
                   },
-                },
-                city: {
-                  select: {
-                    id: true,
-                    cityName: true,
-                    cityCode: true,
-                    createdAt: true,
-                    updatedAt: true,
+                  city: {
+                    select: {
+                      id: true,
+                      cityName: true,
+                      cityCode: true,
+                      createdAt: true,
+                      updatedAt: true,
+                    },
                   },
                 },
               },
             },
+            orderBy: { createdAt: "desc" },
+            take: 1,
           },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-        bankAccounts: {
-          where: { status: "VERIFIED" },
-          orderBy: { isPrimary: "desc" },
-        },
-        userPermissions: {
-          include: {
-            service: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-                isActive: true,
+          bankAccounts: {
+            where: { status: "VERIFIED" },
+            orderBy: { isPrimary: "desc" },
+          },
+          userPermissions: {
+            include: {
+              service: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                  isActive: true,
+                },
               },
             },
           },
-        },
-        piiConsents: {
-          select: {
-            id: true,
-            piiType: true,
-            scope: true,
-            providedAt: true,
-            expiresAt: true,
-            userKycId: true,
-          },
-          where: { expiresAt: { gt: new Date() } },
-        },
-      },
-    });
-
-    if (!user) throw ApiError.notFound("User not found");
-
-    const transformedUser = {
-      ...user,
-      kycInfo:
-        user.kycs.length > 0
-          ? {
-              currentStatus: user.kycs[0].status,
-              isKycSubmitted: true,
-              latestKyc: user.kycs[0],
-              kycHistory: user.kycs,
-              totalKycAttempts: user.kycs.length,
-            }
-          : {
-              currentStatus: "NOT_SUBMITTED",
-              isKycSubmitted: false,
-              latestKyc: null,
-              kycHistory: [],
-              totalKycAttempts: 0,
+          piiConsents: {
+            select: {
+              id: true,
+              piiType: true,
+              scope: true,
+              providedAt: true,
+              expiresAt: true,
+              userKycId: true,
             },
-      bankInfo: {
-        totalAccounts: user.bankAccounts.length,
-        primaryAccount: user.bankAccounts.find((acc) => acc.isPrimary) || null,
-        verifiedAccounts: user.bankAccounts.filter(
-          (acc) => acc.status === "VERIFIED"
-        ),
-      },
-      kycs: undefined,
-      bankAccounts: undefined,
-    };
+            where: { expiresAt: { gt: new Date() } },
+          },
+        },
+      });
 
-    let safeUser;
-
-    const isCurrentUserAdmin = currentUser && currentUser.role === "ADMIN";
-
-    if (isCurrentUserAdmin) {
-      const serialized = Helper.serializeUser(transformedUser);
-
-      if (serialized.password) {
-        try {
-          serialized.password = CryptoService.decrypt(serialized.password);
-        } catch {
-          serialized.password = "Error decrypting";
-        }
+      if (!user) {
+        throw ApiError.notFound("User not found");
       }
 
-      if (serialized.transactionPin) {
+      // Get employee permissions if user is an employee
+      if (user.role.type === "employee") {
         try {
-          serialized.transactionPin = CryptoService.decrypt(
-            serialized.transactionPin
+          const permissions = await EmployeeServices.getEmployeePermissions(
+            user.id
           );
-        } catch {
-          serialized.transactionPin = "Error decrypting";
+          user.userPermissions = permissions;
+        } catch (error) {
+          console.error(
+            `Failed to get employee permissions for user ${userId}:`,
+            error
+          );
+          user.permissions = [];
         }
       }
 
-      safeUser = serialized;
-    } else {
-      const serialized = Helper.serializeUser(transformedUser);
-      const { password, transactionPin, refreshToken, ...safeData } =
-        serialized;
-      safeUser = safeData;
-    }
+      // Transform user data
+      const transformedUser = {
+        ...user,
+        kycInfo:
+          user.kycs.length > 0
+            ? {
+                currentStatus: user.kycs[0].status,
+                isKycSubmitted: true,
+                latestKyc: user.kycs[0],
+                kycHistory: user.kycs,
+                totalKycAttempts: user.kycs.length,
+              }
+            : {
+                currentStatus: "NOT_SUBMITTED",
+                isKycSubmitted: false,
+                latestKyc: null,
+                kycHistory: [],
+                totalKycAttempts: 0,
+              },
+        bankInfo: {
+          totalAccounts: user.bankAccounts.length,
+          primaryAccount:
+            user.bankAccounts.find((acc) => acc.isPrimary) || null,
+          verifiedAccounts: user.bankAccounts,
+        },
+        // Remove original arrays to avoid duplication
+        kycs: undefined,
+        bankAccounts: undefined,
+      };
 
-    return safeUser;
+      // Serialize and secure sensitive data
+      const serialized = Helper.serializeUser(transformedUser);
+      const isCurrentUserAdmin =
+        currentUser && currentUser.role?.name === "ADMIN";
+
+      let safeUser;
+      if (isCurrentUserAdmin) {
+        // Admin can see decrypted sensitive data
+        safeUser = { ...serialized };
+
+        if (safeUser.password) {
+          try {
+            safeUser.password = CryptoService.decrypt(safeUser.password);
+          } catch (error) {
+            console.error(
+              `Failed to decrypt password for user ${userId}:`,
+              error
+            );
+            safeUser.password = "Error decrypting";
+          }
+        }
+
+        if (safeUser.transactionPin) {
+          try {
+            safeUser.transactionPin = CryptoService.decrypt(
+              safeUser.transactionPin
+            );
+          } catch (error) {
+            console.error(
+              `Failed to decrypt transaction pin for user ${userId}:`,
+              error
+            );
+            safeUser.transactionPin = "Error decrypting";
+          }
+        }
+      } else {
+        // Non-admin users get sanitized data
+        const { password, transactionPin, refreshToken, ...safeData } =
+          serialized;
+        safeUser = safeData;
+      }
+
+      return safeUser;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      console.error(`Error in getUserById for user ${userId}:`, error);
+      throw ApiError.internal("Failed to retrieve user data");
+    }
   }
 
   static async logout(userId, refreshToken) {

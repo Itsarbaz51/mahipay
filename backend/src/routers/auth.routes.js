@@ -11,7 +11,7 @@ const authRoutes = Router();
 authRoutes.get(
   "/me",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
+  AuthMiddleware.authorize(["employee", "business"]),
   AuthController.getCurrentUser
 );
 

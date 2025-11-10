@@ -11,11 +11,12 @@ const kycRoutes = Router();
 kycRoutes.post(
   "/list-kyc",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles([
+  AuthMiddleware.authorize([
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
+    "employee",
   ]),
   validateRequest(KycValidationSchemas.ListkycSchema),
   UserKycController.index
@@ -25,7 +26,7 @@ kycRoutes.post(
 kycRoutes.get(
   "/user-kyc-show/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   UserKycController.show
 );
 
@@ -33,7 +34,7 @@ kycRoutes.get(
 kycRoutes.post(
   "/user-kyc-store",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   upload.fields([
     { name: "panFile", maxCount: 1 },
     { name: "aadhaarFile", maxCount: 1 },
@@ -48,7 +49,7 @@ kycRoutes.post(
 kycRoutes.put(
   "/user-verify",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   validateRequest(KycValidationSchemas.VerificationKycSchema),
   UserKycController.verification
 );
@@ -57,7 +58,7 @@ kycRoutes.put(
 kycRoutes.put(
   "/user-kyc-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   upload.fields([
     { name: "panFile", maxCount: 1 },
     { name: "aadhaarFile", maxCount: 1 },

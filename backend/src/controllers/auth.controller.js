@@ -3,6 +3,7 @@ import AuthServices from "../services/auth.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
+import EmployeeServices from "../services/employee.service.js";
 
 const cookieOptions = {
   httpOnly: true,
@@ -55,7 +56,7 @@ class AuthController {
       throw ApiError.unauthorized("User not authenticated");
     }
     try {
-      const safeUser = await AuthServices.getUserById(userId);
+      let safeUser = await AuthServices.getUserById(userId);
 
       if (!safeUser) {
         throw ApiError.notFound("Business user not found");

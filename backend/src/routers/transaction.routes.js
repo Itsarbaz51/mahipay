@@ -11,7 +11,7 @@ const transactionRoutes = Router();
 transactionRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(TransactionValidationSchemas.createTransactionSchema),
   TransactionController.createTransaction
@@ -21,7 +21,7 @@ transactionRoutes.post(
 transactionRoutes.post(
   "/refund",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   validateRequest(TransactionValidationSchemas.refundTransactionSchema),
   TransactionController.refundTransaction
 );
@@ -30,7 +30,7 @@ transactionRoutes.post(
 transactionRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["ADMIN", "business", "employee"]),
   TransactionController.getTransactions
 );
 
@@ -38,7 +38,7 @@ transactionRoutes.get(
 transactionRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorize(["ADMIN", "business", "employee"]),
   TransactionController.getTransactionById
 );
 
@@ -46,7 +46,7 @@ transactionRoutes.get(
 transactionRoutes.patch(
   "/status",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN"]),
   validateRequest(TransactionValidationSchemas.updateTransactionStatusSchema),
   TransactionController.updateTransactionStatus
 );
