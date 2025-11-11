@@ -98,7 +98,7 @@ const MembersTable = () => {
   const limit = pagination.limit || 10;
 
   const services =
-    useSelector((state) => state.services.serviceProviders.activeServices) ||
+    useSelector((state) => state.services.serviceProviders.allActiveServices) ||
     [];
 
   // ✅ Check if current user is ADMIN
@@ -218,7 +218,7 @@ const MembersTable = () => {
   // Service providers effect
   useEffect(() => {
     if (showPermissionModal) {
-      dispatch(allServices());
+      dispatch(allServices("active"));
     }
   }, [showPermissionModal, dispatch]);
 

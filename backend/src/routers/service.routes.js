@@ -18,7 +18,7 @@ serviceRoutes.post(
 );
 
 // Get all service providers (ADMIN sees all, business users see assigned)
-serviceRoutes.get(
+serviceRoutes.post(
   "/lists",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize(["ADMIN", "business", "employee"]),

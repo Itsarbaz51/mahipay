@@ -20,17 +20,15 @@ function ApiIntegration() {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   const dispatch = useDispatch();
-  const { allServiceProviders } = useSelector(
-    (state) => state.services.serviceProviders
-  );
+  const { serviceProviders } = useSelector((state) => state.services);
 
   useEffect(() => {
-    dispatch(allServices());
+    dispatch(allServices("all"));
   }, [dispatch]);
 
   useEffect(() => {
-    if (Array.isArray(allServiceProviders)) {
-      const sanitized = allServiceProviders.map((sp) => {
+    if (Array.isArray(serviceProviders?.allApiIntigration)) {
+      const sanitized = serviceProviders?.allApiIntigration.map((sp) => {
         let envConfigData = sp.envConfig || [];
         if (typeof sp.envConfig === "string") {
           try {
@@ -52,7 +50,7 @@ function ApiIntegration() {
       });
       setIntegrations(sanitized);
     }
-  }, [allServiceProviders]);
+  }, [serviceProviders?.allApiIntigration]);
 
   const handleConnect = useCallback((api) => {
     setSelectedApi(api);
@@ -92,8 +90,6 @@ function ApiIntegration() {
 
   const handleDisconnectBtn = useCallback(
     async (apiId) => {
-      console.log(apiId);
-
       try {
         await dispatch(toggleStatusApiIntigration(apiId));
       } catch (error) {
@@ -118,14 +114,6 @@ function ApiIntegration() {
   };
 
   const handleSubServiceToggle = useCallback((subService, isChecked) => {
-    console.log(
-      "Toggling sub-service:",
-      subService.name,
-      "ID:",
-      subService.id,
-      "to:",
-      isChecked
-    );
     setSubServices((prev) =>
       prev.map((sub) => {
         if (sub.id === subService.id) {
@@ -186,10 +174,7 @@ function ApiIntegration() {
           <div className="flex items-center space-x-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span className="text-sm font-medium text-gray-700">
-              {
-                integrations.filter((i) => i.apiIntegrationStatus === true)
-                  .length
-              }{" "}
+              {serviceProviders.count}
               Active
             </span>
           </div>

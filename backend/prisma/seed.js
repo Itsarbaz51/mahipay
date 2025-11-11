@@ -201,6 +201,14 @@ async function main() {
       description: "connect bbps",
       keyValueInputNumber: 4,
     },
+    {
+      code: "BANK_TRANSFER",
+      name: "BANK TRANSFER",
+      description: "connect BANK TRANSFER",
+      keyValueInputNumber: 0,
+      apiIntegrationStatus: true,
+      isActive: true,
+    },
   ];
 
   for (const provider of serviceProviders) {

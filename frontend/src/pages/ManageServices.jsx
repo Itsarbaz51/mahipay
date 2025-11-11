@@ -4,18 +4,26 @@ import { allServices, toggleStatusService } from "../redux/slices/serviceSlice";
 
 export default function ManageServices() {
   const dispatch = useDispatch();
-  const { activeServices, isLoading } = useSelector(
-    (state) => state.services.serviceProviders
+  const { serviceProviders, isLoading } = useSelector(
+    (state) => state.services
   );
+
+  const allServiceProviders = Array.isArray(serviceProviders)
+    ? serviceProviders
+    : [];
 
   const [localLoading, setLocalLoading] = useState({});
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    dispatch(allServices());
+    dispatch(allServices("allServices"));
   }, [dispatch]);
 
   const toggleService = async (serviceId, currentStatus, isParent = false) => {
+    console.log(serviceId);
+    console.log(currentStatus);
+    console.log(isParent);
+
     try {
       setLocalLoading((prev) => ({ ...prev, [serviceId]: true }));
       const newStatus = !currentStatus;
@@ -25,7 +33,7 @@ export default function ManageServices() {
 
       // If this is a parent, also toggle all its sub-services
       if (isParent) {
-        const parent = activeServices.find((s) => s.id === serviceId);
+        const parent = allServiceProviders.find((s) => s.id === serviceId);
         if (parent && parent.subService?.length > 0) {
           for (const sub of parent.subService) {
             // Make sure child matches parent toggle
@@ -36,7 +44,7 @@ export default function ManageServices() {
         }
       } else {
         // If toggling a sub-service, check if all siblings share same state
-        const parent = activeServices.find((s) =>
+        const parent = allServiceProviders.find((s) =>
           s.subService?.some((sub) => sub.id === serviceId)
         );
 
@@ -53,7 +61,7 @@ export default function ManageServices() {
       }
 
       // Refresh hierarchy
-      await dispatch(allServices());
+      await dispatch(allServices("allServices"));
     } catch (error) {
       console.error("Error toggling service:", error);
     } finally {
@@ -64,7 +72,7 @@ export default function ManageServices() {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      await dispatch(allServices());
+      await dispatch(allServices("allServices"));
     } catch (error) {
       console.error("Error refreshing services:", error);
     } finally {
@@ -72,7 +80,7 @@ export default function ManageServices() {
     }
   };
 
-  if (isLoading && activeServices?.length === 0) {
+  if (isLoading && allServiceProviders?.length === 0) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -80,7 +88,7 @@ export default function ManageServices() {
     );
   }
 
-  if (!isLoading && activeServices?.length === 0) {
+  if (!isLoading && allServiceProviders?.length === 0) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="text-center">
@@ -128,7 +136,7 @@ export default function ManageServices() {
 
       {/* Services Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {activeServices?.map((serviceProvider) => {
+        {allServiceProviders?.map((serviceProvider) => {
           const isActive = serviceProvider.isActive;
           const isServiceLoading = localLoading[serviceProvider.id];
           const hasSubServices =

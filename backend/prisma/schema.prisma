@@ -334,12 +334,12 @@ model ServiceProvider {
   id                   String              @id @default(uuid())
   name                 String
   code                 String              @unique
-  isActive             Boolean             @default(true)
+  isActive             Boolean             @default(false)
   iconUrl              String?
   description          String?             @db.LongText
   envConfig            Json?               @map("env_config")
   keyValueInputNumber  String?             @map("key_value_input_number")
-  apiIntegrationStatus Boolean?            @map("api_integration_status")
+  apiIntegrationStatus Boolean?            @default(false) @map("api_integration_status")
   parentId             String?             @map("parent_id")
   hierarchyLevel       String              @map("hierarchy_level")
   hierarchyPath        String              @map("hierarchy_path") @db.Text

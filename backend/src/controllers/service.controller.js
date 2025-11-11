@@ -42,11 +42,22 @@ class ServiceProviderController {
 
   static getAll = asyncHandler(async (req, res) => {
     const user = req.user;
+    const { type } = req.body; // 'all', 'active', 'inactive'
+
     let serviceProviders;
 
     if (user.role === "ADMIN") {
-      // ADMIN can see all services
-      serviceProviders = await ServiceProviderService.getAll();
+      // ADMIN can see all services based on type
+      switch (type) {
+        case "active":
+          serviceProviders = await ServiceProviderService.getActive();
+          break;
+        case "allServices":
+          serviceProviders = await ServiceProviderService.allServices();
+          break;
+        default:
+          serviceProviders = await ServiceProviderService.getAll();
+      }
     } else {
       // Regular users can only see assigned services
       serviceProviders = await ServiceProviderService.getUserServices(user.id);

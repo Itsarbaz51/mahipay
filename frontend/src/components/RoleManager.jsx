@@ -34,7 +34,8 @@ export default function RoleManager() {
   } = rolesState;
 
   const services =
-    useSelector((state) => state.services?.serviceProviders?.activeServices) || [];
+    useSelector((state) => state.services?.serviceProviders?.allActiveServices) ||
+    [];
   const { currentPermission } = useSelector((state) => state.permission);
 
   const [editRole, setEditRole] = useState(null);
@@ -55,7 +56,7 @@ export default function RoleManager() {
 
   useEffect(() => {
     if (showPermissionModal) {
-      dispatch(allServices());
+      dispatch(allServices("active"));
     }
   }, [showPermissionModal, dispatch]);
 
