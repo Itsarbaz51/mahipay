@@ -64,12 +64,38 @@ class AuthServices {
     });
 
     if (!user) {
+      if (req) {
+        await AuditLogService.createAuditLog({
+          userId: req.id,
+          action: "LOGIN_RETRIEVAL_FAILED",
+          entityType: "LOGIN",
+          entityId: id,
+          ipAddress: Helper.getClientIP(req),
+          metadata: {
+            ...Helper.generateCommonMetadata(req, res),
+            reason: "USER_NOT_FOUND",
+          },
+        });
+      }
       throw ApiError.unauthorized("User not found");
     }
 
     const isValid = CryptoService.decrypt(user.password);
 
     if (isValid !== password) {
+      if (req) {
+        await AuditLogService.createAuditLog({
+          userId: req.id,
+          action: "LOGIN_CREDENTIALS_FAILED",
+          entityType: "LOGIN",
+          entityId: id,
+          ipAddress: Helper.getClientIP(req),
+          metadata: {
+            ...Helper.generateCommonMetadata(req, res),
+            reason: "Invalid credentials",
+          },
+        });
+      }
       throw ApiError.unauthorized("Invalid credentials");
     }
 
