@@ -362,9 +362,9 @@ const AuditLogs = () => {
   }
 
   return (
-    <div>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden p-6">
       {/* Header with Filters */}
-      <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+      <div className="p-6 border-b border-slate-200 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
         {/* Search */}
         <div className="relative w-full max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
@@ -525,9 +525,8 @@ const AuditLogs = () => {
         </div>
       </div>
 
-      {/* Rest of the component remains the same */}
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 p-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 py-6">
         <div className="bg-white border border-gray-200 rounded-2xl p-6 hover:scale-105 transition-transform duration-300 shadow-sm hover:shadow-lg">
           <div className="flex items-center gap-3">
             <Activity className="w-8 h-8 text-blue-500" />
@@ -585,7 +584,7 @@ const AuditLogs = () => {
       )}
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm mx-6">
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

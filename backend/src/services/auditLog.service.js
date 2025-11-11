@@ -53,54 +53,75 @@ class AuditLogService {
 
       let filteredLogs = logs;
 
-      // 🔹 User-based filtering
       if (userRole?.toUpperCase() !== "ADMIN" && userId) {
-        filteredLogs = logs.filter((log) => {
-          const logUserId = log.message?.userId || log.userId;
+        filteredLogs = filteredLogs.filter((log) => {
+          const logUserId =
+            log.userId ||
+            log.user?.id ||
+            log.message?.userId ||
+            log.message?.metadata?.userId;
           return logUserId && logUserId.toString() === userId.toString();
         });
       }
 
-      // 🔹 Apply filters
-      if (filters.action) {
-        filteredLogs = filteredLogs.filter((log) =>
-          log.action?.toLowerCase().includes(filters.action.toLowerCase())
-        );
+      //  Apply field-specific filters
+      if (filters) {
+        if (filters.action) {
+          const action = filters.action.toLowerCase();
+          filteredLogs = filteredLogs.filter(
+            (log) =>
+              log.action?.toLowerCase().includes(action) ||
+              log.message?.action?.toLowerCase().includes(action)
+          );
+        }
+
+        if (filters.resource) {
+          const resource = filters.resource.toLowerCase();
+          filteredLogs = filteredLogs.filter(
+            (log) =>
+              log.resource?.toLowerCase().includes(resource) ||
+              log.message?.resource?.toLowerCase().includes(resource)
+          );
+        }
+
+        if (filters.roleId) {
+          filteredLogs = filteredLogs.filter(
+            (log) =>
+              log.message?.metadata?.roleId?.toString() ===
+                filters.roleId.toString() ||
+              log.user?.roleId?.toString() === filters.roleId.toString()
+          );
+        }
+
+        if (filters.deviceType && filters.deviceType !== "all") {
+          const deviceType = filters.deviceType.toLowerCase();
+          filteredLogs = filteredLogs.filter((log) => {
+            const logDevice =
+              log.message?.metadata?.userAgent?.device?.type?.toLowerCase();
+            return logDevice === deviceType;
+          });
+        }
+
+        if (filters.startDate && filters.endDate) {
+          const start = new Date(filters.startDate);
+          const end = new Date(filters.endDate);
+          filteredLogs = filteredLogs.filter((log) => {
+            const logDate = new Date(log.timestamp);
+            return logDate >= start && logDate <= end;
+          });
+        }
+
+        //  Global search — only for admins
+        if (userRole?.toUpperCase() === "ADMIN" && filters.search) {
+          const term = filters.search.toLowerCase();
+          filteredLogs = filteredLogs.filter((log) => {
+            const combined = JSON.stringify(log).toLowerCase();
+            return combined.includes(term);
+          });
+        }
       }
 
-      if (filters.resource) {
-        filteredLogs = filteredLogs.filter((log) =>
-          log.resource?.toLowerCase().includes(filters.resource.toLowerCase())
-        );
-      }
-
-      if (filters.roleId) {
-        filteredLogs = filteredLogs.filter(
-          (log) =>
-            log.message?.metadata?.roleId?.toString() ===
-              filters.roleId.toString() ||
-            log.user?.roleId?.toString() === filters.roleId.toString()
-        );
-      }
-
-      if (filters.deviceType && filters.deviceType !== "all") {
-        filteredLogs = filteredLogs.filter(
-          (log) =>
-            log.message?.metadata?.userAgent?.device?.type?.toLowerCase() ===
-            filters.deviceType.toLowerCase()
-        );
-      }
-
-      if (filters.startDate && filters.endDate) {
-        const startDate = new Date(filters.startDate);
-        const endDate = new Date(filters.endDate);
-        filteredLogs = filteredLogs.filter((log) => {
-          const logDate = new Date(log.timestamp);
-          return logDate >= startDate && logDate <= endDate;
-        });
-      }
-
-      // 🔹 Sorting
+      //  Sorting
       const sortBy = filters.sortBy || "timestamp";
       const sortOrder = filters.sortOrder || "desc";
 
@@ -120,7 +141,7 @@ class AuditLogService {
         return 0;
       });
 
-      // 🔹 Pagination
+      //  Pagination
       const currentPage = Math.max(1, parseInt(page));
       const pageSize = Math.max(1, Math.min(parseInt(limit), 100));
       const totalItems = filteredLogs.length;
@@ -128,7 +149,7 @@ class AuditLogService {
       const skip = (currentPage - 1) * pageSize;
       const enrichedLogs = filteredLogs.slice(skip, skip + pageSize);
 
-      // 🔹 Enrich logs with user info from Prisma
+      //  Enrich logs with user info from Prisma
       const uniqueUserIds = [
         ...new Set(
           enrichedLogs
