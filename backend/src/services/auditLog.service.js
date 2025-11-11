@@ -4,38 +4,9 @@ import fs from "fs";
 import readline from "readline";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import Prisma from "../db/db.js";
 
 class AuditLogService {
-  static async createAuditLog({
-    userId = null,
-    action,
-    entityType = null,
-    entityId = null,
-    ipAddress = null,
-    metadata = {},
-  }) {
-    try {
-      const auditData = {
-        id: uuidv4(),
-        userId,
-        action,
-        entityType,
-        entityId,
-        ipAddress,
-        metadata,
-      };
-
-      auditLogger.info(auditData);
-
-      return {
-        success: true,
-        data: auditData,
-        message: "Audit log created successfully",
-      };
-    } catch (error) {
-      throw ApiError.internal("Failed to create audit log");
-    }
-  }
   static async getAuditLogs({
     page = 1,
     limit = 10,
@@ -65,7 +36,6 @@ class AuditLogService {
 
       const logs = [];
       const fileStream = fs.createReadStream(logFilePath, { encoding: "utf8" });
-
       const rl = readline.createInterface({
         input: fileStream,
         crlfDelay: Infinity,
@@ -83,7 +53,7 @@ class AuditLogService {
 
       let filteredLogs = logs;
 
-      // Apply user-based filtering
+      // 🔹 User-based filtering
       if (userRole?.toUpperCase() !== "ADMIN" && userId) {
         filteredLogs = logs.filter((log) => {
           const logUserId = log.message?.userId || log.userId;
@@ -91,7 +61,7 @@ class AuditLogService {
         });
       }
 
-      // Apply additional filters if provided
+      // 🔹 Apply filters
       if (filters.action) {
         filteredLogs = filteredLogs.filter((log) =>
           log.action?.toLowerCase().includes(filters.action.toLowerCase())
@@ -104,6 +74,23 @@ class AuditLogService {
         );
       }
 
+      if (filters.roleId) {
+        filteredLogs = filteredLogs.filter(
+          (log) =>
+            log.message?.metadata?.roleId?.toString() ===
+              filters.roleId.toString() ||
+            log.user?.roleId?.toString() === filters.roleId.toString()
+        );
+      }
+
+      if (filters.deviceType && filters.deviceType !== "all") {
+        filteredLogs = filteredLogs.filter(
+          (log) =>
+            log.message?.metadata?.userAgent?.device?.type?.toLowerCase() ===
+            filters.deviceType.toLowerCase()
+        );
+      }
+
       if (filters.startDate && filters.endDate) {
         const startDate = new Date(filters.startDate);
         const endDate = new Date(filters.endDate);
@@ -113,41 +100,74 @@ class AuditLogService {
         });
       }
 
-      let enrichedLogs = [...filteredLogs];
-
-      // Sorting
+      // 🔹 Sorting
       const sortBy = filters.sortBy || "timestamp";
       const sortOrder = filters.sortOrder || "desc";
 
-      enrichedLogs.sort((a, b) => {
+      filteredLogs.sort((a, b) => {
         let aValue = a[sortBy];
         let bValue = b[sortBy];
-
-        // Handle date sorting
         if (sortBy === "timestamp") {
           aValue = new Date(aValue);
           bValue = new Date(bValue);
         }
-
-        // Handle string sorting case-insensitively
         if (typeof aValue === "string" && typeof bValue === "string") {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
         }
-
         if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
         if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
         return 0;
       });
 
-      // Pagination calculation
+      // 🔹 Pagination
       const currentPage = Math.max(1, parseInt(page));
       const pageSize = Math.max(1, Math.min(parseInt(limit), 100));
-      const totalItems = enrichedLogs.length;
+      const totalItems = filteredLogs.length;
       const totalPages = Math.ceil(totalItems / pageSize);
-
       const skip = (currentPage - 1) * pageSize;
-      const paginatedLogs = enrichedLogs.slice(skip, skip + pageSize);
+      const enrichedLogs = filteredLogs.slice(skip, skip + pageSize);
+
+      // 🔹 Enrich logs with user info from Prisma
+      const uniqueUserIds = [
+        ...new Set(
+          enrichedLogs
+            .map((log) => log.userId || log.message?.userId)
+            .filter(Boolean)
+        ),
+      ];
+
+      let users = [];
+      if (uniqueUserIds.length > 0) {
+        users = await Prisma.user.findMany({
+          where: { id: { in: uniqueUserIds } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+          },
+        });
+      }
+
+      // Map users to logs
+      const paginatedLogs = enrichedLogs.map((log) => {
+        const logUserId = log.userId || log.message?.userId;
+        const user = users.find((u) => u.id === logUserId);
+        return {
+          ...log,
+          user: user
+            ? {
+                id: user.id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phoneNumber: user.phoneNumber,
+              }
+            : null,
+        };
+      });
 
       const pagination = {
         page: currentPage,
@@ -161,13 +181,43 @@ class AuditLogService {
         totalItems: totalItems,
       };
 
-      // Return clean object without array index properties showing
       return {
         paginatedLogs,
         pagination,
       };
     } catch (error) {
       throw ApiError.internal(`Failed to fetch audit logs: ${error.message}`);
+    }
+  }
+
+  static async createAuditLog({
+    userId = null,
+    action,
+    entityType = null,
+    entityId = null,
+    ipAddress = null,
+    metadata = {},
+  }) {
+    try {
+      const auditData = {
+        id: uuidv4(),
+        userId,
+        action,
+        entityType,
+        entityId,
+        ipAddress,
+        metadata,
+      };
+
+      auditLogger.info(auditData);
+
+      return {
+        success: true,
+        data: auditData,
+        message: "Audit log created successfully",
+      };
+    } catch (error) {
+      throw ApiError.internal("Failed to create audit log");
     }
   }
 }

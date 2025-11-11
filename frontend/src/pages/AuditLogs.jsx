@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ArrowUpDown,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 import { getAuditLogs } from "../redux/slices/logsSlice";
 import { getAllRoles } from "../redux/slices/roleSlice";
@@ -621,9 +622,7 @@ const AuditLogs = () => {
                 logsList?.data?.paginatedLogs.map((log, index) => (
                   <React.Fragment key={index}>
                     <tr className="hover:bg-blue-50 transition-colors duration-200">
-                      <td className="px-6 py-4">
-                        {getShowingFrom() + index}
-                      </td>
+                      <td className="px-6 py-4">{getShowingFrom() + index}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
@@ -761,6 +760,81 @@ const AuditLogs = () => {
                                   </span>
                                 </div>
                               </div>
+                            </div>
+                          </div>
+                          {/* Show full metadata dynamically */}
+                          {/* Show full metadata dynamically */}
+                          <div className="bg-white mt-6 rounded-lg p-4 border border-blue-100">
+                            <h3 className="text-gray-900 font-semibold flex items-center gap-2 mb-3">
+                              <FileText className="w-4 h-4 text-blue-600" />
+                              Metadata
+                            </h3>
+
+                            {/* Dark JSON Block */}
+                            <div className="bg-gray-900/95 text-gray-100 rounded-md p-4 font-mono text-sm border border-gray-700">
+                              <pre className="overflow-x-auto">
+                                <code>
+                                  {"{\n"}
+                                  {Object.entries(
+                                    log.message?.metadata || {}
+                                  ).map(([key, value], index, arr) => {
+                                    const isObject =
+                                      typeof value === "object" &&
+                                      value !== null;
+                                    const isNumber = typeof value === "number";
+                                    const isBoolean =
+                                      typeof value === "boolean";
+
+                                    let formattedValue;
+                                    if (isObject) {
+                                      formattedValue = (
+                                        <span className="text-yellow-400">
+                                          {JSON.stringify(value, null, 2)}
+                                        </span>
+                                      );
+                                    } else if (isNumber) {
+                                      formattedValue = (
+                                        <span className="text-purple-400">
+                                          {value}
+                                        </span>
+                                      );
+                                    } else if (isBoolean) {
+                                      formattedValue = (
+                                        <span className="text-orange-400">
+                                          {String(value)}
+                                        </span>
+                                      );
+                                    } else {
+                                      formattedValue = (
+                                        <span className="text-green-400">
+                                          "{value}"
+                                        </span>
+                                      );
+                                    }
+
+                                    return (
+                                      <div key={key}>
+                                        &nbsp;&nbsp;
+                                        <span className="text-blue-400">
+                                          "{key}"
+                                        </span>
+                                        <span className="text-gray-400">
+                                          :{" "}
+                                        </span>
+                                        {formattedValue}
+                                        {index < arr.length - 1 ? (
+                                          <span className="text-gray-400">
+                                            ,
+                                          </span>
+                                        ) : (
+                                          ""
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {"}"}
+                                </code>
+                              </pre>
                             </div>
                           </div>
                         </td>

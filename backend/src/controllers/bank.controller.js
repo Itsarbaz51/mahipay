@@ -33,7 +33,7 @@ export class AddBankController {
       search,
     };
 
-    const data = await BankDetailService.index(params);
+    const data = await BankDetailService.index(params, req);
 
     return res
       .status(200)
@@ -46,7 +46,7 @@ export class AddBankController {
     const userId = req.user?.id;
     if (!userId) throw ApiError.internal("User ID not found in request");
 
-    const data = await BankDetailService.getAllMy(userId);
+    const data = await BankDetailService.getAllMy(userId, req);
 
     return res
       .status(200)
@@ -62,7 +62,7 @@ export class AddBankController {
     const { id } = req.params;
     if (!id) throw ApiError.badRequest("ID missing");
 
-    const data = await BankDetailService.show(id, userId);
+    const data = await BankDetailService.show(id, userId, req, res);
     return res
       .status(200)
       .json(ApiResponse.success(data, "Bank detail fetched successfully", 200));
@@ -74,11 +74,15 @@ export class AddBankController {
 
     const file = req.file;
 
-    const data = await BankDetailService.store({
-      ...req.body,
-      bankProofFile: file,
-      userId,
-    });
+    const data = await BankDetailService.store(
+      {
+        ...req.body,
+        bankProofFile: file,
+        userId,
+      },
+      req,
+      res
+    );
 
     return res
       .status(201)
@@ -95,10 +99,16 @@ export class AddBankController {
     if (!id) throw ApiError.internal("Bank detail ID is required");
 
     const files = req.files;
-    const data = await BankDetailService.update(id, userId, {
-      ...req.body,
-      bankProofFile: files?.bankProofFile?.[0],
-    });
+    const data = await BankDetailService.update(
+      id,
+      userId,
+      {
+        ...req.body,
+        bankProofFile: files?.bankProofFile?.[0],
+      },
+      req,
+      res
+    );
 
     return res
       .status(200)
@@ -114,7 +124,7 @@ export class AddBankController {
 
     if (!id) throw ApiError.internal("Bank detail ID is required");
 
-    const result = await BankDetailService.destroy(id, userId);
+    const result = await BankDetailService.destroy(id, userId, req, res);
     return res
       .status(200)
       .json(
@@ -129,10 +139,16 @@ export class AddBankController {
     if (!id) throw ApiError.badRequest("Bank ID is required");
     if (!userId) throw ApiError.unauthorized("User not authenticated");
 
-    const updatedBank = await BankDetailService.verification(id, userId, {
-      status,
-      bankRejectionReason: bankRejectionReason ?? null,
-    });
+    const updatedBank = await BankDetailService.verification(
+      id,
+      userId,
+      {
+        status,
+        bankRejectionReason: bankRejectionReason ?? null,
+      },
+      req,
+      res
+    );
 
     return res
       .status(200)
