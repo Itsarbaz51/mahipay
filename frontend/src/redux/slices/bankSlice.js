@@ -2,6 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import ZodErrorCatch from "../../layouts/ZodErrorCatch";
 
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -91,8 +92,8 @@ export const addBank = (bankPayload) => async (dispatch) => {
     dispatch(bankActionSuccess(data));
     return data;
   } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(bankFail(errMsg));
+    const finalError = ZodErrorCatch(error);
+    dispatch(bankFail(finalError));
   }
 };
 
