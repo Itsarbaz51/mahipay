@@ -13,6 +13,7 @@ export class ServiceProviderService {
       name,
       description,
       isActive,
+      apiIntegrationStatus = false,
       parentId = null,
       keyValueInputNumber = 0,
     } = payload;
@@ -98,6 +99,7 @@ export class ServiceProviderService {
         description: description ? description.trim() : null,
         iconUrl: uploaded,
         isActive: isActive ?? false,
+        apiIntegrationStatus: apiIntegrationStatus ?? false,
         hierarchyLevel,
         hierarchyPath,
         parentId,
