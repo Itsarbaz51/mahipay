@@ -376,8 +376,10 @@ export class BankDetailService {
     } catch (error) {
       throw ApiError.internal("Failed to Add bank account", error.message);
     } finally {
+      console.log("bankProofFile?.path", proofUrl);
+
       if (bankProofFile?.path) {
-        await Helper.deleteOldImage(bankProofFile.path);
+        await Helper.deleteOldImage(proofUrl);
       }
     }
   }
