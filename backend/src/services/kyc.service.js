@@ -196,11 +196,9 @@ class KycServices {
       },
     });
 
-    if (!kyc) throw ApiError.notFound("KYC not found");
+    if (!kyc) return;
 
-    if (
-       requestingUser.id !== kyc.userId 
-    ) {
+    if (requestingUser.id !== kyc.userId) {
       throw ApiError.unauthorized("Unauthorized access");
     }
 
