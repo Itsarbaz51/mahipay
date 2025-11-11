@@ -117,9 +117,40 @@ export class UserPermissionService {
     const user = await Prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw ApiError.notFound("User not found");
 
+    // Agar serviceIds empty hai to user ke saare existing permissions delete karo
+    if (!serviceIds || serviceIds.length === 0) {
+      await Prisma.userPermission.deleteMany({
+        where: { userId },
+      });
+      return [];
+    }
+
     // Process each service individually
     const results = [];
 
+    // Pehle existing permissions mein se jo services nahi hain serviceIds mein, unko delete karo
+    const existingPermissions = await Prisma.userPermission.findMany({
+      where: { userId },
+    });
+
+    const existingServiceIds = existingPermissions.map(
+      (perm) => perm.serviceId
+    );
+    const servicesToRemove = existingServiceIds.filter(
+      (serviceId) => !serviceIds.includes(serviceId)
+    );
+
+    // Remove permissions for services that are not in the new serviceIds
+    if (servicesToRemove.length > 0) {
+      await Prisma.userPermission.deleteMany({
+        where: {
+          userId,
+          serviceId: { in: servicesToRemove },
+        },
+      });
+    }
+
+    // Ab create/update karo remaining services ke liye
     for (const serviceId of serviceIds) {
       const service = await Prisma.serviceProvider.findUnique({
         where: { id: serviceId },
@@ -177,7 +208,6 @@ export class UserPermissionService {
     const permissions = await Prisma.userPermission.findMany({
       where: {
         userId,
-        canView: true,
       },
       select: {
         id: true,
@@ -203,7 +233,7 @@ export class UserPermissionService {
     });
 
     if (!permissions.length) {
-      throw ApiError.notFound("No permissions found for this user");
+      return;
     }
 
     return permissions;

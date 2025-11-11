@@ -10,6 +10,7 @@ import {
 } from "../utils/sendCredentialsEmail.js";
 import AuditLogService from "./auditLog.service.js";
 import LoginLogService from "./loginLog.service.js";
+import { UserPermissionService } from "./permission.service.js";
 
 class AuthServices {
   static async login(payload, req, res) {
@@ -90,6 +91,21 @@ class AuthServices {
 
       // Also include permissions in user object for frontend
       user.userPermissions = permissions;
+    } else if (
+      [
+        "ADMIN",
+        "STATE HEAD",
+        "MASTER DISTRIBUTOR",
+        "DISTRIBUTOR",
+        "RETAILER",
+      ].includes(user.role.name)
+    ) {
+      const permissions = await UserPermissionService.getUserPermissions(
+        user.id
+      );
+      tokenPayload.permissions = permissions;
+
+      user.userPermissions = permissions;
     }
 
     const accessToken = Helper.generateAccessToken(tokenPayload);
@@ -130,7 +146,7 @@ class AuthServices {
       loginData.location = clientLocation.address;
       loginData.accuracy = accuracy;
     }
-    
+
     await LoginLogService.createLoginLog(loginData);
 
     await AuditLogService.createAuditLog({
@@ -250,20 +266,33 @@ class AuthServices {
         throw ApiError.notFound("User not found");
       }
 
-      // Get employee permissions if user is an employee
-      if (user.role.type === "employee") {
-        try {
+      // Get permissions based on role
+      try {
+        if (user.role.type === "employee") {
+          // Employee-specific permissions
           const permissions = await EmployeeServices.getEmployeePermissions(
             user.id
           );
           user.userPermissions = permissions;
-        } catch (error) {
-          console.error(
-            `Failed to get employee permissions for user ${userId}:`,
-            error
+        } else if (
+          [
+            "ADMIN",
+            "STATE HEAD",
+            "MASTER DISTRIBUTOR",
+            "DISTRIBUTOR",
+            "RETAILER",
+          ].includes(user.role.name)
+        ) {
+          const permissions = await UserPermissionService.getUserPermissions(
+            user.id
           );
-          user.permissions = [];
+          user.userPermissions = permissions;
+        } else {
+          user.userPermissions = [];
         }
+      } catch (error) {
+        console.error(`Failed to get permissions for user ${user.id}:`, error);
+        user.userPermissions = [];
       }
 
       // Transform user data

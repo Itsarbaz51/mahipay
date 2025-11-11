@@ -20,7 +20,6 @@ import AddMember from "../forms/AddMember";
 import { useDispatch, useSelector } from "react-redux";
 import {
   getAllBusinessUsersByParentId,
-  getUserById,
   setCurrentUser,
   clearUserError,
   clearUserSuccess,
@@ -99,7 +98,8 @@ const MembersTable = () => {
   const limit = pagination.limit || 10;
 
   const services =
-    useSelector((state) => state.services.serviceProviders) || [];
+    useSelector((state) => state.services.serviceProviders.activeServices) ||
+    [];
 
   // ✅ Check if current user is ADMIN
   const isAdminUser = currentUserRole === "ADMIN";
@@ -228,6 +228,7 @@ const MembersTable = () => {
 
     try {
       const result = await dispatch(getPermissionById(user?.id));
+
       if (
         result?.data &&
         Array.isArray(result.data) &&
@@ -907,6 +908,7 @@ const MembersTable = () => {
       )}
 
       {/* Permission Modal */}
+
       {showPermissionModal && permissionUser && (
         <AddPermission
           mode={permissionMode}

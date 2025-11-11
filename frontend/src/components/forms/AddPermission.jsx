@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { InputField } from "../ui/InputField";
 import ButtonField from "../ui/ButtonField";
 import CloseBtn from "../ui/CloseBtn";
@@ -31,23 +31,69 @@ const AddPermission = ({
   const currentMode = existingPermissions ? "edit" : "add";
 
   useEffect(() => {
-    if (!selectedUser || !selectedUser.id) return;
+    if (!selectedUser?.id) return;
 
-    // Only prefill form if editing existing permissions
-    if (existingPermissions) {
+    if (
+      existingPermissions &&
+      Array.isArray(existingPermissions) &&
+      existingPermissions.length > 0
+    ) {
+      // Handle array of permission objects
+      const permission = existingPermissions[0]; // Take first permission object
+
+      let parsedServiceIds = [];
+      let canView = false;
+      let canEdit = false;
+      let canSetCommission = false;
+
+      // Extract service IDs from the permission objects
+      if (Array.isArray(existingPermissions)) {
+        parsedServiceIds = existingPermissions
+          .map((perm) => {
+            // Get service ID from service object or serviceId field
+            if (perm.service?.id) {
+              return perm.service.id;
+            } else if (perm.serviceId) {
+              return perm.serviceId;
+            }
+            return null;
+          })
+          .filter((id) => id !== null);
+
+        // Use permissions from the first item (assuming all have same permissions for same user)
+        if (existingPermissions.length > 0) {
+          canView = existingPermissions[0].canView ?? false;
+          canEdit = existingPermissions[0].canEdit ?? false;
+          canSetCommission = existingPermissions[0].canSetCommission ?? false;
+        }
+      }
+
+      setFormData({
+        userId: permission?.userId || permission?.user?.id || selectedUser.id,
+        serviceIds: parsedServiceIds,
+        canView: canView,
+        canEdit: canEdit,
+        canSetCommission: canSetCommission,
+      });
+    } else if (existingPermissions && !Array.isArray(existingPermissions)) {
+      // Handle single permission object (backward compatibility)
       let parsedServiceIds = [];
 
-      if (existingPermissions?.serviceIds) {
+      if (existingPermissions.service?.id) {
+        parsedServiceIds = [existingPermissions.service.id];
+      } else if (existingPermissions.serviceId) {
+        parsedServiceIds = [existingPermissions.serviceId];
+      } else if (existingPermissions.serviceIds) {
         if (Array.isArray(existingPermissions.serviceIds)) {
           parsedServiceIds = existingPermissions.serviceIds;
         } else if (typeof existingPermissions.serviceIds === "string") {
-          try {
-            parsedServiceIds = JSON.parse(existingPermissions.serviceIds);
-          } catch (error) {
-            console.warn(
-              "Failed to parse serviceIds as JSON, trying CSV split",
-              error
-            );
+          if (existingPermissions.serviceIds.startsWith("[")) {
+            try {
+              parsedServiceIds = JSON.parse(existingPermissions.serviceIds);
+            } catch (error) {
+              console.warn("Failed to parse serviceIds JSON:", error);
+            }
+          } else {
             parsedServiceIds = existingPermissions.serviceIds
               .split(",")
               .map((id) => id.trim())
@@ -62,14 +108,14 @@ const AddPermission = ({
           existingPermissions?.roleId ||
           selectedUser.id,
         serviceIds: parsedServiceIds,
-        canView: existingPermissions?.canView || false,
-        canEdit: existingPermissions?.canEdit || false,
-        canSetCommission: existingPermissions?.canSetCommission || false,
+        canView: existingPermissions?.canView ?? false,
+        canEdit: existingPermissions?.canEdit ?? false,
+        canSetCommission: existingPermissions?.canSetCommission ?? false,
       });
     } else {
-      // Reset form for add mode
+      // Reset for add mode
       setFormData({
-        userId: selectedUser?.id || "",
+        userId: selectedUser.id,
         serviceIds: [],
         canView: false,
         canEdit: false,
@@ -81,11 +127,14 @@ const AddPermission = ({
   const filteredServices = useCallback(() => {
     if (!services || !Array.isArray(services)) return [];
 
+    const searchTerm = serviceSearchTerm.toLowerCase();
+
     return services.filter(
       (service) =>
-        service.type?.toLowerCase().includes(serviceSearchTerm.toLowerCase()) ||
-        service.id?.toLowerCase().includes(serviceSearchTerm.toLowerCase()) ||
-        service.name?.toLowerCase().includes(serviceSearchTerm.toLowerCase())
+        service.type?.toLowerCase().includes(searchTerm) ||
+        service.id?.toLowerCase().includes(searchTerm) ||
+        service.name?.toLowerCase().includes(searchTerm) ||
+        service.code?.toLowerCase().includes(searchTerm)
     );
   }, [services, serviceSearchTerm]);
 
@@ -112,15 +161,10 @@ const AddPermission = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(""); // Clear previous errors
+    setError("");
 
-    if (formData.serviceIds.length === 0) {
-      setError("Please select at least one service");
-      return;
-    }
-
+    // Validation - only check for user ID, removed service requirement
     if (!formData.userId) {
-      console.error("Missing userId in formData", formData);
       setError("User ID is missing. Please check the selected user.");
       return;
     }
@@ -139,11 +183,13 @@ const AddPermission = ({
       };
 
       await onSubmit(permissionData);
-      // ✅ Success par parent component handle karega - yahan form band nahi hoga
     } catch (error) {
       console.error("Failed to submit permission:", error);
-      setError(error.message || "Failed to update permissions");
-      // ❌ Error aaye toh form band nahi hoga
+      setError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to update permissions"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -155,17 +201,26 @@ const AddPermission = ({
         ...prev,
         [field]: value,
       }));
-      if (error) setError(""); // Clear error on any input change
+      if (error) setError("");
     },
     [error]
   );
 
   const getSelectedServiceNames = useCallback(() => {
+    if (!services || !Array.isArray(services)) return [];
+
     return formData.serviceIds.map((serviceId) => {
-      const service = services?.find((s) => s.id === serviceId);
-      return service ? service.type || service.name : serviceId;
+      const service = services.find((s) => s.id === serviceId);
+      return service
+        ? service.name || service.type || service.code
+        : `Unknown (${serviceId})`;
     });
   }, [formData.serviceIds, services]);
+
+  const selectedServiceNames = useMemo(
+    () => getSelectedServiceNames(),
+    [getSelectedServiceNames]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -245,20 +300,20 @@ const AddPermission = ({
             {/* Service Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Services *
+                Services
                 <span className="text-xs text-gray-500 ml-2">
                   (Multiple selection allowed)
                 </span>
               </label>
 
               {/* Selected Services */}
-              {formData.serviceIds.length > 0 && (
+              {formData.serviceIds.length > 0 ? (
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-600 mb-2">
                     Selected Services ({formData.serviceIds.length}):
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {getSelectedServiceNames().map((serviceName, index) => {
+                    {selectedServiceNames.map((serviceName, index) => {
                       const serviceId = formData.serviceIds[index];
                       return (
                         <span
@@ -278,6 +333,12 @@ const AddPermission = ({
                       );
                     })}
                   </div>
+                </div>
+              ) : (
+                <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-yellow-700 text-xs">
+                    No services selected. You can still submit without services.
+                  </p>
                 </div>
               )}
 
@@ -307,13 +368,19 @@ const AddPermission = ({
                 {/* Service Suggestions */}
                 {showServiceSuggestions && serviceSearchTerm && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {filteredServices().length > 0 ? (
+                    {isLoading ? (
+                      <div className="px-4 py-2 text-gray-500 text-sm">
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                          Loading services...
+                        </div>
+                      </div>
+                    ) : filteredServices().length > 0 ? (
                       filteredServices().map((service) => (
                         <div
                           key={service.id}
                           onClick={() => handleServiceSelect(service)}
                           className="px-4 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                          disabled={isSubmitting || isLoading}
                         >
                           <div className="font-medium text-gray-900">
                             {service.type || service.name}
@@ -321,6 +388,11 @@ const AddPermission = ({
                           <div className="text-xs text-gray-500 font-mono">
                             {service.id}
                           </div>
+                          {formData.serviceIds.includes(service.id) && (
+                            <div className="text-xs text-green-600 mt-1">
+                              ✓ Already selected
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : (
@@ -334,7 +406,7 @@ const AddPermission = ({
 
               {services?.length === 0 && !isLoading && (
                 <div className="text-xs text-gray-500 mt-1">
-                  No services available. Please contact administrator.
+                  No services available. You can still submit without services.
                 </div>
               )}
             </div>
@@ -395,6 +467,11 @@ const AddPermission = ({
                     Can Set Commission
                   </span>
                 </label> */}
+              </div>
+
+              {/* Permission Hint */}
+              <div className="text-xs text-gray-500 mt-2">
+                Select one or more permissions for the selected services
               </div>
             </div>
 
