@@ -288,7 +288,6 @@ export class BankDetailService {
 
       if (bankProofFile) {
         proofUrl = await S3Service.upload(bankProofFile.path, "bankdoc");
-        await Helper.deleteOldImage(bankProofFile.path);
       }
 
       if (!proofUrl) {
@@ -377,7 +376,7 @@ export class BankDetailService {
     } catch (error) {
       throw ApiError.internal("Failed to Add bank account", error.message);
     } finally {
-      if (bankProofFile?.path && (await fileExists(bankProofFile.path))) {
+      if (bankProofFile?.path) {
         await Helper.deleteOldImage(bankProofFile.path);
       }
     }

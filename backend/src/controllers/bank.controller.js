@@ -74,6 +74,10 @@ export class AddBankController {
 
     const file = req.file;
 
+    if (!file) {
+      throw ApiError.badRequest("file are required (Bank Proof).");
+    }
+
     const data = await BankDetailService.store(
       {
         ...req.body,
