@@ -14,7 +14,7 @@ export const ROUTE_SERVICE_MAP = {
   // "/some-other-route": [SERVICES.SOME_SERVICE],
 };
 
-export const useFundPermissions = (routePath = null) => {
+export const usePermissions = (routePath = null) => {
   const { currentUser } = useSelector((state) => state.auth);
 
   const permissions = useMemo(() => {
@@ -51,8 +51,6 @@ export const useFundPermissions = (routePath = null) => {
         return null;
       })
       .filter((service) => service !== null); // Remove null values
-
-    console.log("Available services with canView=true:", servicePermissions);
 
     // Check which services are available (only those with canView: true)
     const hasRazorpay = servicePermissions.includes(SERVICES.RAZORPAY);

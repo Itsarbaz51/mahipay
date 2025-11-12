@@ -7,8 +7,8 @@ import {
 import { useEffect, useRef } from "react";
 import {
   ROUTE_SERVICE_MAP,
-  useFundPermissions,
-} from "../components/hooks/useFundPermissions";
+  usePermissions,
+} from "../components/hooks/usePermissions";
 
 // Authentication and authorization hooks for better reusability
 const useAuth = () => {
@@ -95,7 +95,7 @@ const ProtectedRoute = ({ children }) => {
   const { role, isStaticBusinessRole, isEmployee } = useUserRole(currentUser);
 
   // Use fund permissions hook for route protection - pass currentPath
-  const { isRouteAccessible } = useFundPermissions(currentPath);
+  const { isRouteAccessible } = usePermissions(currentPath);
 
   // Use auto-redirect hook
   useAutoRedirect(currentUser, isEmployee, currentPath, isAuthenticated);
