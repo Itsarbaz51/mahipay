@@ -177,13 +177,14 @@ class AuthServices {
 
     await AuditLogService.createAuditLog({
       userId: user.id,
-      action: "LOGIN_SUCCESS",
+      action: `LOGIN_SUCCESS`,
       entityType: "AUTH",
       entityId: user.id,
       ipAddress: req.ip,
       metadata: {
         ...Helper.generateCommonMetadata(req, res),
         roleType: user.role.type,
+        reason: user.status,
         roleName: user.role.name,
       },
     });
@@ -289,6 +290,17 @@ class AuthServices {
       });
 
       if (!user) {
+        // Add audit log for user not found
+        await AuditLogService.createAuditLog({
+          userId: currentUser?.id || null,
+          action: "USER_RETRIEVAL_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          metadata: {
+            reason: "USER_NOT_FOUND",
+            requestedBy: currentUser?.id || null,
+          },
+        });
         throw ApiError.notFound("User not found");
       }
 
@@ -403,10 +415,10 @@ class AuthServices {
     }
   }
 
-  static async logout(userId, refreshToken) {
+  static async logout(userId, refreshToken, req = null, res = null) {
     if (!userId) return;
 
-    await Prisma.user.update({
+    const user = await Prisma.user.update({
       where: { id: userId },
       data: { refreshToken: null },
     });
@@ -418,16 +430,35 @@ class AuthServices {
       }
     }
 
-    await Prisma.auditLog.create({
-      data: { userId, action: "LOGOUT", metadata: {} },
+    await AuditLogService.createAuditLog({
+      userId: userId,
+      action: "LOGOUT",
+      entityType: "AUTH",
+      entityId: user.id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        roleName: req.user.role,
+        hasRefreshToken: !!refreshToken,
+      },
     });
   }
 
-  static async refreshToken(refreshToken) {
+  static async refreshToken(refreshToken, req = null, res = null) {
     let payload;
     try {
       payload = Helper.verifyRefreshToken(refreshToken);
-    } catch {
+    } catch (error) {
+      await AuditLogService.createAuditLog({
+        userId: payload?.id || null,
+        action: "REFRESH_TOKEN_INVALID",
+        entityType: "AUTH",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          error: "Invalid refresh token",
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        },
+      });
       throw ApiError.unauthorized("Invalid refresh token");
     }
 
@@ -457,13 +488,37 @@ class AuthServices {
       },
     });
 
-    if (!user || !user.refreshToken)
+    if (!user || !user.refreshToken) {
+      await AuditLogService.createAuditLog({
+        userId: payload.id,
+        action: "REFRESH_TOKEN_USER_NOT_FOUND",
+        entityType: "AUTH",
+        entityId: payload.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          error: "User not found or no refresh token",
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        },
+      });
       throw ApiError.unauthorized("Invalid refresh token");
+    }
 
     if (user.refreshToken !== refreshToken) {
       await Prisma.user.update({
         where: { id: user.id },
         data: { refreshToken: null },
+      });
+
+      await AuditLogService.createAuditLog({
+        userId: user.id,
+        action: "REFRESH_TOKEN_MISMATCH",
+        entityType: "AUTH",
+        entityId: user.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "Refresh token mismatch",
+        },
       });
       throw ApiError.unauthorized("Refresh token mismatch");
     }
@@ -493,8 +548,17 @@ class AuthServices {
       data: { refreshToken: newRefreshToken },
     });
 
-    await Prisma.auditLog.create({
-      data: { userId: user.id, action: "REFRESH_TOKEN", metadata: {} },
+    await AuditLogService.createAuditLog({
+      userId: user.id,
+      action: "REFRESH_TOKEN_SUCCESS",
+      entityType: "AUTH",
+      entityId: user.id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        roleType: user.role.type,
+        roleName: user.role.name,
+      },
     });
 
     return {
@@ -504,7 +568,7 @@ class AuthServices {
     };
   }
 
-  static async requestPasswordReset(email) {
+  static async requestPasswordReset(email, req = null, res = null) {
     const user = await Prisma.user.findFirst({
       where: { email },
       include: {
@@ -529,6 +593,16 @@ class AuthServices {
     });
 
     if (!user) {
+      await AuditLogService.createAuditLog({
+        action: "PASSWORD_RESET_REQUEST_FAILED",
+        entityType: "AUTH",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          email: email,
+          reason: "USER_NOT_FOUND",
+        },
+      });
       return {
         message:
           "If an account with that email exists, a password reset link has been sent.",
@@ -561,13 +635,27 @@ class AuthServices {
       `We received a request to reset your ${userType} account password. Click the link below to create a new secure password.`
     );
 
+    await AuditLogService.createAuditLog({
+      userId: user.id,
+      action: "PASSWORD_RESET_REQUESTED",
+      entityType: "AUTH",
+      entityId: user.id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        email: email,
+        userType: userType,
+        roleName: user.role.name,
+      },
+    });
+
     return {
       message:
         "If an account with that email exists, a password reset link has been sent.",
     };
   }
 
-  static async confirmPasswordReset(encryptedToken) {
+  static async confirmPasswordReset(encryptedToken, req = null, res = null) {
     try {
       const token = CryptoService.decrypt(encryptedToken);
       const tokenHash = CryptoService.hashData(token);
@@ -599,6 +687,15 @@ class AuthServices {
       });
 
       if (!user) {
+        await AuditLogService.createAuditLog({
+          action: "PASSWORD_RESET_CONFIRMATION_FAILED",
+          entityType: "AUTH",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INVALID_OR_EXPIRED_TOKEN",
+          },
+        });
         throw ApiError.badRequest("Invalid or expired token");
       }
 
@@ -660,11 +757,38 @@ class AuthServices {
         );
       }
 
+      await AuditLogService.createAuditLog({
+        userId: user.id,
+        action: "PASSWORD_RESET_CONFIRMED",
+        entityType: "AUTH",
+        entityId: user.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          userType: user.role.type,
+          roleName: user.role.name,
+          hasTransactionPin: !!hashedPin,
+        },
+      });
+
       return {
         message:
           "Password reset successfully, and your credentials have been sent to your email.",
       };
     } catch (error) {
+      await AuditLogService.createAuditLog({
+        action: "PASSWORD_RESET_CONFIRMATION_ERROR",
+        entityType: "AUTH",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          error: error.message,
+          reason: error.message.includes("Decryption failed")
+            ? "MALFORMED_TOKEN"
+            : "UNKNOWN_ERROR",
+        },
+      });
+
       if (error.message.includes("Decryption failed")) {
         throw ApiError.badRequest("Invalid or malformed token");
       }
@@ -672,8 +796,17 @@ class AuthServices {
     }
   }
 
-  static async verifyEmail(token) {
+  static async verifyEmail(token, req = null, res = null) {
     if (!token) {
+      await AuditLogService.createAuditLog({
+        action: "EMAIL_VERIFICATION_FAILED",
+        entityType: "AUTH",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "MISSING_TOKEN",
+        },
+      });
       throw ApiError.badRequest("Verification token missing");
     }
 
@@ -699,6 +832,15 @@ class AuthServices {
     });
 
     if (!user) {
+      await AuditLogService.createAuditLog({
+        action: "EMAIL_VERIFICATION_FAILED",
+        entityType: "AUTH",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "INVALID_TOKEN",
+        },
+      });
       throw ApiError.badRequest("Invalid verification token");
     }
 
@@ -710,10 +852,22 @@ class AuthServices {
       },
     });
 
+    await AuditLogService.createAuditLog({
+      userId: user.id,
+      action: "EMAIL_VERIFIED",
+      entityType: "AUTH",
+      entityId: user.id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        email: user.email,
+      },
+    });
+
     return { message: "Email verified successfully" };
   }
 
-  static async createAndSendEmailVerification(user) {
+  static async createAndSendEmailVerification(user, req = null, res = null) {
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
@@ -747,9 +901,28 @@ class AuthServices {
       text: emailContent.text,
       html: emailContent.html,
     });
+
+    await AuditLogService.createAuditLog({
+      userId: user.id,
+      action: "EMAIL_VERIFICATION_SENT",
+      entityType: "AUTH",
+      entityId: user.id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        email: user.email,
+        userType: userType,
+      },
+    });
   }
 
-  static async updateCredentials(userId, credentialsData, requestedBy) {
+  static async updateCredentials(
+    userId,
+    credentialsData,
+    requestedBy,
+    req = null,
+    res = null
+  ) {
     const user = await Prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -773,6 +946,19 @@ class AuthServices {
     });
 
     if (!user) {
+      await AuditLogService.createAuditLog({
+        userId: requestedBy,
+        action: "CREDENTIALS_UPDATE_FAILED",
+        entityType: "AUTH",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "USER_NOT_FOUND",
+          roleName: req.user.role,
+          requestedBy: requestedBy,
+        },
+      });
       throw ApiError.notFound("User not found");
     }
 
@@ -784,6 +970,20 @@ class AuthServices {
       decryptedStoredPassword === credentialsData.currentPassword;
 
     if (!isPasswordValid) {
+      await AuditLogService.createAuditLog({
+        userId: requestedBy,
+        action: "CREDENTIALS_UPDATE_FAILED",
+        entityType: "AUTH",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "INVALID_CURRENT_PASSWORD",
+          requestedBy: requestedBy,
+          roleName: req.user.role,
+          isOwnUpdate: isOwnUpdate,
+        },
+      });
       throw ApiError.unauthorized("Current password is incorrect");
     }
 
@@ -797,6 +997,20 @@ class AuthServices {
     // Only business users have transaction pins
     if (credentialsData.newTransactionPin && user.role.type === "business") {
       if (!credentialsData.currentTransactionPin) {
+        await AuditLogService.createAuditLog({
+          userId: requestedBy,
+          action: "CREDENTIALS_UPDATE_FAILED",
+          entityType: "AUTH",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "MISSING_CURRENT_TRANSACTION_PIN",
+            requestedBy: requestedBy,
+            roleName: req.user.role,
+            isOwnUpdate: isOwnUpdate,
+          },
+        });
         throw ApiError.badRequest("Current transaction PIN is required");
       }
 
@@ -805,6 +1019,20 @@ class AuthServices {
         decryptedStoredPin === credentialsData.currentTransactionPin;
 
       if (!isPinValid) {
+        await AuditLogService.createAuditLog({
+          userId: requestedBy,
+          action: "CREDENTIALS_UPDATE_FAILED",
+          entityType: "AUTH",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INVALID_CURRENT_TRANSACTION_PIN",
+            requestedBy: requestedBy,
+            roleName: req.user.role,
+            isOwnUpdate: isOwnUpdate,
+          },
+        });
         throw ApiError.unauthorized("Current transaction PIN is incorrect");
       }
 
@@ -818,20 +1046,23 @@ class AuthServices {
       data: updateData,
     });
 
-    await Prisma.auditLog.create({
-      data: {
-        userId: requestedBy || userId,
-        action: "UPDATE_CREDENTIALS",
-        metadata: {
-          updatedFields: [
-            ...(credentialsData.newPassword ? ["password"] : []),
-            ...(credentialsData.newTransactionPin ? ["transactionPin"] : []),
-          ],
-          isOwnUpdate: isOwnUpdate,
-          updatedBy: requestedBy,
-          targetUserId: userId,
-          userType: user.role.type,
-        },
+    await AuditLogService.createAuditLog({
+      userId: requestedBy || userId,
+      action: "CREDENTIALS_UPDATED",
+      entityType: "AUTH",
+      entityId: userId,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        updatedFields: [
+          ...(credentialsData.newPassword ? ["password"] : []),
+          ...(credentialsData.newTransactionPin ? ["transactionPin"] : []),
+        ],
+        isOwnUpdate: isOwnUpdate,
+        requestedBy: requestedBy,
+        roleName: req.user.role,
+        targetUserId: userId,
+        userType: user.role.type,
       },
     });
 

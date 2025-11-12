@@ -19,10 +19,14 @@ class UserController {
       data.profileImage = req.file.path;
     }
 
-    const { user, accessToken } = await UserServices.register({
-      ...data,
-      parentId: userId,
-    });
+    const { user, accessToken } = await UserServices.register(
+      {
+        ...data,
+        parentId: userId,
+      },
+      req,
+      res
+    );
 
     if (!user || !accessToken) {
       throw ApiError.internal("Business user creation failed!");
@@ -54,7 +58,9 @@ class UserController {
     const user = await UserServices.updateProfile(
       userId,
       updateData,
-      currentUserId
+      currentUserId,
+      req,
+      res
     );
 
     const safeUser = Helper.serializeUser(user);
@@ -82,7 +88,12 @@ class UserController {
       throw ApiError.badRequest("Profile image is required");
     }
 
-    const user = await UserServices.updateProfileImage(userId, req.file.path);
+    const user = await UserServices.updateProfileImage(
+      userId,
+      req.file.path,
+      req,
+      res
+    );
 
     const safeUser = Helper.serializeUser(user);
 
@@ -106,7 +117,7 @@ class UserController {
       throw ApiError.badRequest("userId required");
     }
 
-    const user = await UserServices.getUserById(userId, currentUser);
+    const user = await UserServices.getUserById(userId, currentUser, req, res);
 
     return res
       .status(200)
@@ -297,7 +308,9 @@ class UserController {
       const user = await UserServices.deactivateUser(
         userId,
         deactivatedBy,
-        reason
+        reason,
+        req,
+        res
       );
 
       const safeUser = Helper.serializeUser(user);
@@ -335,7 +348,9 @@ class UserController {
       const user = await UserServices.reactivateUser(
         userId,
         reactivatedBy,
-        reason
+        reason,
+        req,
+        res
       );
 
       const safeUser = Helper.serializeUser(user);
@@ -370,7 +385,13 @@ class UserController {
     }
 
     try {
-      const user = await UserServices.deleteUser(userId, deletedBy, reason);
+      const user = await UserServices.deleteUser(
+        userId,
+        deletedBy,
+        reason,
+        req,
+        res
+      );
 
       const safeUser = Helper.serializeUser(user);
 

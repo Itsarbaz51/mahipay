@@ -62,14 +62,19 @@ class UserKycController {
       );
     }
 
-    const dbStoreData = await KycServices.storeUserKyc({
-      ...req.body,
-      panFile,
-      aadhaarFile,
-      addressProofFile,
-      photo,
-      userId,
-    });
+    const dbStoreData = await KycServices.storeUserKyc(
+      {
+        ...req.body,
+
+        panFile,
+        aadhaarFile,
+        addressProofFile,
+        photo,
+        userId,
+      },
+      req,
+      res
+    );
 
     return res
       .status(201)
@@ -106,7 +111,12 @@ class UserKycController {
     if (addressProofFile) updateData.addressProofFile = addressProofFile;
     if (photo) updateData.photo = photo;
 
-    const dbUpdateData = await KycServices.updateUserKyc(id, updateData);
+    const dbUpdateData = await KycServices.updateUserKyc(
+      id,
+      updateData,
+      req,
+      res
+    );
 
     return res
       .status(200)
@@ -116,7 +126,7 @@ class UserKycController {
   });
 
   static verification = asyncHandler(async (req, res) => {
-    const dbStoreData = await KycServices.verifyUserKyc(req.body);
+    const dbStoreData = await KycServices.verifyUserKyc(req.body, req, res);
 
     return res
       .status(200)

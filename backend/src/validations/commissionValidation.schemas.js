@@ -16,7 +16,7 @@ class CommissionValidationSchemas {
       applyGST: z.boolean().optional(),
       gstPercent: z.number().min(0).max(100).optional(),
       applySurcharge: z.boolean().optional(),
-      surchargeType: z.enum(["FLAT", "PERCENTAGE"]),
+      surchargeType: z.enum(["FLAT", "PERCENTAGE"]).optional(),
       surchargeAmount: z.number().min(0).max(100).optional(),
       effectiveFrom: z.string().datetime().optional(),
       effectiveTo: z.string().datetime().nullable().optional(),

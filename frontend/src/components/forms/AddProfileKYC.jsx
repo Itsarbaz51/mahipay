@@ -431,38 +431,59 @@ export default function AddProfileKYC() {
       ["firstName", "lastName", "fatherName", "dob", "gender"].forEach(
         (f) => !formData[f] && (newErrors[f] = "Required")
       );
-    }
 
-    if (formData.dob) {
-      const dobDate = new Date(formData.dob);
-      const today = new Date();
-      const age = today.getFullYear() - dobDate.getFullYear();
-      const monthDiff = today.getMonth() - dobDate.getMonth();
-      const dayDiff = today.getDate() - dobDate.getDate();
+      const namePattern = /^[A-Za-z\s]{2,50}$/;
 
-      if (
-        age < 18 ||
-        (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)))
-      ) {
-        newErrors.dob = "You must be at least 18 years old";
+      if (formData.firstName && !namePattern.test(formData.firstName))
+        newErrors.firstName = "Invalid first name (letters only)";
+
+      if (formData.lastName && !namePattern.test(formData.lastName))
+        newErrors.lastName = "Invalid last name (letters only)";
+
+      if (formData.fatherName && !namePattern.test(formData.fatherName))
+        newErrors.fatherName = "Invalid father’s name (letters only)";
+
+      if (formData.dob) {
+        const dobDate = new Date(formData.dob);
+        const today = new Date();
+        const age = today.getFullYear() - dobDate.getFullYear();
+        const monthDiff = today.getMonth() - dobDate.getMonth();
+        const dayDiff = today.getDate() - dobDate.getDate();
+
+        if (
+          age < 18 ||
+          (age === 18 && (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)))
+        ) {
+          newErrors.dob = "You must be at least 18 years old";
+        }
       }
     }
 
     if (step === 2) {
-      ["panNumber", "aadhaarNumber"].forEach(
-        (f) => !formData[f] && (newErrors[f] = "Required")
-      );
-      if (
-        formData.panNumber &&
-        !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber)
-      )
+      // PAN required
+      if (!formData.panNumber) newErrors.panNumber = "Required";
+      else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber))
         newErrors.panNumber = "Invalid PAN format";
+      else if (/^([A-Z])\1{4}[0-9]{4}[A-Z]$/.test(formData.panNumber))
+        newErrors.panNumber =
+          "Invalid PAN: repetitive pattern not allowed (e.g., AAAAA9999A)";
+      else if (["AAAAA9999A", "ABCDE1234F"].includes(formData.panNumber))
+        newErrors.panNumber = "Invalid PAN number";
 
-      if (
-        formData.aadhaarNumber &&
-        !/^\d{4}-\d{4}-\d{4}$/.test(formData.aadhaarNumber)
-      )
+      // Aadhaar required
+      if (!formData.aadhaarNumber) newErrors.aadhaarNumber = "Required";
+      else if (!/^\d{4}-\d{4}-\d{4}$/.test(formData.aadhaarNumber))
         newErrors.aadhaarNumber = "Aadhaar must be in format 1234-5678-9012";
+      else {
+        const digitsOnly = formData.aadhaarNumber.replace(/\D/g, "");
+        if (/^(\d)\1+$/.test(digitsOnly))
+          newErrors.aadhaarNumber = "Invalid Aadhaar: all digits same";
+        else if (/123456|234567|345678|456789|987654|876543/.test(digitsOnly))
+          newErrors.aadhaarNumber =
+            "Invalid Aadhaar: sequential digits not allowed";
+        else if (["123456789012", "000000000000"].includes(digitsOnly))
+          newErrors.aadhaarNumber = "Invalid Aadhaar number";
+      }
     }
 
     if (step === 3) {

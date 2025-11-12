@@ -3,10 +3,15 @@ import { ApiError } from "../utils/ApiError.js";
 import S3Service from "../utils/S3Service.js";
 import Helper from "../utils/helper.js";
 import { CryptoService } from "../utils/cryptoService.js";
+import AuditLogService from "./auditLog.service.js";
 
 class KycServices {
-  // users kyc
-  static async indexUserKyc(params) {
+  static async indexUserKyc(
+    params,
+    currentUserId = null,
+    req = null,
+    res = null
+  ) {
     const {
       userId,
       status = "ALL",
@@ -29,7 +34,21 @@ class KycServices {
       },
     });
 
-    if (!user) throw ApiError.notFound("User not found");
+    if (!user) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_LIST_RETRIEVAL_FAILED",
+        entityType: "KYC",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "USER_NOT_FOUND",
+          requestedBy: currentUserId,
+          targetUserId: userId,
+        },
+      });
+      throw ApiError.notFound("User not found");
+    }
 
     // Modified logic: ADMIN ko saare users, SUPER ADMIN ko apne created users
     let targetUserIds = [];
@@ -196,7 +215,9 @@ class KycServices {
       },
     });
 
-    if (!kyc) return;
+    if (!kyc) {
+      return;
+    }
 
     if (requestingUser.id !== kyc.userId) {
       throw ApiError.unauthorized("Unauthorized access");
@@ -283,14 +304,28 @@ class KycServices {
     return result;
   }
 
-  static async storeUserKyc(payload) {
+  static async storeUserKyc(payload, req = null, res = null) {
+    let currentUserId = req.user.id;
     try {
       const userExists = await Prisma.user.findUnique({
         where: { id: payload.userId },
-        select: { id: true },
+        select: { id: true, email: true, firstName: true, lastName: true },
       });
 
       if (!userExists) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_CREATION_FAILED",
+          entityType: "KYC",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "USER_NOT_FOUND",
+            roleName: req.user.role,
+            targetUserId: payload.userId,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.notFound("User not found");
       }
 
@@ -299,6 +334,21 @@ class KycServices {
       });
 
       if (existingKyc) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_CREATION_FAILED",
+          entityType: "KYC",
+          entityId: existingKyc.id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "KYC_ALREADY_EXISTS",
+            targetUserId: payload.userId,
+            roleName: req.user.role,
+            existingKycId: existingKyc.id,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.conflict("KYC already exists for this user");
       }
 
@@ -308,6 +358,19 @@ class KycServices {
       });
 
       if (!addressExists) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_CREATION_FAILED",
+          entityType: "KYC",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "ADDRESS_NOT_FOUND",
+            roleName: req.user.role,
+            addressId: payload.addressId,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.notFound("Address not found");
       }
 
@@ -323,6 +386,22 @@ class KycServices {
       );
 
       if (!panUrl || !photoUrl || !aadhaarUrl || !addressProofUrl) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_CREATION_FAILED",
+          entityType: "KYC",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "FILE_UPLOAD_FAILED",
+            panUploaded: !!panUrl,
+            photoUploaded: !!photoUrl,
+            aadhaarUploaded: !!aadhaarUrl,
+            roleName: req.user.role,
+            addressProofUploaded: !!addressProofUrl,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.internal("Failed to upload one or more KYC documents");
       }
 
@@ -343,6 +422,18 @@ class KycServices {
       });
 
       if (!createdKyc) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_CREATION_FAILED",
+          entityType: "KYC",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "DATABASE_CREATION_FAILED",
+            roleName: req.user.role,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.internal("Failed to create user kyc");
       }
 
@@ -377,8 +468,38 @@ class KycServices {
       });
 
       if (!createdPii) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_CREATION_FAILED",
+          entityType: "KYC",
+          entityId: createdKyc.id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "PII_CREATION_FAILED",
+            roleName: req.user.role,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.internal("Failed to create user kyc Pii");
       }
+
+      // Audit log for successful KYC creation
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_CREATED",
+        entityType: "KYC",
+        entityId: createdKyc.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          targetUserId: payload.userId,
+          userEmail: userExists.email,
+          roleName: req.user.role,
+          piiTypes: ["PAN", "AADHAAR"],
+          createdBy: currentUserId,
+        },
+      });
 
       return {
         ...createdKyc,
@@ -386,8 +507,7 @@ class KycServices {
         kycRejectionReason: createdKyc.kycRejectionReason ?? "",
       };
     } catch (error) {
-      console.error("storeUserKyc failed:", error);
-      throw error;
+      throw ApiError.internal("storeUserKyc failed:", error.message);
     } finally {
       const allFiles = [
         payload.panFile?.path,
@@ -402,36 +522,96 @@ class KycServices {
     }
   }
 
-  static async updateUserKyc(id, payload) {
+  static async updateUserKyc(id, payload, req = null, res = null) {
+    let currentUserId = req.user.id;
     try {
       const existingKyc = await Prisma.userKyc.findUnique({
         where: { id: id },
+        include: {
+          user: {
+            select: {
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
       });
 
       if (!existingKyc) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_UPDATE_FAILED",
+          entityType: "KYC",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "KYC_NOT_FOUND",
+            roleName: req.user.role,
+            updatedBy: currentUserId,
+          },
+        });
         throw ApiError.notFound("KYC not found");
       }
 
       if (payload.userId && existingKyc.userId !== payload.userId) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_UPDATE_FAILED",
+          entityType: "KYC",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "UNAUTHORIZED_ACCESS",
+            kycUserId: existingKyc.userId,
+            requestingUserId: payload.userId,
+            roleName: req.user.role,
+            updatedBy: currentUserId,
+          },
+        });
         throw ApiError.forbidden(
           "Access denied - you can only update your own KYC"
         );
       }
 
       const updates = {};
-      if (payload.firstName) updates.firstName = payload.firstName.trim();
-      if (payload.lastName) updates.lastName = payload.lastName.trim();
-      if (payload.fatherName) updates.fatherName = payload.fatherName.trim();
-      if (payload.gender) updates.gender = payload.gender;
-      if (payload.dob) updates.dob = new Date(payload.dob);
+      const updatedFields = [];
+
+      if (payload.firstName) {
+        updates.firstName = payload.firstName.trim();
+        updatedFields.push("firstName");
+      }
+      if (payload.lastName) {
+        updates.lastName = payload.lastName.trim();
+        updatedFields.push("lastName");
+      }
+      if (payload.fatherName) {
+        updates.fatherName = payload.fatherName.trim();
+        updatedFields.push("fatherName");
+      }
+      if (payload.gender) {
+        updates.gender = payload.gender;
+        updatedFields.push("gender");
+      }
+      if (payload.dob) {
+        updates.dob = new Date(payload.dob);
+        updatedFields.push("dob");
+      }
 
       if (existingKyc.status === "REJECT") {
         updates.status = "PENDING";
         updates.kycRejectionReason = null;
+        updatedFields.push("status", "kycRejectionReason");
       } else {
-        if (payload.status) updates.status = payload.status;
+        if (payload.status) {
+          updates.status = payload.status;
+          updatedFields.push("status");
+        }
         if (payload.kycRejectionReason !== undefined) {
           updates.kycRejectionReason = payload.kycRejectionReason;
+          updatedFields.push("kycRejectionReason");
         }
       }
 
@@ -455,6 +635,7 @@ class KycServices {
                   await S3Service.delete({ fileUrl: oldUrl });
                 }
                 updates[dbField] = newUrl;
+                updatedFields.push(dbField);
               }
               return newUrl;
             })()
@@ -472,8 +653,39 @@ class KycServices {
       });
 
       if (!updatedKyc) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "KYC_UPDATE_FAILED",
+          entityType: "KYC",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "DATABASE_UPDATE_FAILED",
+            roleName: req.user.role,
+            updatedBy: currentUserId,
+          },
+        });
         throw ApiError.internal("Failed to update user kyc");
       }
+
+      // Audit log for successful KYC update
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_UPDATED",
+        entityType: "KYC",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          updatedFields: updatedFields,
+          previousStatus: existingKyc.status,
+          newStatus: updatedKyc.status,
+          roleName: req.user.role,
+          userEmail: existingKyc.user.email,
+          updatedBy: currentUserId,
+        },
+      });
 
       return {
         ...updatedKyc,
@@ -497,22 +709,73 @@ class KycServices {
     }
   }
 
-  static async verifyUserKyc(payload) {
+  static async verifyUserKyc(payload, req = null, res = null) {
+    let currentUserId = req.user.id;
+
     const existingKyc = await Prisma.userKyc.findFirst({
       where: { id: payload.id },
+      include: {
+        user: {
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
     });
 
     if (!existingKyc) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_VERIFICATION_FAILED",
+        entityType: "KYC",
+        entityId: payload.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "KYC_NOT_FOUND",
+          roleName: req.user.role,
+          verifiedBy: currentUserId,
+        },
+      });
       throw ApiError.notFound("KYC not found");
     }
 
     const enumStatus = payload.status;
 
     if (!enumStatus) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_VERIFICATION_FAILED",
+        entityType: "KYC",
+        entityId: existingKyc.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "INVALID_STATUS",
+          providedStatus: payload.status,
+          roleName: req.user.role,
+          verifiedBy: currentUserId,
+        },
+      });
       throw ApiError.badRequest("Invalid status value");
     }
 
     if (enumStatus === "REJECT" && !payload.kycRejectionReason) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_VERIFICATION_FAILED",
+        entityType: "KYC",
+        entityId: existingKyc.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "MISSING_REJECTION_REASON",
+          roleName: req.user.role,
+          verifiedBy: currentUserId,
+        },
+      });
       throw ApiError.badRequest(
         "Rejection reason is required when status is REJECTED"
       );
@@ -529,6 +792,19 @@ class KycServices {
     });
 
     if (!updateVerify) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_VERIFICATION_FAILED",
+        entityType: "KYC",
+        entityId: existingKyc.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "DATABASE_UPDATE_FAILED",
+          roleName: req.user.role,
+          verifiedBy: currentUserId,
+        },
+      });
       throw ApiError.internal("Failed to verify user KYC");
     }
 
@@ -542,8 +818,39 @@ class KycServices {
     });
 
     if (!updatedUser) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "KYC_VERIFICATION_FAILED",
+        entityType: "KYC",
+        entityId: existingKyc.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "USER_UPDATE_FAILED",
+          roleName: req.user.role,
+          verifiedBy: currentUserId,
+        },
+      });
       throw ApiError.internal("Failed to update user KYC status");
     }
+
+    // Audit log for successful KYC verification
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: `KYC_${enumStatus}`,
+      entityType: "KYC",
+      entityId: existingKyc.id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req ? Helper.generateCommonMetadata(req, res) : {}),
+        previousStatus: existingKyc.status,
+        newStatus: enumStatus,
+        roleName: req.user.role,
+        rejectionReason: payload.kycRejectionReason || null,
+        userEmail: existingKyc.user.email,
+        verifiedBy: currentUserId,
+      },
+    });
 
     return {
       ...updateVerify,

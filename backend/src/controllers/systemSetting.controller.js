@@ -5,7 +5,6 @@ import { ApiError } from "../utils/ApiError.js";
 import Helper from "../utils/helper.js";
 
 class SystemSettingController {
-
   static upsert = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.unauthorized("User not authenticated");
@@ -14,7 +13,7 @@ class SystemSettingController {
 
     const uploadedFilePaths = [];
     if (req.files) {
-      const files = req.files 
+      const files = req.files;
       if (files.companyLogo?.[0]) {
         data.companyLogo = files.companyLogo[0].path;
         uploadedFilePaths.push(files.companyLogo[0].path);
@@ -26,7 +25,7 @@ class SystemSettingController {
     }
 
     try {
-      const setting = await SystemSettingService.upsert(data, userId);
+      const setting = await SystemSettingService.upsert(data, userId, req, res);
 
       return res
         .status(200)

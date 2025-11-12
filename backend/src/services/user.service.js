@@ -4,10 +4,11 @@ import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
 import { sendCredentialsEmail } from "../utils/sendCredentialsEmail.js";
+import AuditLogService from "./auditLog.service.js";
 
 class UserServices {
   // BUSINESS USER REGISTRATION
-  static async register(payload) {
+  static async register(payload, req = null, res = null) {
     const {
       username,
       firstName,
@@ -29,14 +30,57 @@ class UserServices {
       });
 
       if (existingUser) {
+        await AuditLogService.createAuditLog({
+          userId: parentId,
+          action: "BUSINESS_USER_REGISTRATION_FAILED",
+          entityType: "USER",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "USER_ALREADY_EXISTS",
+            roleName: req.user.role,
+            email: email,
+            phoneNumber: phoneNumber,
+            username: username,
+            registeredBy: parentId,
+          },
+        });
         throw ApiError.badRequest("User already exists");
       }
 
       const role = await Prisma.role.findUnique({ where: { id: roleId } });
-      if (!role) throw ApiError.badRequest("Invalid roleId");
+      if (!role) {
+        await AuditLogService.createAuditLog({
+          userId: parentId,
+          action: "BUSINESS_USER_REGISTRATION_FAILED",
+          entityType: "USER",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INVALID_ROLE_ID",
+            roleName: req.user.role,
+            roleId: roleId,
+            registeredBy: parentId,
+          },
+        });
+        throw ApiError.badRequest("Invalid roleId");
+      }
 
       // Ensure only business roles are assigned
       if (role.type !== "business") {
+        await AuditLogService.createAuditLog({
+          userId: parentId,
+          action: "BUSINESS_USER_REGISTRATION_FAILED",
+          entityType: "USER",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_BUSINESS_ROLE",
+            roleName: role.name,
+            roleType: role.type,
+            registeredBy: parentId,
+          },
+        });
         throw ApiError.badRequest("Only business type roles can be assigned");
       }
 
@@ -53,7 +97,22 @@ class UserServices {
         const parent = await Prisma.user.findUnique({
           where: { id: parentId },
         });
-        if (!parent) throw ApiError.badRequest("Invalid parentId");
+        if (!parent) {
+          await AuditLogService.createAuditLog({
+            userId: parentId,
+            action: "BUSINESS_USER_REGISTRATION_FAILED",
+            entityType: "USER",
+            ipAddress: req ? Helper.getClientIP(req) : null,
+            metadata: {
+              ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+              reason: "INVALID_PARENT_ID",
+              roleName: req.user.role,
+              parentId: parentId,
+              registeredBy: parentId,
+            },
+          });
+          throw ApiError.badRequest("Invalid parentId");
+        }
         hierarchyLevel = parent.hierarchyLevel + 1;
         hierarchyPath = parent.hierarchyPath
           ? `${parent.hierarchyPath}/${parentId}`
@@ -168,14 +227,20 @@ class UserServices {
         roleLevel: user.role.level,
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: "BUSINESS_USER_REGISTER",
-          metadata: {
-            role: user.role.name,
-            createdBy: parentId,
-          },
+      await AuditLogService.createAuditLog({
+        userId: parentId,
+        action: "BUSINESS_USER_REGISTERED",
+        entityType: "USER",
+        entityId: user.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          businessUserName: `${formattedFirstName} ${formattedLastName}`,
+          businessUserEmail: user.email,
+          roleName: req.user.role,
+          hierarchyLevel: user.hierarchyLevel,
+          hasProfileImage: !!profileImageUrl,
+          registeredBy: parentId,
         },
       });
 
@@ -188,6 +253,21 @@ class UserServices {
       });
 
       if (err instanceof ApiError) throw err;
+
+      await AuditLogService.createAuditLog({
+        userId: parentId,
+        action: "BUSINESS_USER_REGISTRATION_FAILED",
+        entityType: "USER",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          roleName: req.user.role,
+          error: err.message,
+          registeredBy: parentId,
+        },
+      });
+
       throw ApiError.internal(
         "Failed to register business user. Please try again."
       );
@@ -197,7 +277,13 @@ class UserServices {
   }
 
   // BUSINESS USER PROFILE UPDATE
-  static async updateProfile(userId, updateData, currentUserId) {
+  static async updateProfile(
+    userId,
+    updateData,
+    currentUserId,
+    req = null,
+    res = null
+  ) {
     const { username, phoneNumber, firstName, lastName, email, roleId } =
       updateData;
 
@@ -211,6 +297,19 @@ class UserServices {
     });
 
     if (!currentUser) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "BUSINESS_PROFILE_UPDATE_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "CURRENT_USER_NOT_FOUND",
+          roleName: req.user.role,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.unauthorized("Current user not found");
     }
 
@@ -224,11 +323,38 @@ class UserServices {
     });
 
     if (!userToUpdate) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "BUSINESS_PROFILE_UPDATE_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "USER_TO_UPDATE_NOT_FOUND",
+          roleName: req.user.role,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.notFound("User to update not found");
     }
 
     // Ensure we're updating a business user
     if (userToUpdate.role.type !== "business") {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "BUSINESS_PROFILE_UPDATE_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "NON_BUSINESS_USER",
+          userRoleType: userToUpdate.role.type,
+          roleName: req.user.role,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.badRequest("Can only update business users");
     }
 
@@ -238,12 +364,38 @@ class UserServices {
     const isEmailChanged = email && email !== userToUpdate.email;
 
     if (isEmailChanged && !isAdmin) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "BUSINESS_PROFILE_UPDATE_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNAUTHORIZED_EMAIL_UPDATE",
+          roleName: req.user.role,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.forbidden(
         "Only administrators can update email addresses"
       );
     }
 
     if (roleId && !isAdmin) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "BUSINESS_PROFILE_UPDATE_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNAUTHORIZED_ROLE_UPDATE",
+          roleName: req.user.role,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.forbidden("Only administrators can change user roles");
     }
 
@@ -264,6 +416,26 @@ class UserServices {
       });
 
       if (existingUser) {
+        let reason = "";
+        if (existingUser.username === username) reason = "USERNAME_EXISTS";
+        else if (existingUser.phoneNumber === phoneNumber)
+          reason = "PHONE_EXISTS";
+        else if (existingUser.email === email) reason = "EMAIL_EXISTS";
+
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "BUSINESS_PROFILE_UPDATE_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: reason,
+            roleName: req.user.role,
+            updatedBy: currentUserId,
+          },
+        });
+
         if (existingUser.username === username)
           throw ApiError.badRequest("Username already taken");
         if (existingUser.phoneNumber === phoneNumber)
@@ -274,12 +446,28 @@ class UserServices {
     }
 
     const formattedData = {};
+    const updatedFields = [];
 
-    if (username) formattedData.username = username.trim();
-    if (firstName) formattedData.firstName = this.formatName(firstName);
-    if (lastName) formattedData.lastName = this.formatName(lastName);
-    if (phoneNumber) formattedData.phoneNumber = phoneNumber;
-    if (email) formattedData.email = email.trim().toLowerCase();
+    if (username) {
+      formattedData.username = username.trim();
+      updatedFields.push("username");
+    }
+    if (firstName) {
+      formattedData.firstName = this.formatName(firstName);
+      updatedFields.push("firstName");
+    }
+    if (lastName) {
+      formattedData.lastName = this.formatName(lastName);
+      updatedFields.push("lastName");
+    }
+    if (phoneNumber) {
+      formattedData.phoneNumber = phoneNumber;
+      updatedFields.push("phoneNumber");
+    }
+    if (email) {
+      formattedData.email = email.trim().toLowerCase();
+      updatedFields.push("email");
+    }
 
     if (roleId && isAdmin) {
       const roleRecord = await Prisma.role.findUnique({
@@ -290,6 +478,7 @@ class UserServices {
         throw ApiError.badRequest("Can only assign business roles");
       }
       formattedData.roleId = roleRecord.id;
+      updatedFields.push("roleId");
     }
 
     const updatedUser = await Prisma.user.update({
@@ -328,21 +517,29 @@ class UserServices {
     });
 
     if (isEmailChanged) {
-      await this.regenerateCredentialsAndNotify(userId, email);
+      await this.regenerateCredentialsAndNotify(
+        userId,
+        email,
+        currentUserId,
+        req,
+        res
+      );
     }
 
-    await Prisma.auditLog.create({
-      data: {
-        userId: currentUserId,
-        action: "BUSINESS_PROFILE_UPDATE",
-        entityType: "User",
-        entityId: userId,
-        metadata: {
-          updatedFields: Object.keys(updateData),
-          emailChanged: isEmailChanged,
-          isAdmin: isAdmin,
-          isOwnProfile: isUpdatingOwnProfile,
-        },
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "BUSINESS_PROFILE_UPDATED",
+      entityType: "USER",
+      entityId: userId,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        updatedFields: updatedFields,
+        roleName: req.user.role,
+        emailChanged: isEmailChanged,
+        isAdmin: isAdmin,
+        isOwnProfile: isUpdatingOwnProfile,
+        updatedBy: currentUserId,
       },
     });
 
@@ -350,7 +547,12 @@ class UserServices {
   }
 
   // BUSINESS USER PROFILE IMAGE UPDATE
-  static async updateProfileImage(userId, profileImagePath) {
+  static async updateProfileImage(
+    userId,
+    profileImagePath,
+    req = null,
+    res = null
+  ) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -369,19 +571,48 @@ class UserServices {
       });
 
       if (!user) {
+        await AuditLogService.createAuditLog({
+          userId: userId,
+          action: "BUSINESS_PROFILE_IMAGE_UPDATE_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "USER_NOT_FOUND",
+            roleName: req.user.role,
+            updatedBy: userId,
+          },
+        });
         throw ApiError.notFound("User not found");
       }
 
       // Ensure it's a business user
       if (user.role.type !== "business") {
+        await AuditLogService.createAuditLog({
+          userId: userId,
+          action: "BUSINESS_PROFILE_IMAGE_UPDATE_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_BUSINESS_USER",
+            userRoleType: user.role.type,
+            roleName: req.user.role,
+            updatedBy: userId,
+          },
+        });
         throw ApiError.badRequest(
           "Can only update business user profile images"
         );
       }
 
+      let oldImageDeleted = false;
       if (user.profileImage) {
         try {
           await S3Service.delete({ fileUrl: user.profileImage });
+          oldImageDeleted = true;
         } catch (error) {
           console.error("Failed to delete old profile image", {
             userId,
@@ -429,11 +660,18 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId,
-          action: "BUSINESS_PROFILE_IMAGE_UPDATE",
-          metadata: { newImage: profileImageUrl },
+      await AuditLogService.createAuditLog({
+        userId: userId,
+        action: "BUSINESS_PROFILE_IMAGE_UPDATED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          oldImageDeleted: oldImageDeleted,
+          newImageUrl: profileImageUrl,
+          roleName: req.user.role,
+          updatedBy: userId,
         },
       });
 
@@ -861,7 +1099,13 @@ class UserServices {
   }
 
   // BUSINESS USER DEACTIVATION
-  static async deactivateUser(userId, deactivatedBy, reason) {
+  static async deactivateUser(
+    userId,
+    deactivatedBy,
+    reason,
+    req = null,
+    res = null
+  ) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -869,15 +1113,55 @@ class UserServices {
       });
 
       if (!user) {
+        await AuditLogService.createAuditLog({
+          userId: deactivatedBy,
+          action: "BUSINESS_USER_DEACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "USER_NOT_FOUND",
+            roleName: req.user.role,
+            deactivatedBy: deactivatedBy,
+          },
+        });
         throw ApiError.notFound("User not found");
       }
 
       // Ensure it's a business user
       if (user.role.type !== "business") {
+        await AuditLogService.createAuditLog({
+          userId: deactivatedBy,
+          action: "BUSINESS_USER_DEACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_BUSINESS_USER",
+            userRoleType: user.role.type,
+            roleName: req.user.role,
+            deactivatedBy: deactivatedBy,
+          },
+        });
         throw ApiError.badRequest("Can only deactivate business users");
       }
 
       if (user.status === "IN_ACTIVE") {
+        await AuditLogService.createAuditLog({
+          userId: deactivatedBy,
+          action: "BUSINESS_USER_DEACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "ALREADY_DEACTIVATED",
+            roleName: req.user.role,
+            deactivatedBy: deactivatedBy,
+          },
+        });
         throw ApiError.badRequest("User is already deactivated");
       }
 
@@ -887,6 +1171,19 @@ class UserServices {
       });
 
       if (!deactivator) {
+        await AuditLogService.createAuditLog({
+          userId: deactivatedBy,
+          action: "BUSINESS_USER_DEACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INVALID_DEACTIVATOR",
+            roleName: req.user.role,
+            deactivatedBy: deactivatedBy,
+          },
+        });
         throw ApiError.unauthorized("Invalid deactivator user");
       }
 
@@ -895,6 +1192,20 @@ class UserServices {
       const hasHigherRole = deactivator.role.level > user.role.level;
 
       if (!isAdmin && !isParent && !hasHigherRole) {
+        await AuditLogService.createAuditLog({
+          userId: deactivatedBy,
+          action: "BUSINESS_USER_DEACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INSUFFICIENT_PERMISSIONS",
+            deactivatorRole: deactivator.role.name,
+            roleName: req.user.role,
+            deactivatedBy: deactivatedBy,
+          },
+        });
         throw ApiError.forbidden(
           "You don't have permission to deactivate this user"
         );
@@ -939,19 +1250,19 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: deactivatedBy,
-          action: "BUSINESS_USER_DEACTIVATE",
-          entityType: "User",
-          metadata: {
-            previousStatus: user.status,
-            newStatus: "IN_ACTIVE",
-            reason: reason || "No reason provided",
-            deactivatedBy,
-            timestamp: new Date().toISOString(),
-            targetUserId: userId,
-          },
+      await AuditLogService.createAuditLog({
+        userId: deactivatedBy,
+        action: "BUSINESS_USER_DEACTIVATED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          previousStatus: user.status,
+          newStatus: "IN_ACTIVE",
+          reason: reason || "No reason provided",
+          roleName: req.user.role,
+          deactivatedBy: deactivatedBy,
         },
       });
 
@@ -964,6 +1275,22 @@ class UserServices {
       });
 
       if (error instanceof ApiError) throw error;
+
+      await AuditLogService.createAuditLog({
+        userId: deactivatedBy,
+        action: "BUSINESS_USER_DEACTIVATION_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          error: error.message,
+          roleName: req.user.role,
+          deactivatedBy: deactivatedBy,
+        },
+      });
+
       throw ApiError.internal(
         "Failed to deactivate business user. Please try again."
       );
@@ -971,7 +1298,13 @@ class UserServices {
   }
 
   // BUSINESS USER REACTIVATION
-  static async reactivateUser(userId, reactivatedBy, reason) {
+  static async reactivateUser(
+    userId,
+    reactivatedBy,
+    reason,
+    req = null,
+    res = null
+  ) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -979,19 +1312,71 @@ class UserServices {
       });
 
       if (!user) {
+        await AuditLogService.createAuditLog({
+          userId: reactivatedBy,
+          action: "BUSINESS_USER_REACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "USER_NOT_FOUND",
+            roleName: req.user.role,
+            reactivatedBy: reactivatedBy,
+          },
+        });
         throw ApiError.notFound("User not found");
       }
 
       // Ensure it's a business user
       if (user.role.type !== "business") {
+        await AuditLogService.createAuditLog({
+          userId: reactivatedBy,
+          action: "BUSINESS_USER_REACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_BUSINESS_USER",
+            roleName: req.user.role,
+            reactivatedBy: reactivatedBy,
+          },
+        });
         throw ApiError.badRequest("Can only reactivate business users");
       }
 
       if (user.status === "DELETE") {
+        await AuditLogService.createAuditLog({
+          userId: reactivatedBy,
+          action: "BUSINESS_USER_REACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "USER_DELETED",
+            roleName: req.user.role,
+            reactivatedBy: reactivatedBy,
+          },
+        });
         throw ApiError.badRequest("Cannot reactivate a deleted user");
       }
 
       if (user.status === "ACTIVE") {
+        await AuditLogService.createAuditLog({
+          userId: reactivatedBy,
+          action: "BUSINESS_USER_REACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "ALREADY_ACTIVE",
+            roleName: req.user.role,
+            reactivatedBy: reactivatedBy,
+          },
+        });
         throw ApiError.badRequest("User is already active");
       }
 
@@ -1001,6 +1386,19 @@ class UserServices {
       });
 
       if (!activator) {
+        await AuditLogService.createAuditLog({
+          userId: reactivatedBy,
+          action: "BUSINESS_USER_REACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INVALID_ACTIVATOR",
+            roleName: req.user.role,
+            reactivatedBy: reactivatedBy,
+          },
+        });
         throw ApiError.unauthorized("Invalid activator user");
       }
 
@@ -1009,6 +1407,20 @@ class UserServices {
       const hasHigherRole = activator.role.level > user.role.level;
 
       if (!isAdmin && !isParent && !hasHigherRole) {
+        await AuditLogService.createAuditLog({
+          userId: reactivatedBy,
+          action: "BUSINESS_USER_REACTIVATION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INSUFFICIENT_PERMISSIONS",
+            activatorRole: activator.role.name,
+            roleName: req.user.role,
+            reactivatedBy: reactivatedBy,
+          },
+        });
         throw ApiError.forbidden(
           "You don't have permission to reactivate this user"
         );
@@ -1053,19 +1465,20 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: reactivatedBy,
-          action: "BUSINESS_USER_REACTIVATE",
-          entityType: "User",
-          metadata: {
-            previousStatus: user.status,
-            newStatus: "ACTIVE",
-            reason: reason || "No reason provided",
-            reactivatedBy,
-            timestamp: new Date().toISOString(),
-            targetUserId: userId,
-          },
+      await AuditLogService.createAuditLog({
+        userId: reactivatedBy,
+        action: "BUSINESS_USER_REACTIVATED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          previousStatus: user.status,
+          newStatus: "ACTIVE",
+          reason: reason || "No reason provided",
+          roleType: activator.role.type,
+          roleName: activator.role.name,
+          reactivatedBy: reactivatedBy,
         },
       });
 
@@ -1078,6 +1491,21 @@ class UserServices {
       });
 
       if (error instanceof ApiError) throw error;
+
+      await AuditLogService.createAuditLog({
+        userId: reactivatedBy,
+        action: "BUSINESS_USER_REACTIVATION_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          error: error.message,
+          reactivatedBy: reactivatedBy,
+        },
+      });
+
       throw ApiError.internal(
         "Failed to reactivate business user. Please try again."
       );
@@ -1085,7 +1513,7 @@ class UserServices {
   }
 
   // BUSINESS USER SOFT DELETE
-  static async deleteUser(userId, deletedBy, reason) {
+  static async deleteUser(userId, deletedBy, reason, req = null, res = null) {
     try {
       const user = await Prisma.user.findUnique({
         where: { id: userId },
@@ -1093,11 +1521,38 @@ class UserServices {
       });
 
       if (!user) {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "BUSINESS_USER_DELETION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "USER_NOT_FOUND",
+            roleName: req.user.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.notFound("User not found");
       }
 
       // Ensure it's a business user
       if (user.role.type !== "business") {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "BUSINESS_USER_DELETION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_BUSINESS_USER",
+            userRoleType: user.role.type,
+            roleName: req.user.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.badRequest("Can only delete business users");
       }
 
@@ -1107,11 +1562,38 @@ class UserServices {
       });
 
       if (!deleter) {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "BUSINESS_USER_DELETION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INVALID_DELETER",
+            roleName: req.user.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.unauthorized("Invalid deleter user");
       }
 
       const isAdmin = deleter.role.name === "ADMIN";
       if (!isAdmin) {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "BUSINESS_USER_DELETION_FAILED",
+          entityType: "USER",
+          entityId: userId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_ADMIN_DELETION",
+            roleName: req.user.role,
+            deleterRole: deleter.role.name,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.forbidden("Only ADMIN can delete users");
       }
 
@@ -1155,19 +1637,20 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: deletedBy,
-          action: "BUSINESS_USER_DELETE",
-          entityType: "User",
-          metadata: {
-            previousStatus: user.status,
-            newStatus: "DELETE",
-            reason: reason || "No reason provided",
-            deletedBy,
-            timestamp: new Date().toISOString(),
-            targetUserId: userId,
-          },
+      await AuditLogService.createAuditLog({
+        userId: deletedBy,
+        action: "BUSINESS_USER_DELETED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          previousStatus: user.status,
+          newStatus: "DELETE",
+          reason: reason || "No reason provided",
+          roleName: req.user.role,
+          deleterRole: deleter.role.name,
+          deletedBy: deletedBy,
         },
       });
 
@@ -1180,6 +1663,22 @@ class UserServices {
       });
 
       if (error instanceof ApiError) throw error;
+
+      await AuditLogService.createAuditLog({
+        userId: deletedBy,
+        action: "BUSINESS_USER_DELETION_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          roleName: req.user.role,
+          error: error.message,
+          deletedBy: deletedBy,
+        },
+      });
+
       throw ApiError.internal(
         "Failed to delete business user. Please try again."
       );
@@ -1187,7 +1686,13 @@ class UserServices {
   }
 
   // HELPER METHODS
-  static async regenerateCredentialsAndNotify(userId, newEmail) {
+  static async regenerateCredentialsAndNotify(
+    userId,
+    newEmail,
+    currentUserId = null,
+    req = null,
+    res = null
+  ) {
     try {
       const newPassword = Helper.generatePassword();
       const newTransactionPin = Helper.generateTransactionPin();
@@ -1216,20 +1721,38 @@ class UserServices {
         "business"
       );
 
-      await Prisma.auditLog.create({
-        data: {
-          userId,
-          action: "BUSINESS_CREDENTIALS_REGENERATED",
-          metadata: {
-            reason: "EMAIL_UPDATED",
-            newEmail: newEmail,
-          },
+      await AuditLogService.createAuditLog({
+        userId: currentUserId || userId,
+        action: "BUSINESS_CREDENTIALS_REGENERATED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "EMAIL_UPDATED",
+          newEmail: newEmail,
+          regeneratedBy: currentUserId || userId,
         },
       });
 
       return user;
     } catch (error) {
       console.error("Error regenerating business credentials:", error);
+
+      await AuditLogService.createAuditLog({
+        userId: currentUserId || userId,
+        action: "BUSINESS_CREDENTIALS_REGENERATION_FAILED",
+        entityType: "USER",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "REGENERATION_ERROR",
+          error: error.message,
+          regeneratedBy: currentUserId || userId,
+        },
+      });
+
       throw ApiError.internal("Failed to regenerate business credentials");
     }
   }

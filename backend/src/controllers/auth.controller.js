@@ -56,7 +56,7 @@ class AuthController {
       throw ApiError.unauthorized("User not authenticated");
     }
     try {
-      let safeUser = await AuthServices.getUserById(userId);
+      let safeUser = await AuthServices.getUserById(userId, req, res);
 
       if (!safeUser) {
         throw ApiError.notFound("Business user not found");
@@ -83,7 +83,7 @@ class AuthController {
 
     if (!userId) throw ApiError.unauthorized("User not authenticated");
 
-    await AuthServices.logout(userId, refreshToken);
+    await AuthServices.logout(userId, refreshToken, req, res);
 
     res.clearCookie("accessToken", cookieOptions);
     res.clearCookie("refreshToken", cookieOptions);
@@ -100,8 +100,11 @@ class AuthController {
       throw ApiError.unauthorized("Refresh token missing");
     }
 
-    const { accessToken, refreshToken, user } =
-      await AuthServices.refreshToken(incomingRefresh);
+    const { accessToken, refreshToken, user } = await AuthServices.refreshToken(
+      incomingRefresh,
+      req,
+      res
+    );
 
     res.cookie("refreshToken", refreshToken, refreshCookieOptions);
     res.cookie("accessToken", accessToken, cookieOptions);
@@ -132,7 +135,7 @@ class AuthController {
       throw ApiError.badRequest("Email is required");
     }
 
-    const result = await AuthServices.requestPasswordReset(email);
+    const result = await AuthServices.requestPasswordReset(email, req, res);
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
@@ -144,7 +147,7 @@ class AuthController {
       throw ApiError.badRequest("Token is required");
     }
 
-    const result = await AuthServices.confirmPasswordReset(token);
+    const result = await AuthServices.confirmPasswordReset(token, req, res);
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
@@ -156,7 +159,7 @@ class AuthController {
       throw ApiError.badRequest("Token is required");
     }
 
-    const result = await AuthServices.verifyEmail(String(token));
+    const result = await AuthServices.verifyEmail(String(token, req, res));
 
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
@@ -174,7 +177,9 @@ class AuthController {
     const result = await AuthServices.updateCredentials(
       userId,
       credentialsData,
-      currentUserId
+      currentUserId,
+      req,
+      res
     );
 
     const isUpdatingOwnAccount = currentUserId === userId;
