@@ -1,5 +1,7 @@
 import Prisma from "../db/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import AuditLogService from "./auditLog.service.js";
+import Helper from "../utils/helper.js";
 
 class RoleServices {
   static getAllRoles = async (options = {}) => {
@@ -117,7 +119,7 @@ class RoleServices {
     }
   }
 
-  static async getRolebyId(id) {
+  static async getRolebyId(id, currentUserId = null, req = null, res = null) {
     const role = await Prisma.role.findUnique({
       where: { id },
       include: {
@@ -149,7 +151,38 @@ class RoleServices {
       },
     });
 
-    if (!role) return null;
+    if (!role) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "ROLE_RETRIEVAL_FAILED",
+        entityType: "ROLE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "ROLE_NOT_FOUND",
+          retrievedBy: currentUserId,
+        },
+      });
+      return null;
+    }
+
+    // Audit log for successful role retrieval
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "ROLE_RETRIEVED",
+      entityType: "ROLE",
+      entityId: id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        roleName: role.name,
+        roleType: role.type,
+        userCount: role._count.users,
+        permissionCount: role.rolePermissions.length,
+        retrievedBy: currentUserId,
+      },
+    });
 
     return {
       id: role.id,
@@ -172,11 +205,25 @@ class RoleServices {
     };
   }
 
-  static async createRole(payload) {
+  static async createRole(payload, req = null, res = null) {
     let { name, description, type = "employee", createdBy } = payload;
 
     // TYPE VALIDATION: Only allow creating 'employee' type roles
     if (type !== "employee") {
+      await AuditLogService.createAuditLog({
+        userId: createdBy,
+        action: "ROLE_CREATION_FAILED",
+        entityType: "ROLE",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "INVALID_ROLE_TYPE",
+          roleName: req.user.role,
+          providedType: type,
+          roleName: name,
+          createdBy: createdBy,
+        },
+      });
       throw ApiError.badRequest("Only 'employee' type roles can be created");
     }
 
@@ -184,6 +231,18 @@ class RoleServices {
       where: { name },
     });
     if (existingByName) {
+      await AuditLogService.createAuditLog({
+        userId: createdBy,
+        action: "ROLE_CREATION_FAILED",
+        entityType: "ROLE",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "ROLE_NAME_EXISTS",
+          roleName: req.user.role,
+          createdBy: createdBy,
+        },
+      });
       throw ApiError.conflict("Role with this name already exists");
     }
 
@@ -246,20 +305,70 @@ class RoleServices {
       updatedAt: role.updatedAt,
     };
 
+    // Audit log for successful role creation
+    await AuditLogService.createAuditLog({
+      userId: createdBy,
+      action: "ROLE_CREATED",
+      entityType: "ROLE",
+      entityId: role.id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        createRoleName: role.name,
+        roleName: req.user.role,
+        roleLevel: role.level,
+        roleType: role.type,
+        servicesWithPermissions: services.length,
+        createdBy: createdBy,
+      },
+    });
+
     return dto;
   }
 
-  static async updateRole(id, payload) {
+  static async updateRole(id, payload, req = null, res = null) {
+    let currentUserId = req.user.id;
+
     const { name, description, level, type } = payload;
 
     // Check if role exists
     const existingRole = await Prisma.role.findUnique({
       where: { id },
     });
-    if (!existingRole) return null;
+    if (!existingRole) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "ROLE_UPDATE_FAILED",
+        entityType: "ROLE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "ROLE_NOT_FOUND",
+          roleName: req.user.role,
+          updatedBy: currentUserId,
+        },
+      });
+      return null;
+    }
 
     // TYPE CHECK: Only allow updating 'employee' type roles
     if (existingRole.type !== "employee") {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "ROLE_UPDATE_FAILED",
+        entityType: "ROLE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "NON_EMPLOYEE_ROLE_UPDATE",
+          existingRoleName: existingRole.name,
+          roleName: req.user.role,
+          roleType: existingRole.type,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.forbidden("Cannot update non-employee type roles");
     }
 
@@ -269,6 +378,20 @@ class RoleServices {
         where: { name },
       });
       if (existingByName && existingByName.id !== id) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "ROLE_UPDATE_FAILED",
+          entityType: "ROLE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "ROLE_NAME_EXISTS",
+            roleName: req.user.role,
+            newRoleName: name,
+            updatedBy: currentUserId,
+          },
+        });
         throw ApiError.conflict("Role with this name already exists");
       }
     }
@@ -279,19 +402,58 @@ class RoleServices {
         where: { level },
       });
       if (existingByLevel && existingByLevel.id !== id) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "ROLE_UPDATE_FAILED",
+          entityType: "ROLE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "ROLE_LEVEL_EXISTS",
+            roleName: req.user.role,
+            newRoleLevel: level,
+            updatedBy: currentUserId,
+          },
+        });
         throw ApiError.conflict("Role with this level already exists");
       }
     }
 
     // Prevent changing type to 'business'
     if (type && type !== "employee") {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "ROLE_UPDATE_FAILED",
+        entityType: "ROLE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "INVALID_ROLE_TYPE_CHANGE",
+          roleName: req.user.role,
+          newType: type,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.badRequest("Cannot change role type to non-employee");
     }
 
     const updateData = {};
-    if (name) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (level !== undefined) updateData.level = level;
+    const updatedFields = [];
+
+    if (name) {
+      updateData.name = name;
+      updatedFields.push("name");
+    }
+    if (description !== undefined) {
+      updateData.description = description;
+      updatedFields.push("description");
+    }
+    if (level !== undefined) {
+      updateData.level = level;
+      updatedFields.push("level");
+    }
     updateData.type = "employee"; // Force type to remain 'employee'
 
     const role = await Prisma.role.update({
@@ -320,10 +482,29 @@ class RoleServices {
       updatedAt: role.updatedAt,
     };
 
+    // Audit log for successful role update
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "ROLE_UPDATED",
+      entityType: "ROLE",
+      entityId: id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        createdRoleName: role.name,
+        roleName: req.user.role,
+        updatedFields: updatedFields,
+        previousName: existingRole.name,
+        previousLevel: existingRole.level,
+        previousDescription: existingRole.description,
+        updatedBy: currentUserId,
+      },
+    });
+
     return dto;
   }
 
-  static async deleteRole(id) {
+  static async deleteRole(id, currentUserId = null, req = null, res = null) {
     // Check if role exists
     const existingRole = await Prisma.role.findUnique({
       where: { id },
@@ -334,15 +515,57 @@ class RoleServices {
       },
     });
 
-    if (!existingRole) return false;
+    if (!existingRole) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "ROLE_DELETION_FAILED",
+        entityType: "ROLE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "ROLE_NOT_FOUND",
+          deletedBy: currentUserId,
+        },
+      });
+      return false;
+    }
 
     // TYPE CHECK: Only allow deleting 'employee' type roles
     if (existingRole.type !== "employee") {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "ROLE_DELETION_FAILED",
+        entityType: "ROLE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "NON_EMPLOYEE_ROLE_DELETION",
+          roleName: existingRole.name,
+          roleType: existingRole.type,
+          deletedBy: currentUserId,
+        },
+      });
       throw ApiError.forbidden("Cannot delete non-employee type roles");
     }
 
     // Check if role is assigned to any users
     if (existingRole.users.length > 0) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "ROLE_DELETION_FAILED",
+        entityType: "ROLE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "ROLE_ASSIGNED_TO_USERS",
+          roleName: existingRole.name,
+          userCount: existingRole.users.length,
+          deletedBy: currentUserId,
+        },
+      });
       throw ApiError.conflict("Cannot delete role assigned to users");
     }
 
@@ -362,6 +585,21 @@ class RoleServices {
       await tx.role.delete({
         where: { id },
       });
+    });
+
+    // Audit log for successful role deletion
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "ROLE_DELETED",
+      entityType: "ROLE",
+      entityId: id,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        roleName: existingRole.name,
+        roleLevel: existingRole.level,
+        deletedBy: currentUserId,
+      },
     });
 
     return true;

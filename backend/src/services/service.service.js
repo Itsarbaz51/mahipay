@@ -4,10 +4,10 @@ import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
 import { TestingAPI } from "./testing/testingAPIs.js";
+import AuditLogService from "./auditLog.service.js";
 
 export class ServiceProviderService {
-  // create services
-  static async create(payload, files) {
+  static async create(payload, files, req = null, res = null) {
     const {
       code,
       name,
@@ -19,10 +19,24 @@ export class ServiceProviderService {
     } = payload;
 
     let uploaded = null;
+    let currentUserId = req.user.id;
 
     try {
       // Validate required fields
       if (!code || !name) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_CREATION_FAILED",
+          entityType: "SERVICE",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "MISSING_REQUIRED_FIELDS",
+            providedCode: code,
+            providedName: name,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.badRequest("Code and name are required", 400);
       }
 
@@ -32,6 +46,18 @@ export class ServiceProviderService {
       });
 
       if (existingCode) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_CREATION_FAILED",
+          entityType: "SERVICE",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "SERVICE_CODE_EXISTS",
+            serviceCode: code,
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.conflict("Service Provider code already exists", 400);
       }
 
@@ -45,10 +71,34 @@ export class ServiceProviderService {
         });
 
         if (!parent) {
+          await AuditLogService.createAuditLog({
+            userId: currentUserId,
+            action: "SERVICE_CREATION_FAILED",
+            entityType: "SERVICE",
+            ipAddress: req ? Helper.getClientIP(req) : null,
+            metadata: {
+              ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+              reason: "PARENT_NOT_FOUND",
+              parentId: parentId,
+              createdBy: currentUserId,
+            },
+          });
           throw ApiError.notFound("Parent service provider not found", 404);
         }
 
         if (parent.parentId === null && !this.isValidRootParent(parent)) {
+          await AuditLogService.createAuditLog({
+            userId: currentUserId,
+            action: "SERVICE_CREATION_FAILED",
+            entityType: "SERVICE",
+            ipAddress: req ? Helper.getClientIP(req) : null,
+            metadata: {
+              ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+              reason: "INVALID_PARENT_HIERARCHY",
+              parentId: parentId,
+              createdBy: currentUserId,
+            },
+          });
           throw ApiError.badRequest("Invalid parent hierarchy", 400);
         }
 
@@ -79,6 +129,17 @@ export class ServiceProviderService {
 
       // Validate hierarchy values
       if (!hierarchyLevel || !hierarchyPath) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_CREATION_FAILED",
+          entityType: "SERVICE",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "HIERARCHY_GENERATION_FAILED",
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.internal("Failed to generate hierarchy data", 500);
       }
 
@@ -88,6 +149,17 @@ export class ServiceProviderService {
         try {
           uploaded = await S3Service.upload(iconFile.path, "services");
         } catch (uploadError) {
+          await AuditLogService.createAuditLog({
+            userId: currentUserId,
+            action: "SERVICE_CREATION_FAILED",
+            entityType: "SERVICE",
+            ipAddress: req ? Helper.getClientIP(req) : null,
+            metadata: {
+              ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+              reason: "ICON_UPLOAD_FAILED",
+              createdBy: currentUserId,
+            },
+          });
           console.error(" Failed to upload icon:", uploadError);
           throw ApiError.internal("Failed to upload service icon", 500);
         }
@@ -129,6 +201,25 @@ export class ServiceProviderService {
         },
       });
 
+      // Audit log for successful service creation
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_CREATED",
+        entityType: "SERVICE",
+        entityId: serviceProvider.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          serviceName: serviceProvider.name,
+          serviceCode: serviceProvider.code,
+          isActive: serviceProvider.isActive,
+          apiIntegrationStatus: serviceProvider.apiIntegrationStatus,
+          parentId: serviceProvider.parentId,
+          hierarchyLevel: serviceProvider.hierarchyLevel,
+          createdBy: currentUserId,
+        },
+      });
+
       return serviceProvider;
     } catch (error) {
       // Clean up uploaded file if creation fails
@@ -136,17 +227,36 @@ export class ServiceProviderService {
         try {
           await S3Service.delete(uploaded);
         } catch (cleanupError) {
-          throw ApiError.internal(
-            "Failed to clean up uploaded file:",
-            cleanupError
-          );
+          console.error("Failed to clean up uploaded file:", cleanupError);
         }
       }
 
       // Handle specific Prisma errors
       if (error.code === "P2002") {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_CREATION_FAILED",
+          entityType: "SERVICE",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "SERVICE_CODE_EXISTS_PRISMA",
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.conflict("Service Provider code already exists", 400);
       } else if (error.code === "P2003") {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_CREATION_FAILED",
+          entityType: "SERVICE",
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "INVALID_PARENT_REFERENCE",
+            createdBy: currentUserId,
+          },
+        });
         throw ApiError.badRequest("Invalid parent reference", 400);
       }
 
@@ -155,6 +265,18 @@ export class ServiceProviderService {
         throw error;
       }
 
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_CREATION_FAILED",
+        entityType: "SERVICE",
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          error: error.message,
+          createdBy: currentUserId,
+        },
+      });
       throw ApiError.internal("Failed to create service provider", 500);
     } finally {
       // Clean up temporary files
@@ -191,7 +313,9 @@ export class ServiceProviderService {
     return pathRegex.test(path);
   }
 
-  static async getHierarchyTree() {
+  static async getHierarchyTree(req = null, res = null) {
+    let currentUserId = req.user.id;
+
     const allServices = await Prisma.serviceProvider.findMany({
       select: {
         id: true,
@@ -202,6 +326,19 @@ export class ServiceProviderService {
         parentId: true,
       },
       orderBy: { hierarchyPath: "asc" },
+    });
+
+    // Audit log for hierarchy tree retrieval
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "SERVICE_HIERARCHY_RETRIEVED",
+      entityType: "SERVICE",
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        totalServices: allServices.length,
+        retrievedBy: currentUserId,
+      },
     });
 
     return allServices;
@@ -398,7 +535,8 @@ export class ServiceProviderService {
   }
 
   // Update environment configuration
-  static async updateEnvConfig(id, data) {
+  static async updateEnvConfig(id, data, req = null, res = null) {
+    let currentUserId = req.user.id;
     try {
       const existing = await Prisma.serviceProvider.findUnique({
         where: { id },
@@ -406,6 +544,19 @@ export class ServiceProviderService {
       });
 
       if (!existing) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_ENV_CONFIG_UPDATE_FAILED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "SERVICE_NOT_FOUND",
+            roleName: req.user.role,
+            updatedBy: currentUserId,
+          },
+        });
         throw ApiError.notFound("Service Provider not found");
       }
 
@@ -469,8 +620,41 @@ export class ServiceProviderService {
         },
       });
 
+      // Audit log for successful environment config update
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_ENV_CONFIG_UPDATED",
+        entityType: "SERVICE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          serviceName: updated.name,
+          roleName: req.user.role,
+          serviceCode: updated.code,
+          envConfigCount: updateData.envConfig.length,
+          apiIntegrationStatus: updated.apiIntegrationStatus,
+          updatedSubServices: data.subServices?.length || 0,
+          updatedBy: currentUserId,
+        },
+      });
+
       return updated;
     } catch (error) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_ENV_CONFIG_UPDATE_FAILED",
+        entityType: "SERVICE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UPDATE_ERROR",
+          roleName: req.user.role,
+          error: error.message,
+          updatedBy: currentUserId,
+        },
+      });
       throw ApiError.internal(
         `Failed to update environment config: ${error.message}`
       );
@@ -478,7 +662,9 @@ export class ServiceProviderService {
   }
 
   // only service status change
-  static async toggleServiceStatus(id) {
+  static async toggleServiceStatus(id, req = null, res = null) {
+    let currentUserId = req.user.id;
+
     try {
       // 1. Pehle service find karo
       const existing = await Prisma.serviceProvider.findUnique({
@@ -490,6 +676,19 @@ export class ServiceProviderService {
       });
 
       if (!existing) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_STATUS_TOGGLE_FAILED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "SERVICE_NOT_FOUND",
+            roleName: req.user.role,
+            toggledBy: currentUserId,
+          },
+        });
         throw ApiError.notFound("Service not found");
       }
 
@@ -510,7 +709,7 @@ export class ServiceProviderService {
         });
 
         // Updated service return karo
-        return await Prisma.serviceProvider.findUnique({
+        const updatedService = await Prisma.serviceProvider.findUnique({
           where: { id },
           include: {
             subService: {
@@ -522,10 +721,45 @@ export class ServiceProviderService {
             },
           },
         });
+
+        // Audit log for service status toggle with sub-services
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_STATUS_TOGGLED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            serviceName: existing.name,
+            previousStatus: existing.isActive,
+            roleName: req.user.role,
+            newStatus: newStatus,
+            subServicesAffected: existing.subService.length,
+            toggledBy: currentUserId,
+          },
+        });
+
+        return updatedService;
       }
 
       // 4. Agar service child hai AUR uska parent disabled hai AUR hum enable karna chahte hain
       if (existing.parentId && !existing.parent.isActive && newStatus) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_STATUS_TOGGLE_FAILED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "PARENT_DISABLED",
+            serviceName: existing.name,
+            parentName: existing.parent.name,
+            roleName: req.user.role,
+            toggledBy: currentUserId,
+          },
+        });
         throw ApiError.badRequest(
           `Cannot enable "${existing.name}" - parent "${existing.parent.name}" is disabled`
         );
@@ -540,11 +774,56 @@ export class ServiceProviderService {
         },
       });
 
-      if (!updated)
+      if (!updated) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_STATUS_TOGGLE_FAILED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "DATABASE_UPDATE_FAILED",
+            roleName: req.user.role,
+            toggledBy: currentUserId,
+          },
+        });
         throw ApiError.internal("Failed to change active/inactive status");
+      }
+
+      // Audit log for successful service status toggle
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_STATUS_TOGGLED",
+        entityType: "SERVICE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          serviceName: existing.name,
+          previousStatus: existing.isActive,
+          roleName: req.user.role,
+          newStatus: newStatus,
+          toggledBy: currentUserId,
+        },
+      });
 
       return updated;
     } catch (error) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_STATUS_TOGGLE_FAILED",
+        entityType: "SERVICE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          error: error.message,
+          roleName: req.user.role,
+          toggledBy: currentUserId,
+        },
+      });
       throw ApiError.internal(
         `Failed to toggle service status: ${error.message}`
       );
@@ -552,7 +831,9 @@ export class ServiceProviderService {
   }
 
   // only api intigration status change
-  static async toggleApiIntigrationStatus(id) {
+  static async toggleApiIntigrationStatus(id, req = null, res = null) {
+    let currentUserId = req.user.id;
+
     try {
       const existing = await Prisma.serviceProvider.findUnique({
         where: { id },
@@ -563,6 +844,19 @@ export class ServiceProviderService {
       });
 
       if (!existing) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_API_STATUS_TOGGLE_FAILED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "SERVICE_NOT_FOUND",
+            roleName: req.user.role,
+            toggledBy: currentUserId,
+          },
+        });
         throw ApiError.notFound("Service not found");
       }
 
@@ -581,7 +875,7 @@ export class ServiceProviderService {
           },
         });
 
-        return await Prisma.serviceProvider.findUnique({
+        const updatedService = await Prisma.serviceProvider.findUnique({
           where: { id },
           include: {
             subService: {
@@ -593,6 +887,26 @@ export class ServiceProviderService {
             },
           },
         });
+
+        // Audit log for API status toggle with sub-services
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_API_STATUS_TOGGLED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            serviceName: existing.name,
+            roleName: req.user.role,
+            previousApiStatus: existing.apiIntegrationStatus,
+            newApiStatus: newApiStatus,
+            subServicesAffected: existing.subService.length,
+            toggledBy: currentUserId,
+          },
+        });
+
+        return updatedService;
       }
 
       if (
@@ -601,6 +915,21 @@ export class ServiceProviderService {
         newStatus &&
         newApiStatus
       ) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_API_STATUS_TOGGLE_FAILED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "PARENT_DISABLED",
+            serviceName: existing.name,
+            roleName: req.user.role,
+            parentName: existing.parent.name,
+            toggledBy: currentUserId,
+          },
+        });
         throw ApiError.badRequest(
           `Cannot enable "${existing.name}" - parent "${existing.parent.name}" is disabled`
         );
@@ -615,11 +944,56 @@ export class ServiceProviderService {
         },
       });
 
-      if (!updated)
+      if (!updated) {
+        await AuditLogService.createAuditLog({
+          userId: currentUserId,
+          action: "SERVICE_API_STATUS_TOGGLE_FAILED",
+          entityType: "SERVICE",
+          entityId: id,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "DATABASE_UPDATE_FAILED",
+            roleName: req.user.role,
+            toggledBy: currentUserId,
+          },
+        });
         throw ApiError.internal("Failed to change active/inactive status");
+      }
+
+      // Audit log for successful API status toggle
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_API_STATUS_TOGGLED",
+        entityType: "SERVICE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          serviceName: existing.name,
+          roleName: req.user.role,
+          previousApiStatus: existing.apiIntegrationStatus,
+          newApiStatus: newApiStatus,
+          toggledBy: currentUserId,
+        },
+      });
 
       return updated;
     } catch (error) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "SERVICE_API_STATUS_TOGGLE_FAILED",
+        entityType: "SERVICE",
+        entityId: id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          roleName: req.user.role,
+          error: error.message,
+          toggledBy: currentUserId,
+        },
+      });
       throw ApiError.internal(
         `Failed to toggle service status: ${error.message}`
       );
@@ -627,16 +1001,51 @@ export class ServiceProviderService {
   }
 
   // Test API connection
-  static async testApiConnection(serviceProviderId, envConfig) {
+  static async testApiConnection(
+    serviceProviderId,
+    envConfig,
+    req = null,
+    res = null
+  ) {
+    let currentUserId = req.user.id;
+
     const serviceProvider = await Prisma.serviceProvider.findUnique({
       where: { id: serviceProviderId },
     });
 
     if (!serviceProvider) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "API_CONNECTION_TEST_FAILED",
+        entityType: "SERVICE",
+        entityId: serviceProviderId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "SERVICE_NOT_FOUND",
+          roleName: req.user.role,
+          testedBy: currentUserId,
+        },
+      });
       throw new ApiError.notFound("Service Provider not found");
     }
 
     if (envConfig.length !== Number(serviceProvider.keyValueInputNumber)) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "API_CONNECTION_TEST_FAILED",
+        entityType: "SERVICE",
+        entityId: serviceProviderId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "INVALID_ENV_CONFIG_COUNT",
+          roleName: req.user.role,
+          requiredFields: serviceProvider.keyValueInputNumber,
+          providedFields: envConfig.length,
+          testedBy: currentUserId,
+        },
+      });
       throw ApiError.badRequest(
         `${serviceProvider.keyValueInputNumber} Numbers of Filed are required`
       );
@@ -646,6 +1055,23 @@ export class ServiceProviderService {
       serviceProvider.code,
       envConfig
     );
+
+    // Audit log for API connection test
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "API_CONNECTION_TESTED",
+      entityType: "SERVICE",
+      entityId: serviceProviderId,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        serviceName: serviceProvider.name,
+        serviceCode: serviceProvider.code,
+        testSuccess: testResult.success,
+        testMessage: testResult.message,
+        testedBy: currentUserId,
+      },
+    });
 
     return testResult;
   }

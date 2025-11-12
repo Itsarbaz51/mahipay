@@ -64,7 +64,7 @@ class RoleController {
       throw ApiError.badRequest("Role ID is required");
     }
 
-    const role = await RoleServices.getRolebyId(roleId);
+    const role = await RoleServices.getRolebyId(roleId, req.user.id, req, res);
 
     if (!role) {
       throw ApiError.notFound("Role not found");
@@ -104,11 +104,15 @@ class RoleController {
       throw ApiError.forbidden("Cannot create role with equal or lower level");
     }
 
-    const role = await RoleServices.createRole({
-      ...req.body,
-      type,
-      createdBy,
-    });
+    const role = await RoleServices.createRole(
+      {
+        ...req.body,
+        type,
+        createdBy,
+      },
+      req,
+      res
+    );
 
     return res
       .status(201)
@@ -136,6 +140,7 @@ class RoleController {
 
     // Get the existing role to check its level and type
     const existingRole = await RoleServices.getRolebyId(roleId);
+
     if (!existingRole) {
       throw ApiError.notFound("Role not found");
     }
@@ -164,12 +169,17 @@ class RoleController {
       );
     }
 
-    const role = await RoleServices.updateRole(roleId, {
-      ...req.body,
-      updatedBy,
-      // Ensure type remains 'employee'
-      type: "employee",
-    });
+    const role = await RoleServices.updateRole(
+      roleId,
+      {
+        ...req.body,
+        updatedBy,
+        // Ensure type remains 'employee'
+        type: "employee",
+      },
+      req,
+      res
+    );
 
     return res
       .status(200)
@@ -191,7 +201,12 @@ class RoleController {
     }
 
     // Get the existing role to check its level and type
-    const existingRole = await RoleServices.getRolebyId(roleId);
+    const existingRole = await RoleServices.getRolebyId(
+      roleId,
+      req.user.id,
+      req,
+      res
+    );
     if (!existingRole) {
       throw ApiError.notFound("Role not found");
     }
@@ -206,7 +221,7 @@ class RoleController {
       throw ApiError.forbidden("Cannot delete role with equal or lower level");
     }
 
-    const result = await RoleServices.deleteRole(roleId);
+    const result = await RoleServices.deleteRole(roleId, req, res);
 
     if (!result) {
       throw ApiError.notFound("Role not found or delete failed");

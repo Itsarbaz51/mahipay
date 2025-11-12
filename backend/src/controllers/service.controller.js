@@ -25,9 +25,14 @@ class ServiceProviderController {
       }
     }
 
-    const serviceProvider = await ServiceProviderService.create(req.body, {
-      icon: [iconFile],
-    });
+    const serviceProvider = await ServiceProviderService.create(
+      req.body,
+      {
+        icon: [iconFile],
+      },
+      req,
+      res
+    );
 
     return res
       .status(201)
@@ -87,7 +92,9 @@ class ServiceProviderController {
       {
         envConfig,
         subServices,
-      }
+      },
+      req,
+      res
     );
 
     return res
@@ -108,7 +115,11 @@ class ServiceProviderController {
       throw ApiError.badRequest("Service ID is required");
     }
 
-    const result = await ServiceProviderService.toggleServiceStatus(id);
+    const result = await ServiceProviderService.toggleServiceStatus(
+      id,
+      req,
+      res
+    );
 
     return res
       .status(200)
@@ -122,7 +133,11 @@ class ServiceProviderController {
       throw ApiError.badRequest("Api Intigration ID is required");
     }
 
-    const result = await ServiceProviderService.toggleApiIntigrationStatus(id);
+    const result = await ServiceProviderService.toggleApiIntigrationStatus(
+      id,
+      req,
+      res
+    );
 
     return res
       .status(200)
@@ -141,7 +156,9 @@ class ServiceProviderController {
 
     const testResult = await ServiceProviderService.testApiConnection(
       id,
-      envConfig
+      envConfig,
+      req,
+      res
     );
 
     return res

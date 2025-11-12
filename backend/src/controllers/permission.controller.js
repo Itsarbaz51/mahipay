@@ -9,7 +9,11 @@ import { ApiError } from "../utils/ApiError.js";
 export class RolePermissionController {
   static createOrUpdate = asyncHandler(async (req, res) => {
     const permissions =
-      await RolePermissionService.createOrUpdateRolePermission(req.body);
+      await RolePermissionService.createOrUpdateRolePermission(
+        req.body,
+        req,
+        res
+      );
 
     return res
       .status(200)
@@ -37,7 +41,12 @@ export class RolePermissionController {
     if (!serviceId) throw ApiError.badRequest("service id is required");
     if (!roleId) throw ApiError.badRequest("role id is required");
 
-    await RolePermissionService.deleteRolePermission(roleId, serviceId);
+    await RolePermissionService.deleteRolePermission(
+      roleId,
+      serviceId,
+      req,
+      res
+    );
     return res
       .status(200)
       .json(ApiResponse.success({}, "Permission deleted successfully", 200));
@@ -47,7 +56,11 @@ export class RolePermissionController {
 export class UserPermissionController {
   static createOrUpdate = asyncHandler(async (req, res) => {
     const permissions =
-      await UserPermissionService.createOrUpdateUserPermission(req.body);
+      await UserPermissionService.createOrUpdateUserPermission(
+        req.body,
+        req,
+        res
+      );
 
     return res
       .status(200)
@@ -78,7 +91,12 @@ export class UserPermissionController {
     if (!userId) throw ApiError.badRequest("User id is required");
     if (!serviceId) throw ApiError.badRequest("service id is required");
 
-    await UserPermissionService.deleteUserPermission(userId, serviceId);
+    await UserPermissionService.deleteUserPermission(
+      userId,
+      serviceId,
+      req,
+      res
+    );
     return res
       .status(200)
       .json(ApiResponse.success({}, "Permission deleted successfully", 200));
