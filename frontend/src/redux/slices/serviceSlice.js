@@ -148,6 +148,8 @@ export const ApiTesting = (id, payload) => async (dispatch) => {
     dispatch(allServices());
     return data;
   } catch (error) {
+    console.log(error);
+
     const errMsg = error?.response?.data?.message || error?.message;
     dispatch(serviceFail(errMsg));
     throw error;
