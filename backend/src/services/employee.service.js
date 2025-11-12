@@ -357,6 +357,236 @@ class EmployeeServices {
     return updatedUser;
   }
 
+  static async updateProfileImage(employeeId, profileImagePath, req = null) {
+    try {
+      // Find employee with role information
+      const employee = await Prisma.user.findUnique({
+        where: { id: employeeId },
+        include: {
+          role: {
+            select: {
+              id: true,
+              name: true,
+              level: true,
+              description: true,
+              type: true,
+            },
+          },
+        },
+      });
+
+      if (!employee) {
+        throw ApiError.notFound("Employee not found");
+      }
+
+      // Ensure it's an employee user
+      if (employee.role.type !== "employee") {
+        throw ApiError.badRequest("Can only update employee profile images");
+      }
+
+      // Authorization check - only admin or the employee themselves can update
+      const currentUserId = req?.user?.id;
+      const isAdmin = req?.user?.role === "ADMIN";
+      const isUpdatingOwnProfile = employeeId === currentUserId;
+
+      if (!isUpdatingOwnProfile && !isAdmin) {
+        // Check if current user has permission to update employees
+        const canUpdate = await this.checkPermission(
+          currentUserId,
+          "UPDATE_EMPLOYEE"
+        );
+        if (!canUpdate) {
+          throw ApiError.forbidden(
+            "You don't have permission to update this employee's profile image"
+          );
+        }
+      }
+
+      let oldImageDeleted = false;
+      // Delete old profile image if exists
+      if (employee.profileImage) {
+        try {
+          await S3Service.delete({ fileUrl: employee.profileImage });
+          oldImageDeleted = true;
+        } catch (error) {
+          console.error("Failed to delete old profile image", {
+            employeeId,
+            profileImage: employee.profileImage,
+            error,
+          });
+          // Continue with update even if old image deletion fails
+        }
+      }
+
+      // Upload new profile image
+      const profileImageUrl =
+        (await S3Service.upload(profileImagePath, "profile")) ?? "";
+
+      // Update employee profile image
+      const updatedEmployee = await Prisma.user.update({
+        where: { id: employeeId },
+        data: { profileImage: profileImageUrl },
+        include: {
+          role: {
+            select: { id: true, name: true, level: true, description: true },
+          },
+          parent: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              profileImage: true,
+            },
+          },
+          EmployeePermissionsOwned: {
+            where: { isActive: true },
+            select: { permission: true, assignedAt: true },
+          },
+        },
+      });
+
+      return updatedEmployee;
+    } catch (error) {
+      console.error("Employee profile image update error:", error);
+      throw error;
+    } finally {
+      // Clean up temporary file
+      if (profileImagePath) {
+        Helper.deleteOldImage(profileImagePath);
+      }
+    }
+  }
+
+  // PERMANENTLY DELETE EMPLOYEE
+  static async deleteEmployee(
+    employeeId,
+    deletedBy,
+    reason = "No reason provided"
+  ) {
+    try {
+      // Validate inputs
+      if (!employeeId) {
+        throw ApiError.badRequest("Employee ID is required");
+      }
+
+      if (!deletedBy) {
+        throw ApiError.unauthorized("Admin authentication required");
+      }
+
+      // Get employee and admin details
+      const [employee, admin] = await Promise.all([
+        Prisma.user.findUnique({
+          where: { id: employeeId },
+          include: {
+            role: true,
+            EmployeePermissionsOwned: true,
+          },
+        }),
+        Prisma.user.findUnique({
+          where: { id: deletedBy },
+          include: { role: true },
+        }),
+      ]);
+
+      // Validate employee exists
+      if (!employee) {
+        throw ApiError.notFound("Employee not found");
+      }
+
+      // Validate admin privileges
+      if (!admin || admin.role.name !== "ADMIN") {
+        throw ApiError.forbidden(
+          "Only administrators can permanently delete employees"
+        );
+      }
+
+      // Ensure we're only deleting employees
+      if (employee.role.type !== "employee") {
+        throw ApiError.badRequest("Can only delete employee accounts");
+      }
+
+      // Optional: Check if employee has any important relationships
+      // that might need to be handled before deletion
+      const hasSubordinates = await Prisma.user.findFirst({
+        where: { parentId: employeeId },
+      });
+
+      if (hasSubordinates) {
+        throw ApiError.conflict(
+          "Cannot delete employee who has subordinates. Please reassign subordinates first."
+        );
+      }
+
+      // Use transaction for atomic deletion
+      const result = await Prisma.$transaction(async (tx) => {
+        // 1. Delete all employee permissions
+        await tx.employeePermission.deleteMany({
+          where: { userId: employeeId },
+        });
+
+        // 2. Delete profile image from S3 if exists
+        if (employee.profileImage) {
+          try {
+            await S3Service.delete({ fileUrl: employee.profileImage });
+          } catch (s3Error) {
+            console.warn("Failed to delete profile image from S3:", s3Error);
+            // Continue with deletion even if S3 deletion fails
+          }
+        }
+
+        // 3. Permanently delete the employee
+        const deletedEmployee = await tx.user.delete({
+          where: { id: employeeId },
+          include: {
+            role: { select: this.roleSelectFields },
+          },
+        });
+
+        return deletedEmployee;
+      });
+
+      // Create audit log
+      // await this.createAuditLog(deletedBy, "EMPLOYEE_PERMANENTLY_DELETED", employeeId, {
+      //   employeeEmail: employee.email,
+      //   employeeRole: employee.role.name,
+      //   deletionReason: reason,
+      //   deletedAt: new Date().toISOString(),
+      // });
+
+      return {
+        success: true,
+        message: "Employee permanently deleted successfully",
+        deletedEmployee: {
+          id: result.id,
+          email: result.email,
+          username: result.username,
+          role: result.role.name,
+        },
+        deletionDetails: {
+          deletedBy: admin.id,
+          reason: reason,
+          timestamp: new Date(),
+        },
+      };
+    } catch (error) {
+      console.error("Employee deletion error:", error);
+
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      // Handle Prisma errors
+      if (error.code === "P2025") {
+        throw ApiError.notFound("Employee not found or already deleted");
+      }
+
+      throw ApiError.internal("Failed to delete employee permanently");
+    }
+  }
+
   // GET EMPLOYEE BY ID
   static async getEmployeeById(employeeId, currentUser) {
     const user = await Prisma.user.findUnique({
@@ -439,7 +669,7 @@ class EmployeeServices {
     });
 
     const safeUsers = users.map((user) =>
-      this.sanitizeUserData(user, { role: { name: parent.role.name } })
+      this.sanitizeUserData(user, parent.role)
     );
 
     return {
@@ -675,7 +905,7 @@ class EmployeeServices {
   static sanitizeUserData(user, currentUser) {
     const serialized = Helper.serializeUser(user);
 
-    if (currentUser.role.name === "ADMIN") {
+    if (currentUser.role === "ADMIN" || currentUser.name === "ADMIN") {
       if (serialized.password) {
         try {
           serialized.password = CryptoService.decrypt(serialized.password);
@@ -687,7 +917,10 @@ class EmployeeServices {
       return safeData;
     }
 
-    if (currentUser.role.name === "EMPLOYEE" && user.id === currentUser.id) {
+    if (
+      (currentUser.role === "employee" && user.id === currentUser.id) ||
+      (currentUser.name === "ADMIN" && user.id === currentUser.id)
+    ) {
       const { password, transactionPin, refreshToken, ...safeData } =
         serialized;
       return safeData;

@@ -68,7 +68,8 @@ class EmployeeController {
 
     const user = await EmployeeServices.updateProfileImage(
       employeeId,
-      req.file.path
+      req.file.path,
+      req
     );
 
     const safeUser = Helper.serializeUser(user);
@@ -93,16 +94,11 @@ class EmployeeController {
       employeeId,
       currentUser
     );
-    const safeUser = Helper.serializeUser(user);
 
     return res
       .status(200)
       .json(
-        ApiResponse.success(
-          { user: safeUser },
-          "Employee fetched successfully",
-          200
-        )
+        ApiResponse.success({ user }, "Employee fetched successfully", 200)
       );
   });
 

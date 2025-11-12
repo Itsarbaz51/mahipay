@@ -19,8 +19,6 @@ import {
   Building,
   UserCheck,
   Key,
-  CreditCard,
-  Banknote,
 } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { getUserById } from "../../redux/slices/userSlice";
@@ -82,7 +80,7 @@ export default function UserProfileView({
     if (userId) {
       fetchUserData();
     }
-  }, [userId, isEmployee, type, dispatch]); // Added 'type' to dependencies
+  }, [userId, isEmployee, type, dispatch]);
 
   // Fixed data adaptation function
   const adaptUserData = (rawData) => {
@@ -126,16 +124,15 @@ export default function UserProfileView({
         },
 
         // Employee-specific fields
-        employeeId: rawData?.id, // Using user ID as employee ID
-        employeeCode: rawData?.username, // Using username as employee code
+        employeeId: rawData?.id,
+        employeeCode: rawData?.username,
         department: rawData?.role?.name || "Not specified",
         designation: rawData?.role?.name || "Employee",
 
         // Permissions - EmployeePermissionsOwned से लें
         permissions:
-          rawData?.EmployeePermissionsOwned?.filter(
-            (perm) => perm.isActive
-          )?.map((item) => item.permission) || [],
+          rawData?.EmployeePermissionsOwned?.map((item) => item.permission) ||
+          [],
 
         permissionsData: rawData?.EmployeePermissionsOwned || [],
 
@@ -143,6 +140,7 @@ export default function UserProfileView({
         wallets: [],
       };
     } else {
+      // For business users - SIMPLE FORMAT like employees
       return {
         // Common fields
         id: rawData?.id,
@@ -182,8 +180,17 @@ export default function UserProfileView({
         // Bank information
         bankInfo: rawData?.bankInfo,
 
-        // Permissions
-        permissions: rawData?.userPermissions || [],
+        // FIXED: Business user permissions - SIMPLE FORMAT like employees
+        permissions:
+          rawData?.userPermissions?.map(
+            (perm) =>
+              `${perm?.service?.name}${perm?.canView ? "_VIEW" : ""}${
+                perm?.canEdit ? "_EDIT" : ""
+              }${perm?.canSetCommission ? "_COMMISSION" : ""}${
+                perm?.canProcess ? "_PROCESS" : ""
+              }`
+          ) || [],
+
         permissionsData: rawData?.userPermissions || [],
       };
     }
@@ -300,6 +307,68 @@ export default function UserProfileView({
     );
   }
 
+  // Business User Permissions Section
+  const BusinessPermissionsSection = () => {
+    if (isEmployee || !isAdminUser) return null;
+
+    const permissions = adaptedUser?.permissions || [];
+
+    return (
+      <div className={detailCard + " p-6 bg-white shadow-lg rounded-xl"}>
+        <div className="flex items-center justify-between pb-4 border-b border-gray-200 mb-4">
+          <h3
+            className={
+              sectionTitleClass +
+              " flex items-center text-xl font-semibold text-gray-800"
+            }
+          >
+            <Key className="text-cyan-600 mr-2" size={24} />
+            Business User Permissions
+          </h3>
+        </div>
+
+        {permissions?.length > 0 ? (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-base text-gray-600">
+                Total permissions assigned to this user:
+              </p>
+              <span className="inline-flex px-4 py-1.5 bg-cyan-50 text-cyan-700 rounded-full text-base font-bold border border-cyan-200 shadow-sm">
+                {permissions?.length} Permission
+                {permissions?.length > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <h4 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wider">
+              Assigned Permissions
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {permissions?.map((permission, index) => (
+                <div
+                  key={index}
+                  className="bg-gray-50 p-3 rounded-lg border border-gray-200 shadow-sm transition-all hover:bg-cyan-50 hover:border-cyan-300"
+                >
+                  <PermissionBadge permission={permission} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-10 px-6 border-2 border-gray-300 border-dashed rounded-lg bg-gray-50">
+            <Key className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h4 className="text-xl font-semibold text-gray-800 mb-2">
+              No Permissions Assigned
+            </h4>
+            <p className="text-gray-500 text-base max-w-sm mx-auto">
+              This business user currently has no specific permissions. Assign
+              permissions to define their access.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Employee-specific fields
   const EmployeeSpecificInfo = () => {
     if (!isEmployee) return null;
@@ -331,7 +400,7 @@ export default function UserProfileView({
             </div>
           )}
           {adaptedUser?.department && (
-            <div>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <label className="text-xs font-medium text-gray-500 uppercase">
                 Department
               </label>
@@ -341,7 +410,7 @@ export default function UserProfileView({
             </div>
           )}
           {adaptedUser?.designation && (
-            <div>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <label className="text-xs font-medium text-gray-500 uppercase">
                 Designation
               </label>
@@ -417,9 +486,6 @@ export default function UserProfileView({
     );
   };
 
-  // Get appropriate icon based on user type
-  const userTypeIcon = isEmployee ? Building : UserCheck;
-
   // Deactivation/Deletion Info
   const DeactivationInfo = () => {
     if (!adaptedUser?.deletedAt && !adaptedUser?.deactivationReason)
@@ -464,7 +530,11 @@ export default function UserProfileView({
         {/* Sticky Header with Close Button */}
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 rounded-t-3xl p-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <userTypeIcon className="text-cyan-500" size={24} />
+            {isEmployee ? (
+              <Building className="text-cyan-500" size={24} />
+            ) : (
+              <UserCheck className="text-cyan-500" size={24} />
+            )}
             {userTypeLabel} Profile Detail
           </h1>
           <button
@@ -546,8 +616,8 @@ export default function UserProfileView({
                     </span>
                   )}
 
-                  {/* Permissions Count Badge for Employees */}
-                  {isEmployee && isAdminUser && adaptedUser?.permissions && (
+                  {/* Permissions Count Badge */}
+                  {isAdminUser && adaptedUser?.permissions && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-semibold border border-orange-300 transition-all duration-200 hover:bg-orange-200">
                       <Key size={14} /> {adaptedUser?.permissions?.length}{" "}
                       Permissions
@@ -564,17 +634,24 @@ export default function UserProfileView({
           {/* Type Specific Info */}
           {isEmployee && <EmployeeSpecificInfo />}
 
-          {/* Employee Permissions Section */}
-          <EmployeePermissionsSection />
+          {/* Permissions Section */}
+          {isEmployee ? (
+            <EmployeePermissionsSection />
+          ) : (
+            <BusinessPermissionsSection />
+          )}
 
           {/* Quick Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {!isEmployee && (
+            {!isEmployee && adaptedUser?.wallets?.[0] && (
               <StatCard
                 icon={Wallet}
                 title="Current Balance"
                 value={formatCurrency(adaptedUser?.wallets?.[0]?.balance || 0)}
                 color="green"
+                subText={`Available: ${formatCurrency(
+                  adaptedUser?.wallets?.[0]?.availableBalance || 0
+                )}`}
               />
             )}
             <StatCard
