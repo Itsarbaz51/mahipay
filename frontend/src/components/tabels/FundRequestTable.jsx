@@ -17,7 +17,7 @@ import ButtonField from "../ui/ButtonField";
 import HeaderSection from "../ui/HeaderSection";
 import FundRequestForm from "../forms/AddFundRequest";
 import { useSelector } from "react-redux";
-import { useFundPermissions, SERVICES } from "../hooks/useFundPermissions";
+import { usePermissions, SERVICES } from "../hooks/usePermissions";
 
 // Constants
 const STATUS_TYPES = {
@@ -285,7 +285,7 @@ const FundRequestContent = () => {
     useFundRequests();
 
   // Use fund permissions hook
-  const { visibleServices } = useFundPermissions();
+  const { visibleServices } = usePermissions();
 
   const [savedAccounts] = useState([
     {
@@ -650,7 +650,7 @@ const FundRequestContent = () => {
 // Main Component
 const FundRequestTable = () => {
   // Use fund permissions hook at the top level
-  const { isRouteAccessible } = useFundPermissions();
+  const { isRouteAccessible } = usePermissions();
 
   // Conditionally render based on route accessibility
   if (!isRouteAccessible) {

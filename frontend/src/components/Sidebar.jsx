@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
-import { useFundPermissions } from "./hooks/useFundPermissions";
+import { usePermissions } from "./hooks/usePermissions";
 
 // Static business roles
 const STATIC_BUSINESS_ROLES = [
@@ -37,7 +37,7 @@ const Sidebar = () => {
   const { currentUser, isAuthenticated } = useSelector((state) => state.auth);
 
   // Use fund permissions hook
-  const { showAddFund } = useFundPermissions();
+  const { showAddFund } = usePermissions();
 
   const handleLogout = () => {
     dispatch(logout());
