@@ -201,12 +201,7 @@ class RoleController {
     }
 
     // Get the existing role to check its level and type
-    const existingRole = await RoleServices.getRolebyId(
-      roleId,
-      req.user.id,
-      req,
-      res
-    );
+    const existingRole = await RoleServices.getRolebyId(roleId);
     if (!existingRole) {
       throw ApiError.notFound("Role not found");
     }

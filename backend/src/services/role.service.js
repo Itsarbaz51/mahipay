@@ -119,7 +119,7 @@ class RoleServices {
     }
   }
 
-  static async getRolebyId(id, currentUserId = null, req = null, res = null) {
+  static async getRolebyId(id) {
     const role = await Prisma.role.findUnique({
       where: { id },
       include: {
@@ -151,39 +151,8 @@ class RoleServices {
       },
     });
 
-    if (!role) {
-      await AuditLogService.createAuditLog({
-        userId: currentUserId,
-        action: "ROLE_RETRIEVAL_FAILED",
-        entityType: "ROLE",
-        entityId: id,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "ROLE_NOT_FOUND",
-          retrievedBy: currentUserId,
-        },
-      });
-      return null;
-    }
-
-    // Audit log for successful role retrieval
-    await AuditLogService.createAuditLog({
-      userId: currentUserId,
-      action: "ROLE_RETRIEVED",
-      entityType: "ROLE",
-      entityId: id,
-      ipAddress: req ? Helper.getClientIP(req) : null,
-      metadata: {
-        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-        roleName: role.name,
-        roleType: role.type,
-        userCount: role._count.users,
-        permissionCount: role.rolePermissions.length,
-        retrievedBy: currentUserId,
-      },
-    });
-
+ 
+   
     return {
       id: role.id,
       name: role.name,
@@ -504,7 +473,11 @@ class RoleServices {
     return dto;
   }
 
-  static async deleteRole(id, currentUserId = null, req = null, res = null) {
+  static async deleteRole(id, req = null, res = null) {
+    console.log(id);
+    console.log(req.user);
+
+    let currentUserId = req.user.id;
     // Check if role exists
     const existingRole = await Prisma.role.findUnique({
       where: { id },
