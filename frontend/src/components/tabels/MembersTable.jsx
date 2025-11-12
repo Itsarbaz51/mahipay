@@ -337,7 +337,7 @@ const MembersTable = () => {
 
   const handleLogin = async (user) => {
     const payload = {
-      username: user.username.trim(),
+      emailOrUsername: user.username.trim(),
       password: user.password.trim(),
     };
 
