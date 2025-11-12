@@ -100,13 +100,13 @@ export function RoleList({
                       </button>
 
                       {/* Permission Button */}
-                      <button
+                      {/* <button
                         onClick={() => onPermission(role)}
                         className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-cyan-600 hover:to-blue-700 transition-all shadow-sm"
                       >
                         <Shield size={14} />
                         Permission
-                      </button>
+                      </button> */}
 
                       {/* Delete Button */}
                       <button

@@ -187,13 +187,13 @@ const EmployeeTable = () => {
   };
 
   const handleLogin = async (employee) => {
+    const payload = {
+      username: employee.username.trim(),
+      password: employee.password.trim(),
+    };
+
     try {
-      await dispatch(
-        login({
-          username: employee.username,
-          password: employee.password,
-        })
-      );
+      await dispatch(login(payload));
       toast.success(`Logged in as ${employee.firstName}`);
     } catch (error) {
       toast.error("Login failed");
@@ -764,6 +764,7 @@ const EmployeeTable = () => {
           selectedUser={permissionUser}
           existingPermissions={permissionUser.EmployeePermissionsOwned || []}
           isLoading={isLoading}
+          type={"user"}
         />
       )}
     </div>
