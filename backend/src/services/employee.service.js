@@ -112,11 +112,21 @@ class EmployeeServices {
       });
 
       // Audit log
-      // await this.createAuditLog(parentId, "EMPLOYEE_CREATED", user.id, {
-      //   employeeEmail: user.email,
-      //   employeeRole: user.role.name,
-      //   permissionsCount: permissions.length,
-      // });
+      await AuditLogService.createAuditLog({
+        userId: parentId,
+        action: "EMPLOYEE_CREATED",
+        entityType: "EMPLOYEE",
+        entityId: user.id,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          employeeEmail: user.email,
+          employeeRole: user.role.name,
+          permissionsCount: permissions.length,
+          roleName: req?.user?.role,
+          createdBy: parentId,
+        },
+      });
 
       return { user, accessToken };
     } catch (error) {
@@ -142,10 +152,36 @@ class EmployeeServices {
     });
 
     if (!employee) {
+      await AuditLogService.createAuditLog({
+        userId: adminId,
+        action: "EMPLOYEE_PERMISSIONS_UPDATE_FAILED",
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "EMPLOYEE_NOT_FOUND",
+          roleName: req?.user?.roleres,
+          updatedBy: adminId,
+        },
+      });
       throw ApiError.notFound("Employee not found");
     }
 
     if (!Array.isArray(permissions)) {
+      await AuditLogService.createAuditLog({
+        userId: adminId,
+        action: "EMPLOYEE_PERMISSIONS_UPDATE_FAILED",
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "INVALID_PERMISSIONS_FORMAT",
+          roleName: req?.user?.roleres,
+          updatedBy: adminId,
+        },
+      });
       throw ApiError.badRequest("Permissions must be an array");
     }
 
@@ -229,14 +265,25 @@ class EmployeeServices {
     });
 
     // Create audit log
-    // await this.createAuditLog(adminId, actionType, employeeId, {
-    //   employeeEmail: employee.email,
-    //   activated: permissionsToActivate,
-    //   deactivated: permissionsToDeactivate,
-    //   created: permissionsToCreate,
-    //   finalPermissions: normalizedPermissions,
-    //   totalPermissions: normalizedPermissions.length,
-    // });
+    await AuditLogService.createAuditLog({
+      userId: adminId,
+      action: actionType,
+      entityType: "EMPLOYEE",
+      entityId: employeeId,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        employeeEmail: employee.email,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        activated: permissionsToActivate,
+        deactivated: permissionsToDeactivate,
+        created: permissionsToCreate,
+        finalPermissions: normalizedPermissions,
+        totalPermissions: normalizedPermissions.length,
+        roleName: req?.user?.roleres,
+        updatedBy: adminId,
+      },
+    });
 
     // Get updated permissions for response
     const updatedPermissions = await this.getEmployeePermissions(employeeId);
@@ -300,12 +347,55 @@ class EmployeeServices {
       }),
     ]);
 
-    if (!currentUser) throw ApiError.unauthorized("Current user not found");
-    if (!userToUpdate) throw ApiError.notFound("Employee not found");
-    if (userToUpdate.role.type !== "employee") {
-      throw ApiError.badRequest("Can only update employees");
+    if (!currentUser) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "EMPLOYEE_PROFILE_UPDATE_FAILED",
+        entityType: "EMPLOYEE",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "CURRENT_USER_NOT_FOUND",
+          roleName: req?.user?.role,
+          updatedBy: currentUserId,
+        },
+      });
+      throw ApiError.unauthorized("Current user not found");
+    }
+    if (!userToUpdate) {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "EMPLOYEE_PROFILE_UPDATE_FAILED",
+        entityType: "EMPLOYEE",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "EMPLOYEE_NOT_FOUND",
+          roleName: req?.user?.role,
+          updatedBy: currentUserId,
+        },
+      });
+      throw ApiError.notFound("Employee not found");
     }
 
+    if (userToUpdate.role.type !== "employee") {
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "EMPLOYEE_PROFILE_UPDATE_FAILED",
+        entityType: "EMPLOYEE",
+        entityId: userId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "NOT_AN_EMPLOYEE",
+          roleName: req?.user?.role,
+          updatedBy: currentUserId,
+        },
+      });
+      throw ApiError.badRequest("Can only update employees");
+    }
     // Authorization check
     await this.authorizeEmployeeUpdate(
       currentUser,
@@ -344,16 +434,21 @@ class EmployeeServices {
       await this.regenerateCredentialsAndNotify(userId, email);
     }
 
-    // await this.createAuditLog(
-    //   currentUserId,
-    //   "EMPLOYEE_PROFILE_UPDATE",
-    //   userId,
-    //   {
-    //     updatedFields: Object.keys(updateData),
-    //     emailChanged: !!email,
-    //   }
-    // );
-
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "EMPLOYEE_PROFILE_UPDATED",
+      entityType: "EMPLOYEE",
+      entityId: userId,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        updatedFields: Object.keys(updateData),
+        emailChanged: !!email,
+        roleChanged: !!roleId,
+        roleName: req?.user?.role,
+        updatedBy: currentUserId,
+      },
+    });
     return updatedUser;
   }
 
@@ -376,14 +471,38 @@ class EmployeeServices {
       });
 
       if (!employee) {
+        await AuditLogService.createAuditLog({
+          userId: req?.user?.id,
+          action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
+          entityType: "EMPLOYEE",
+          entityId: employeeId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "EMPLOYEE_NOT_FOUND",
+            roleName: req?.user?.role,
+            updatedBy: req?.user?.id,
+          },
+        });
         throw ApiError.notFound("Employee not found");
       }
-
       // Ensure it's an employee user
       if (employee.role.type !== "employee") {
+        await AuditLogService.createAuditLog({
+          userId: req?.user?.id,
+          action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
+          entityType: "EMPLOYEE",
+          entityId: employeeId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_EMPLOYEE_USER",
+            roleName: req?.user?.role,
+            updatedBy: req?.user?.id,
+          },
+        });
         throw ApiError.badRequest("Can only update employee profile images");
       }
-
       // Authorization check - only admin or the employee themselves can update
       const currentUserId = req?.user?.id;
       const isAdmin = req?.user?.role === "ADMIN";
@@ -396,6 +515,19 @@ class EmployeeServices {
           "UPDATE_EMPLOYEE"
         );
         if (!canUpdate) {
+          await AuditLogService.createAuditLog({
+            userId: currentUserId,
+            action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
+            entityType: "EMPLOYEE",
+            entityId: employeeId,
+            ipAddress: req ? Helper.getClientIP(req) : null,
+            metadata: {
+              ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+              reason: "INSUFFICIENT_PERMISSIONS",
+              roleName: req?.user?.role,
+              updatedBy: currentUserId,
+            },
+          });
           throw ApiError.forbidden(
             "You don't have permission to update this employee's profile image"
           );
@@ -448,8 +580,37 @@ class EmployeeServices {
         },
       });
 
+      // Audit log for successful profile image update
+      await AuditLogService.createAuditLog({
+        userId: currentUserId,
+        action: "EMPLOYEE_PROFILE_IMAGE_UPDATED",
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          oldImageDeleted: oldImageDeleted,
+          isOwnProfile: isUpdatingOwnProfile,
+          roleName: req?.user?.role,
+          updatedBy: currentUserId,
+        },
+      });
+
       return updatedEmployee;
     } catch (error) {
+      await AuditLogService.createAuditLog({
+        userId: req?.user?.id,
+        action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: error.message,
+          roleName: req?.user?.role,
+          updatedBy: req?.user?.id,
+        },
+      });
       console.error("Employee profile image update error:", error);
       throw error;
     } finally {
@@ -493,18 +654,56 @@ class EmployeeServices {
 
       // Validate employee exists
       if (!employee) {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "EMPLOYEE_DELETION_FAILED",
+          entityType: "EMPLOYEE",
+          entityId: employeeId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "EMPLOYEE_NOT_FOUND",
+            roleName: req?.user?.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.notFound("Employee not found");
       }
 
       // Validate admin privileges
       if (!admin || admin.role.name !== "ADMIN") {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "EMPLOYEE_DELETION_FAILED",
+          entityType: "EMPLOYEE",
+          entityId: employeeId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_ADMIN_DELETION",
+            roleName: req?.user?.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.forbidden(
           "Only administrators can permanently delete employees"
         );
       }
-
       // Ensure we're only deleting employees
       if (employee.role.type !== "employee") {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "EMPLOYEE_DELETION_FAILED",
+          entityType: "EMPLOYEE",
+          entityId: employeeId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "NON_EMPLOYEE_DELETION",
+            roleName: req?.user?.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.badRequest("Can only delete employee accounts");
       }
 
@@ -515,6 +714,19 @@ class EmployeeServices {
       });
 
       if (hasSubordinates) {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "EMPLOYEE_DELETION_FAILED",
+          entityType: "EMPLOYEE",
+          entityId: employeeId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "EMPLOYEE_HAS_SUBORDINATES",
+            roleName: req?.user?.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.conflict(
           "Cannot delete employee who has subordinates. Please reassign subordinates first."
         );
@@ -549,13 +761,21 @@ class EmployeeServices {
       });
 
       // Create audit log
-      // await this.createAuditLog(deletedBy, "EMPLOYEE_PERMANENTLY_DELETED", employeeId, {
-      //   employeeEmail: employee.email,
-      //   employeeRole: employee.role.name,
-      //   deletionReason: reason,
-      //   deletedAt: new Date().toISOString(),
-      // });
-
+      await AuditLogService.createAuditLog({
+        userId: deletedBy,
+        action: "EMPLOYEE_PERMANENTLY_DELETED",
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          employeeEmail: employee.email,
+          employeeRole: employee.role.name,
+          deletionReason: reason,
+          roleName: req?.user?.role,
+          deletedBy: deletedBy,
+        },
+      });
       return {
         success: true,
         message: "Employee permanently deleted successfully",
@@ -579,10 +799,38 @@ class EmployeeServices {
       }
 
       // Handle Prisma errors
+      // Handle Prisma errors
       if (error.code === "P2025") {
+        await AuditLogService.createAuditLog({
+          userId: deletedBy,
+          action: "EMPLOYEE_DELETION_FAILED",
+          entityType: "EMPLOYEE",
+          entityId: employeeId,
+          ipAddress: req ? Helper.getClientIP(req) : null,
+          metadata: {
+            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+            reason: "EMPLOYEE_NOT_FOUND_OR_ALREADY_DELETED",
+            roleName: req?.user?.role,
+            deletedBy: deletedBy,
+          },
+        });
         throw ApiError.notFound("Employee not found or already deleted");
       }
 
+      await AuditLogService.createAuditLog({
+        userId: deletedBy,
+        action: "EMPLOYEE_DELETION_FAILED",
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNKNOWN_ERROR",
+          error: error.message,
+          roleName: req?.user?.role,
+          deletedBy: deletedBy,
+        },
+      });
       throw ApiError.internal("Failed to delete employee permanently");
     }
   }
@@ -947,19 +1195,76 @@ class EmployeeServices {
       }),
     ]);
 
-    if (!user) throw ApiError.notFound("Employee not found");
+    if (!user) {
+      await AuditLogService.createAuditLog({
+        userId: changedBy,
+        action: `${action}_FAILED`,
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "EMPLOYEE_NOT_FOUND",
+          roleName: req?.user?.role,
+          changedBy: changedBy,
+        },
+      });
+      throw ApiError.notFound("Employee not found");
+    }
+
     if (user.role.type !== "employee") {
+      await AuditLogService.createAuditLog({
+        userId: changedBy,
+        action: `${action}_FAILED`,
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "NOT_AN_EMPLOYEE",
+          roleName: req?.user?.role,
+          changedBy: changedBy,
+        },
+      });
       throw ApiError.badRequest(
         `Can only ${action.toLowerCase().split("_")[1]} employees`
       );
     }
     if (!changer || changer.role.name !== "ADMIN") {
+      await AuditLogService.createAuditLog({
+        userId: changedBy,
+        action: `${action}_FAILED`,
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "UNAUTHORIZED",
+          roleName: req?.user?.role,
+          changedBy: changedBy,
+        },
+      });
       throw ApiError.forbidden(
         `Only administrators can ${action.toLowerCase().split("_")[1]} employees`
       );
     }
 
     if (user.status === status) {
+      await AuditLogService.createAuditLog({
+        userId: changedBy,
+        action: `${action}_FAILED`,
+        entityType: "EMPLOYEE",
+        entityId: employeeId,
+        ipAddress: req ? Helper.getClientIP(req) : null,
+        metadata: {
+          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+          reason: "ALREADY_IN_STATE",
+          currentStatus: user.status,
+          attemptedStatus: status,
+          roleName: req?.user?.role,
+          changedBy: changedBy,
+        },
+      });
       throw ApiError.badRequest(
         `Employee is already ${status === "ACTIVE" ? "active" : "deactivated"}`
       );
@@ -978,11 +1283,21 @@ class EmployeeServices {
       },
     });
 
-    // await this.createAuditLog(changedBy, action, employeeId, {
-    //   previousStatus: user.status,
-    //   newStatus: status,
-    //   reason: reason || "No reason provided",
-    // });
+    await AuditLogService.createAuditLog({
+      userId: changedBy,
+      action: action,
+      entityType: "EMPLOYEE",
+      entityId: employeeId,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        previousStatus: user.status,
+        newStatus: status,
+        reason: reason || "No reason provided",
+        roleName: req?.user?.role,
+        changedBy: changedBy,
+      },
+    });
 
     return updatedUser;
   }
@@ -1014,6 +1329,21 @@ class EmployeeServices {
         permissions: permissions,
       }
     );
+
+    // Audit log for credential regeneration
+    await AuditLogService.createAuditLog({
+      userId: currentUserId,
+      action: "EMPLOYEE_CREDENTIALS_REGENERATED",
+      entityType: "EMPLOYEE",
+      entityId: userId,
+      ipAddress: req ? Helper.getClientIP(req) : null,
+      metadata: {
+        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
+        newEmail: newEmail,
+        roleName: req?.user?.role,
+        regeneratedBy: currentUserId,
+      },
+    });
 
     return user;
   }

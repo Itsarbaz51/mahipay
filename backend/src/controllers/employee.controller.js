@@ -17,7 +17,11 @@ class EmployeeController {
       parentId: adminId,
     };
 
-    const { user, accessToken } = await EmployeeServices.register(data);
+    const { user, accessToken } = await EmployeeServices.register(
+      data,
+      req,
+      res
+    );
 
     const safeUser = Helper.serializeUser(user);
 
@@ -47,7 +51,7 @@ class EmployeeController {
       currentUserId
     );
 
-    const safeUser = Helper.serializeUser(user);
+    const safeUser = Helper.serializeUser(userreq, req, res);
 
     return res
       .status(200)
@@ -72,7 +76,7 @@ class EmployeeController {
       req
     );
 
-    const safeUser = Helper.serializeUser(user);
+    const safeUser = Helper.serializeUser(user, req, res);
 
     return res
       .status(200)
@@ -115,7 +119,9 @@ class EmployeeController {
     const result = await EmployeeServices.updateEmployeePermissions(
       employeeId,
       permissions,
-      adminId
+      adminId,
+      req,
+      res
     );
 
     return res
@@ -192,7 +198,9 @@ class EmployeeController {
     const user = await EmployeeServices.deactivateEmployee(
       employeeId,
       deactivatedBy,
-      reason
+      reason,
+      req,
+      res
     );
 
     const safeUser = Helper.serializeUser(user);
@@ -217,7 +225,9 @@ class EmployeeController {
     const user = await EmployeeServices.reactivateEmployee(
       employeeId,
       reactivatedBy,
-      reason
+      reason,
+      req,
+      res
     );
 
     const safeUser = Helper.serializeUser(user);
@@ -239,7 +249,13 @@ class EmployeeController {
     const deletedBy = req.user?.id;
     const { reason } = req.body;
 
-    await EmployeeServices.deleteEmployee(employeeId, deletedBy, reason);
+    await EmployeeServices.deleteEmployee(
+      employeeId,
+      deletedBy,
+      reason,
+      req,
+      res
+    );
 
     return res
       .status(200)
