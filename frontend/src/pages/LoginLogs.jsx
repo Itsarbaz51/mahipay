@@ -40,14 +40,22 @@ const LoginLogs = () => {
 
   // Redux data
   const { logsList = {}, loading } = useSelector((state) => state.logs);
+  const { currentUser } = useSelector((state) => state.auth);
+
+  const isAdmin = useMemo(
+    () => currentUser.role?.name === "ADMIN",
+    [currentUser]
+  );
   const pagination = logsList?.pagination;
   const summary = logsList?.summary || {};
 
   const roles = useSelector((state) => state?.roles?.roles || []);
 
   useEffect(() => {
-    dispatch(getAllRoles());
-  }, [dispatch]);
+    if (isAdmin) {
+      dispatch(getAllRoles());
+    }
+  }, [dispatch, isAdmin]);
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
@@ -397,53 +405,54 @@ const LoginLogs = () => {
             </div>
 
             {/* Role Filter */}
-            <div className="relative">
-              <button
-                onClick={() => setRoleFilterOpen(!roleFilterOpen)}
-                className="inline-flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
-              >
-                <User className="h-4 w-4" />
-                Role
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${
-                    roleFilterOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-              {roleFilterOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
-                  <div className="p-2">
-                    <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">
-                      User Role
-                    </div>
-                    <button
-                      onClick={() => handleRoleFilterChange("all")}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedRole === "all"
-                          ? "bg-blue-50 text-blue-700 font-medium"
-                          : "text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      All Roles
-                    </button>
-                    {roles.map((role) => (
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  onClick={() => setRoleFilterOpen(!roleFilterOpen)}
+                  className="inline-flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+                >
+                  <User className="h-4 w-4" />
+                  Role
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      roleFilterOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {roleFilterOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
+                    <div className="p-2">
+                      <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">
+                        User Role
+                      </div>
                       <button
-                        key={role.id}
-                        onClick={() => handleRoleFilterChange(role.id)}
+                        onClick={() => handleRoleFilterChange("all")}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                          selectedRole === role.id
+                          selectedRole === "all"
                             ? "bg-blue-50 text-blue-700 font-medium"
                             : "text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        {role.name}
+                        All Roles
                       </button>
-                    ))}
+                      {roles.map((role) => (
+                        <button
+                          key={role.id}
+                          onClick={() => handleRoleFilterChange(role.id)}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                            selectedRole === role.id
+                              ? "bg-blue-50 text-blue-700 font-medium"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {role.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-
+                )}
+              </div>
+            )}
             {/* Sort */}
             <div className="relative">
               <button
@@ -511,65 +520,6 @@ const LoginLogs = () => {
             </button>
           </div>
         </div>
-
-        {/* Active Filters */}
-        {(selectedDevice !== "all" ||
-          selectedRole !== "all" ||
-          selectedSortBy !== "createdAt" ||
-          selectedSort !== "desc" ||
-          searchTerm) && (
-          <div className="px-6 py-3 border-b border-slate-200 bg-blue-50">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-slate-600">Active filters:</span>
-              {selectedDevice !== "all" && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
-                  Device: {selectedDevice}
-                  <button
-                    onClick={() => handleDeviceFilterChange("all")}
-                    className="hover:text-blue-900"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {selectedRole !== "all" && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
-                  Role:{" "}
-                  {roles.find((r) => r.id === selectedRole)?.name ||
-                    selectedRole}
-                  <button
-                    onClick={() => handleRoleFilterChange("all")}
-                    className="hover:text-blue-900"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {(selectedSortBy !== "createdAt" || selectedSort !== "desc") && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
-                  Sort: {getSortLabel()}
-                  <button
-                    onClick={() => handleSortChange("desc", "createdAt")}
-                    className="hover:text-blue-900"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {searchTerm && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
-                  Search: {searchTerm}
-                  <button
-                    onClick={() => setSearchTerm("")}
-                    className="hover:text-blue-900"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Table */}
         <div className="overflow-x-auto">

@@ -168,16 +168,16 @@ class UserServices {
         roleLevel: user.role.level,
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: user.id,
-          action: "BUSINESS_USER_REGISTER",
-          metadata: {
-            role: user.role.name,
-            createdBy: parentId,
-          },
-        },
-      });
+      // await Prisma.auditLog.create({
+      //   data: {
+      //     userId: user.id,
+      //     action: "BUSINESS_USER_REGISTER",
+      //     metadata: {
+      //       role: user.role.name,
+      //       createdBy: parentId,
+      //     },
+      //   },
+      // });
 
       return { user, accessToken };
     } catch (err) {
@@ -331,20 +331,20 @@ class UserServices {
       await this.regenerateCredentialsAndNotify(userId, email);
     }
 
-    await Prisma.auditLog.create({
-      data: {
-        userId: currentUserId,
-        action: "BUSINESS_PROFILE_UPDATE",
-        entityType: "User",
-        entityId: userId,
-        metadata: {
-          updatedFields: Object.keys(updateData),
-          emailChanged: isEmailChanged,
-          isAdmin: isAdmin,
-          isOwnProfile: isUpdatingOwnProfile,
-        },
-      },
-    });
+    // await Prisma.auditLog.create({
+    //   data: {
+    //     userId: currentUserId,
+    //     action: "BUSINESS_PROFILE_UPDATE",
+    //     entityType: "User",
+    //     entityId: userId,
+    //     metadata: {
+    //       updatedFields: Object.keys(updateData),
+    //       emailChanged: isEmailChanged,
+    //       isAdmin: isAdmin,
+    //       isOwnProfile: isUpdatingOwnProfile,
+    //     },
+    //   },
+    // });
 
     return updatedUser;
   }
@@ -429,13 +429,13 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId,
-          action: "BUSINESS_PROFILE_IMAGE_UPDATE",
-          metadata: { newImage: profileImageUrl },
-        },
-      });
+      // await Prisma.auditLog.create({
+      //   data: {
+      //     userId,
+      //     action: "BUSINESS_PROFILE_IMAGE_UPDATE",
+      //     metadata: { newImage: profileImageUrl },
+      //   },
+      // });
 
       return updatedUser;
     } finally {
@@ -939,21 +939,21 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: deactivatedBy,
-          action: "BUSINESS_USER_DEACTIVATE",
-          entityType: "User",
-          metadata: {
-            previousStatus: user.status,
-            newStatus: "IN_ACTIVE",
-            reason: reason || "No reason provided",
-            deactivatedBy,
-            timestamp: new Date().toISOString(),
-            targetUserId: userId,
-          },
-        },
-      });
+      // await Prisma.auditLog.create({
+      //   data: {
+      //     userId: deactivatedBy,
+      //     action: "BUSINESS_USER_DEACTIVATE",
+      //     entityType: "User",
+      //     metadata: {
+      //       previousStatus: user.status,
+      //       newStatus: "IN_ACTIVE",
+      //       reason: reason || "No reason provided",
+      //       deactivatedBy,
+      //       timestamp: new Date().toISOString(),
+      //       targetUserId: userId,
+      //     },
+      //   },
+      // });
 
       return updatedUser;
     } catch (error) {
@@ -1053,21 +1053,21 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: reactivatedBy,
-          action: "BUSINESS_USER_REACTIVATE",
-          entityType: "User",
-          metadata: {
-            previousStatus: user.status,
-            newStatus: "ACTIVE",
-            reason: reason || "No reason provided",
-            reactivatedBy,
-            timestamp: new Date().toISOString(),
-            targetUserId: userId,
-          },
-        },
-      });
+      // await Prisma.auditLog.create({
+      //   data: {
+      //     userId: reactivatedBy,
+      //     action: "BUSINESS_USER_REACTIVATE",
+      //     entityType: "User",
+      //     metadata: {
+      //       previousStatus: user.status,
+      //       newStatus: "ACTIVE",
+      //       reason: reason || "No reason provided",
+      //       reactivatedBy,
+      //       timestamp: new Date().toISOString(),
+      //       targetUserId: userId,
+      //     },
+      //   },
+      // });
 
       return updatedUser;
     } catch (error) {
@@ -1155,21 +1155,21 @@ class UserServices {
         },
       });
 
-      await Prisma.auditLog.create({
-        data: {
-          userId: deletedBy,
-          action: "BUSINESS_USER_DELETE",
-          entityType: "User",
-          metadata: {
-            previousStatus: user.status,
-            newStatus: "DELETE",
-            reason: reason || "No reason provided",
-            deletedBy,
-            timestamp: new Date().toISOString(),
-            targetUserId: userId,
-          },
-        },
-      });
+      // await Prisma.auditLog.create({
+      //   data: {
+      //     userId: deletedBy,
+      //     action: "BUSINESS_USER_DELETE",
+      //     entityType: "User",
+      //     metadata: {
+      //       previousStatus: user.status,
+      //       newStatus: "DELETE",
+      //       reason: reason || "No reason provided",
+      //       deletedBy,
+      //       timestamp: new Date().toISOString(),
+      //       targetUserId: userId,
+      //     },
+      //   },
+      // });
 
       return updatedUser;
     } catch (error) {
@@ -1216,16 +1216,16 @@ class UserServices {
         "business"
       );
 
-      await Prisma.auditLog.create({
-        data: {
-          userId,
-          action: "BUSINESS_CREDENTIALS_REGENERATED",
-          metadata: {
-            reason: "EMAIL_UPDATED",
-            newEmail: newEmail,
-          },
-        },
-      });
+      // await Prisma.auditLog.create({
+      //   data: {
+      //     userId,
+      //     action: "BUSINESS_CREDENTIALS_REGENERATED",
+      //     metadata: {
+      //       reason: "EMAIL_UPDATED",
+      //       newEmail: newEmail,
+      //     },
+      //   },
+      // });
 
       return user;
     } catch (error) {

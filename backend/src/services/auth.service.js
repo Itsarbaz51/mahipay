@@ -418,9 +418,9 @@ class AuthServices {
       }
     }
 
-    await Prisma.auditLog.create({
-      data: { userId, action: "LOGOUT", metadata: {} },
-    });
+    // await Prisma.auditLog.create({
+    //   data: { userId, action: "LOGOUT", metadata: {} },
+    // });
   }
 
   static async refreshToken(refreshToken) {
@@ -493,9 +493,9 @@ class AuthServices {
       data: { refreshToken: newRefreshToken },
     });
 
-    await Prisma.auditLog.create({
-      data: { userId: user.id, action: "REFRESH_TOKEN", metadata: {} },
-    });
+    // await Prisma.auditLog.create({
+    //   data: { userId: user.id, action: "REFRESH_TOKEN", metadata: {} },
+    // });
 
     return {
       accessToken: newAccessToken,
@@ -818,22 +818,22 @@ class AuthServices {
       data: updateData,
     });
 
-    await Prisma.auditLog.create({
-      data: {
-        userId: requestedBy || userId,
-        action: "UPDATE_CREDENTIALS",
-        metadata: {
-          updatedFields: [
-            ...(credentialsData.newPassword ? ["password"] : []),
-            ...(credentialsData.newTransactionPin ? ["transactionPin"] : []),
-          ],
-          isOwnUpdate: isOwnUpdate,
-          updatedBy: requestedBy,
-          targetUserId: userId,
-          userType: user.role.type,
-        },
-      },
-    });
+    // await Prisma.auditLog.create({
+    //   data: {
+    //     userId: requestedBy || userId,
+    //     action: "UPDATE_CREDENTIALS",
+    //     metadata: {
+    //       updatedFields: [
+    //         ...(credentialsData.newPassword ? ["password"] : []),
+    //         ...(credentialsData.newTransactionPin ? ["transactionPin"] : []),
+    //       ],
+    //       isOwnUpdate: isOwnUpdate,
+    //       updatedBy: requestedBy,
+    //       targetUserId: userId,
+    //       userType: user.role.type,
+    //     },
+    //   },
+    // });
 
     return { message: "Credentials updated successfully" };
   }
