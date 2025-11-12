@@ -17,6 +17,7 @@ import ButtonField from "../ui/ButtonField";
 import HeaderSection from "../ui/HeaderSection";
 import FundRequestForm from "../forms/AddFundRequest";
 import { useSelector } from "react-redux";
+import { useFundPermissions, SERVICES } from "../hooks/useFundPermissions";
 
 // Constants
 const STATUS_TYPES = {
@@ -135,14 +136,19 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// Search and Filter Component
+// Search and Filter Component - UPDATED
 const SearchFilterBar = ({
   searchTerm,
   onSearchChange,
   onRefresh,
   showPaymentButtons,
   onMethodSelect,
+  visibleServices, // NEW: Pass visible services
 }) => {
+  // Show payment buttons only if user has at least one service
+  const shouldShowPaymentButtons =
+    showPaymentButtons && visibleServices.length > 0;
+
   return (
     <div className="flex flex-col sm:flex-row items-center gap-4">
       <div className="relative flex-1 max-w-md">
@@ -164,22 +170,28 @@ const SearchFilterBar = ({
         Refresh
       </button>
 
-      {showPaymentButtons && (
+      {shouldShowPaymentButtons && (
         <div className="grid grid-cols-2 gap-2">
-          <ButtonField
-            isOpen={() => onMethodSelect(PAYMENT_METHODS.RAZORPAY)}
-            name="Razorpay"
-            icon={CreditCard}
-            type="button"
-            className="min-w-[120px]"
-          />
-          <ButtonField
-            isOpen={() => onMethodSelect(PAYMENT_METHODS.BANK_TRANSFER)}
-            name="Bank Transfer"
-            icon={Landmark}
-            type="button"
-            className="min-w-[120px]"
-          />
+          {/* Show Razorpay button only if service is available */}
+          {visibleServices.includes(SERVICES.RAZORPAY) && (
+            <ButtonField
+              isOpen={() => onMethodSelect(PAYMENT_METHODS.RAZORPAY)}
+              name="Razorpay"
+              icon={CreditCard}
+              type="button"
+              className="min-w-[120px]"
+            />
+          )}
+          {/* Show Bank Transfer button only if service is available */}
+          {visibleServices.includes(SERVICES.BANK_TRANSFER) && (
+            <ButtonField
+              isOpen={() => onMethodSelect(PAYMENT_METHODS.BANK_TRANSFER)}
+              name="Bank Transfer"
+              icon={Landmark}
+              type="button"
+              className="min-w-[120px]"
+            />
+          )}
         </div>
       )}
     </div>
@@ -242,7 +254,25 @@ const ActionButtons = ({
   );
 };
 
-const FundRequestTable = () => {
+// Permission Denied Component
+const PermissionDeniedView = () => {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-700 mb-2">
+          Permission Denied
+        </h2>
+        <p className="text-gray-500">
+          You don't have permission to access fund services.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Main Fund Request Content Component
+const FundRequestContent = () => {
   const [step, setStep] = useState("select-method");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -253,6 +283,9 @@ const FundRequestTable = () => {
   const { currentUser } = useSelector((state) => state.auth);
   const { fundRequests, addFundRequest, updateRequestStatus } =
     useFundRequests();
+
+  // Use fund permissions hook
+  const { visibleServices } = useFundPermissions();
 
   const [savedAccounts] = useState([
     {
@@ -473,6 +506,12 @@ const FundRequestTable = () => {
                   ? "Manage and review fund requests from users"
                   : "Add funds to your account using secure payment methods"}
               </p>
+              {/* Show available services info */}
+              {!isAdmin && (
+                <div className="mt-2 text-sm text-gray-500">
+                  Available services: {visibleServices.join(", ")}
+                </div>
+              )}
             </div>
 
             <SearchFilterBar
@@ -481,6 +520,7 @@ const FundRequestTable = () => {
               onRefresh={() => window.location.reload()}
               showPaymentButtons={!isAdmin && step === "select-method"}
               onMethodSelect={handleMethodSelect}
+              visibleServices={visibleServices} // Pass visible services
             />
           </div>
         </div>
@@ -605,6 +645,19 @@ const FundRequestTable = () => {
       )}
     </div>
   );
+};
+
+// Main Component
+const FundRequestTable = () => {
+  // Use fund permissions hook at the top level
+  const { isRouteAccessible } = useFundPermissions();
+
+  // Conditionally render based on route accessibility
+  if (!isRouteAccessible) {
+    return <PermissionDeniedView />;
+  }
+
+  return <FundRequestContent />;
 };
 
 export default FundRequestTable;

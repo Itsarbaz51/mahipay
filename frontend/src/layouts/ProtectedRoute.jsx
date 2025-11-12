@@ -1,7 +1,14 @@
 import { useSelector } from "react-redux";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ROUTE_CONFIG, RouteUtils } from "./hooks/usePermissionMonitor";
+import {
+  ROUTE_CONFIG,
+  RouteUtils,
+} from "../components/hooks/usePermissionMonitor";
 import { useEffect, useRef } from "react";
+import {
+  ROUTE_SERVICE_MAP,
+  useFundPermissions,
+} from "../components/hooks/useFundPermissions";
 
 // Authentication and authorization hooks for better reusability
 const useAuth = () => {
@@ -87,6 +94,9 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, currentUser, currentPath, location } = useAuth();
   const { role, isStaticBusinessRole, isEmployee } = useUserRole(currentUser);
 
+  // Use fund permissions hook for route protection - pass currentPath
+  const { isRouteAccessible } = useFundPermissions(currentPath);
+
   // Use auto-redirect hook
   useAutoRedirect(currentUser, isEmployee, currentPath, isAuthenticated);
 
@@ -98,6 +108,13 @@ const ProtectedRoute = ({ children }) => {
   // Authentication check
   if (!isAuthenticated || !currentUser) {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  // Check if current route requires specific services
+  const routeRequiresServices =
+    Object.keys(ROUTE_SERVICE_MAP).includes(currentPath);
+  if (routeRequiresServices && !isRouteAccessible) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   // NEW: Prevent access to permission-denied if user has valid permissions
