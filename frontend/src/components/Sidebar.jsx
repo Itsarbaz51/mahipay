@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/slices/authSlice";
+import { useFundPermissions } from "./hooks/useFundPermissions";
 
 // Static business roles
 const STATIC_BUSINESS_ROLES = [
@@ -33,9 +34,10 @@ const STATIC_BUSINESS_ROLES = [
 const Sidebar = () => {
   const location = useLocation();
   const dispatch = useDispatch();
-
-  // Get current user from Redux store
   const { currentUser, isAuthenticated } = useSelector((state) => state.auth);
+
+  // Use fund permissions hook
+  const { showAddFund } = useFundPermissions();
 
   const handleLogout = () => {
     dispatch(logout());
@@ -59,6 +61,7 @@ const Sidebar = () => {
       path: "/request-fund",
       permission: "fund request",
       staticRoles: STATIC_BUSINESS_ROLES,
+      // This item will be conditionally shown based on showAddFund
     },
     {
       id: "members",
@@ -151,10 +154,8 @@ const Sidebar = () => {
   const roleType = userData.role?.type || "business";
 
   // FIXED: Extract employee permissions correctly from userPermissions array
-  // Your data shows userPermissions is an array of strings: ["transactions"]
   const userPermissions = (userData.userPermissions || [])
     .map((perm) => {
-      // Handle both string and object formats
       if (typeof perm === "string") {
         return perm.toLowerCase().trim();
       } else if (perm && typeof perm === "object") {
@@ -166,23 +167,26 @@ const Sidebar = () => {
 
   // Filter menu items based on user role and permissions
   const filteredMenuItems = baseMenuItems.filter((item) => {
+    // Hide "Add Fund" menu if user doesn't have any payment service permissions
+    if (item.id === "add-fund" && !showAddFund) {
+      return false;
+    }
+
     // For static business roles
     if (STATIC_BUSINESS_ROLES.includes(role)) {
       return item.staticRoles.includes(role);
     }
     // For dynamic employee roles
     else if (roleType === "employee") {
-      // FIXED: Check if the employee has this permission
       const hasPermission = userPermissions.includes(
         item.permission.toLowerCase()
       );
-
       return hasPermission;
     }
     return false;
   });
 
-  // Group menu items by category for better organization
+  // Rest of your sidebar component remains the same...
   const mainItems = filteredMenuItems.filter((item) =>
     ["dashboard", "add-fund", "members", "commission", "transactions"].includes(
       item.id

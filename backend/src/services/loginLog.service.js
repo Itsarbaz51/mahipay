@@ -104,36 +104,70 @@ export class LoginLogService {
       allLogs = allLogs.filter((log) => log.userId === currentUser.id);
     }
 
-    // ✅ Inline helper: Filtering
-    const applyFilters = (logs) => {
-      let filtered = [...logs];
-      if (userId) filtered = filtered.filter((log) => log.userId == userId);
-      if (roleId) filtered = filtered.filter((log) => log.roleId == roleId);
-      if (deviceType) {
-        filtered = filtered.filter((log) => {
-          if (!log.userAgent) return false;
-          const parser = new UAParser(log.userAgent);
-          const result = parser.getResult();
+    // ✅ Get unique user IDs from logs for Prisma query
+    const userIds = [...new Set(allLogs.map((log) => log.userId))];
 
-          // Determine if this is mobile or desktop
-          const isMobile =
-            result.device.type === "mobile" || result.device.type === "tablet";
-          const normalizedDevice = isMobile ? "mobile" : "desktop";
-
-          return normalizedDevice.toLowerCase() === deviceType.toLowerCase();
-        });
-      }
-      if (search) {
-        const s = search.toLowerCase();
-        filtered = filtered.filter(
-          (log) =>
-            log.ip?.toLowerCase().includes(s) ||
-            log.deviceType?.toLowerCase().includes(s) ||
-            log.userName?.toLowerCase().includes(s)
-        );
-      }
-      return filtered;
+    // ✅ Build Prisma where clause for user search
+    let userWhereClause = {
+      id: {
+        in: userIds,
+      },
     };
+
+    // ✅ Add roleId filter if provided
+    if (roleId) {
+      userWhereClause.roleId = roleId;
+    }
+
+    // ✅ Add search filter if provided - YAHAN SEARCH PRISMA SE HOGI
+    if (search) {
+      const searchLower = search.toLowerCase();
+      userWhereClause.OR = [
+        { firstName: { contains: searchLower } },
+        { lastName: { contains: searchLower } },
+        { email: { contains: searchLower } },
+        { username: { contains: searchLower } },
+      ];
+    }
+
+    // ✅ Fetch users with filters from Prisma
+    const users = await Prisma.user.findMany({
+      where: userWhereClause,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phoneNumber: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+          },
+        },
+      },
+    });
+
+    const filteredUserIds = new Set(users.map((user) => user.id));
+
+    // ✅ Apply device type filter on logs
+    let filteredLogs = allLogs.filter((log) => filteredUserIds.has(log.userId));
+
+    if (deviceType) {
+      filteredLogs = filteredLogs.filter((log) => {
+        if (!log.userAgent) return false;
+        const parser = new UAParser(log.userAgent);
+        const result = parser.getResult();
+
+        // Determine if this is mobile or desktop
+        const isMobile =
+          result.device.type === "mobile" || result.device.type === "tablet";
+        const normalizedDevice = isMobile ? "mobile" : "desktop";
+
+        return normalizedDevice.toLowerCase() === deviceType.toLowerCase();
+      });
+    }
 
     // ✅ Inline helper: Sorting
     const applySorting = (logs) => {
@@ -148,8 +182,7 @@ export class LoginLogService {
       });
     };
 
-    // ✅ Apply filters & sorting
-    let filteredLogs = applyFilters(allLogs);
+    // ✅ Apply sorting
     filteredLogs = applySorting(filteredLogs);
 
     // ✅ Pagination
@@ -175,30 +208,7 @@ export class LoginLogService {
       return { ...log, userAgentSimple };
     });
 
-    // ✅ Fetch user details
-    const userIds = [...new Set(paginatedLogs.map((log) => log.userId))];
-
-    const users = await Prisma.user.findMany({
-      where: {
-        id: {
-          in: userIds,
-        },
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phoneNumber: true,
-        role: {
-          select: {
-            name: true,
-            level: true,
-          },
-        },
-      },
-    });
-
+    // ✅ Create user map for merging
     const userMap = {};
     for (const user of users) userMap[user.id] = user;
 

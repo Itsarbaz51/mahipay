@@ -112,11 +112,11 @@ class EmployeeServices {
       });
 
       // Audit log
-      await this.createAuditLog(parentId, "EMPLOYEE_CREATED", user.id, {
-        employeeEmail: user.email,
-        employeeRole: user.role.name,
-        permissionsCount: permissions.length,
-      });
+      // await this.createAuditLog(parentId, "EMPLOYEE_CREATED", user.id, {
+      //   employeeEmail: user.email,
+      //   employeeRole: user.role.name,
+      //   permissionsCount: permissions.length,
+      // });
 
       return { user, accessToken };
     } catch (error) {
@@ -229,14 +229,14 @@ class EmployeeServices {
     });
 
     // Create audit log
-    await this.createAuditLog(adminId, actionType, employeeId, {
-      employeeEmail: employee.email,
-      activated: permissionsToActivate,
-      deactivated: permissionsToDeactivate,
-      created: permissionsToCreate,
-      finalPermissions: normalizedPermissions,
-      totalPermissions: normalizedPermissions.length,
-    });
+    // await this.createAuditLog(adminId, actionType, employeeId, {
+    //   employeeEmail: employee.email,
+    //   activated: permissionsToActivate,
+    //   deactivated: permissionsToDeactivate,
+    //   created: permissionsToCreate,
+    //   finalPermissions: normalizedPermissions,
+    //   totalPermissions: normalizedPermissions.length,
+    // });
 
     // Get updated permissions for response
     const updatedPermissions = await this.getEmployeePermissions(employeeId);
@@ -344,15 +344,15 @@ class EmployeeServices {
       await this.regenerateCredentialsAndNotify(userId, email);
     }
 
-    await this.createAuditLog(
-      currentUserId,
-      "EMPLOYEE_PROFILE_UPDATE",
-      userId,
-      {
-        updatedFields: Object.keys(updateData),
-        emailChanged: !!email,
-      }
-    );
+    // await this.createAuditLog(
+    //   currentUserId,
+    //   "EMPLOYEE_PROFILE_UPDATE",
+    //   userId,
+    //   {
+    //     updatedFields: Object.keys(updateData),
+    //     emailChanged: !!email,
+    //   }
+    // );
 
     return updatedUser;
   }
@@ -580,17 +580,17 @@ class EmployeeServices {
     );
   }
 
-  static async createAuditLog(userId, action, entityId, metadata = {}) {
-    await Prisma.auditLog.create({
-      data: {
-        userId,
-        action,
-        entityType: "User",
-        entityId,
-        metadata,
-      },
-    });
-  }
+  // static async createAuditLog(userId, action, entityId, metadata = {}) {
+  //   await Prisma.auditLog.create({
+  //     data: {
+  //       userId,
+  //       action,
+  //       entityType: "User",
+  //       entityId,
+  //       metadata,
+  //     },
+  //   });
+  // }
 
   static async authorizeEmployeeUpdate(
     currentUser,
@@ -745,11 +745,11 @@ class EmployeeServices {
       },
     });
 
-    await this.createAuditLog(changedBy, action, employeeId, {
-      previousStatus: user.status,
-      newStatus: status,
-      reason: reason || "No reason provided",
-    });
+    // await this.createAuditLog(changedBy, action, employeeId, {
+    //   previousStatus: user.status,
+    //   newStatus: status,
+    //   reason: reason || "No reason provided",
+    // });
 
     return updatedUser;
   }

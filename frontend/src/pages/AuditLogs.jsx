@@ -1,5 +1,11 @@
 import { useDebounce } from "use-debounce";
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Shield,
@@ -24,9 +30,12 @@ const AuditLogs = () => {
   const dispatch = useDispatch();
   const { logsList, loading, error } = useSelector((state) => state.logs);
 
+  // Search input reference to maintain focus
+  const searchInputRef = useRef(null);
+
   const [expandedLog, setExpandedLog] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 500); // 500ms debounce
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Filter states
@@ -39,41 +48,65 @@ const AuditLogs = () => {
     roleId: "",
     sort: "desc",
     sortBy: "timestamp",
-    startDate: "",
-    endDate: "",
-    browser: "",
-    os: "",
   });
 
   // Get current user from auth state
   const { currentUser } = useSelector((state) => state.auth);
   const roles = useSelector((state) => state?.roles?.roles || []);
 
-  useEffect(() => {
-    dispatch(getAllRoles());
-  }, [dispatch]);
+  const isAdmin = useMemo(
+    () => currentUser.role?.name === "ADMIN",
+    [currentUser]
+  );
 
   useEffect(() => {
-    fetchLogs();
-  }, [currentPage, debouncedSearchTerm, filters]);
+    if (isAdmin) {
+      dispatch(getAllRoles());
+    }
+  }, [dispatch, isAdmin]);
 
-  const fetchLogs = () => {
+  // Stable fetch function that doesn't change on every render
+  const fetchLogs = useCallback(() => {
     const params = {
       page: currentPage,
       limit: 10,
-      search: debouncedSearchTerm, // Use debounced search term
+      search: debouncedSearchTerm,
+      searchFields: [
+        "user.firstName",
+        "user.lastName",
+        "user.email",
+        "message.ipAddress",
+        "message.metadata.location",
+      ],
       ...filters,
     };
 
-    // If user is not admin, filter by their user ID
     if (currentUser?.role?.type !== "ADMIN") {
       params.userId = currentUser?.id;
     }
 
     dispatch(getAuditLogs(params));
-  };
+  }, [currentPage, debouncedSearchTerm, filters, currentUser, dispatch]);
+
+  // Separate useEffect for fetching logs
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  // Maintain search input focus
+  useEffect(() => {
+    if (
+      searchInputRef.current &&
+      document.activeElement === searchInputRef.current
+    ) {
+      // If search input was focused, keep it focused after re-render
+      searchInputRef.current.focus();
+    }
+  });
 
   const formatTime = (timestamp) => {
+    if (!timestamp) return "N/A";
+
     const date = new Date(timestamp);
     return date.toLocaleString("en-US", {
       month: "short",
@@ -87,79 +120,76 @@ const AuditLogs = () => {
   const getActionColor = (action) => {
     if (action?.includes("SUCCESS")) return "text-green-600";
     if (action?.includes("FAILED")) return "text-red-600";
+    if (action?.includes("ERROR")) return "text-red-600";
     return "text-blue-600";
   };
 
   const getActionBg = (action) => {
     if (action?.includes("SUCCESS")) return "bg-green-50 border-green-200";
     if (action?.includes("FAILED")) return "bg-red-50 border-red-200";
+    if (action?.includes("ERROR")) return "bg-red-50 border-red-200";
     return "bg-blue-50 border-blue-200";
   };
 
   // Calculate showing from/to values
   const getShowingFrom = () => {
-    if (!logsList?.data.pagination) return 0;
+    if (!logsList?.data?.pagination) return 0;
     return logsList.data.pagination.showingFrom || 1;
   };
 
   const getShowingTo = () => {
-    if (!logsList?.data.pagination) return 0;
+    if (!logsList?.data?.pagination) return 0;
     return logsList.data.pagination.showingTo || 0;
   };
 
-  // Handle search with debounce
+  // Handle search - maintain focus
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     setCurrentPage(1);
   };
 
-  // Handle filter changes
-  const handleFilterChange = (key, value) => {
+  // Stable filter handlers
+  const handleDeviceFilterChange = useCallback((deviceType) => {
     setFilters((prev) => ({
       ...prev,
-      [key]: value,
+      deviceType,
     }));
     setCurrentPage(1);
-  };
-
-  // Handle device filter change
-  const handleDeviceFilterChange = (deviceType) => {
-    handleFilterChange("deviceType", deviceType);
     setDeviceFilterOpen(false);
-  };
+  }, []);
 
-  // Handle role filter change - fixed the parameter issue
-  const handleRoleFilterChange = (roleId) => {
-    handleFilterChange("roleId", roleId);
+  const handleRoleFilterChange = useCallback((roleId) => {
+    setFilters((prev) => ({
+      ...prev,
+      roleId,
+    }));
+    setCurrentPage(1);
     setRoleFilterOpen(false);
-  };
+  }, []);
 
-  // Handle sort change
-  const handleSortChange = (sort) => {
-    handleFilterChange("sort", sort);
+  const handleSortChange = useCallback((sort) => {
+    setFilters((prev) => ({
+      ...prev,
+      sort,
+    }));
+    setCurrentPage(1);
     setSortOpen(false);
-  };
+  }, []);
 
-  // Clear all filters
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({
       deviceType: "all",
       roleId: "",
       sort: "desc",
       sortBy: "timestamp",
-      startDate: "",
-      endDate: "",
-      browser: "",
-      os: "",
     });
     setSearchTerm("");
     setCurrentPage(1);
-  };
+  }, []);
 
-  // Refresh data
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     fetchLogs();
-  };
+  }, [fetchLogs]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -183,11 +213,9 @@ const AuditLogs = () => {
 
   // Render pagination controls
   const renderPagination = () => {
-    if (!logsList?.data.pagination) return null;
+    if (!logsList?.data?.pagination) return null;
 
     const { pagination } = logsList.data;
-
-    // Use the correct property names
     const currentPageNum = pagination.currentPage || pagination.page || 1;
     const totalPages = pagination.totalPages || 1;
     const hasNext = pagination.hasNext || false;
@@ -202,7 +230,6 @@ const AuditLogs = () => {
     );
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
-    // Adjust start page if we're near the end
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
@@ -323,13 +350,15 @@ const AuditLogs = () => {
     }
 
     const totalEvents =
-      logsList.pagination?.totalItems ||
-      logsList.pagination?.totalCount ||
+      logsList.data.pagination?.totalItems ||
+      logsList.data.pagination?.totalCount ||
       logsList?.data?.paginatedLogs.length ||
       0;
+
     const successEvents = logsList?.data?.paginatedLogs.filter((log) =>
       log.message?.action?.includes("SUCCESS")
     ).length;
+
     const successRate =
       totalEvents > 0 ? (successEvents / totalEvents) * 100 : 0;
 
@@ -353,24 +382,16 @@ const AuditLogs = () => {
 
   const stats = calculateStats();
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden p-6">
       {/* Header with Filters */}
       <div className="p-6 border-b border-slate-200 flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
-        {/* Search */}
+        {/* Search - Updated placeholder to reflect table-only search */}
         <div className="relative w-full max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
           <input
             type="text"
-            placeholder="Search users, IPs, locations..."
+            placeholder="Search users, IPs, actions..."
             value={searchTerm}
             onChange={handleSearch}
             className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
@@ -419,52 +440,54 @@ const AuditLogs = () => {
           </div>
 
           {/* Role Filter - Fixed */}
-          <div className="relative role-filter">
-            <button
-              onClick={() => setRoleFilterOpen(!roleFilterOpen)}
-              className="inline-flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
-            >
-              <User className="h-4 w-4" />
-              Role
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${
-                  roleFilterOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-            {roleFilterOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
-                <div className="p-2">
-                  <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">
-                    User Role
-                  </div>
-                  <button
-                    onClick={() => handleRoleFilterChange("")}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                      filters.roleId === ""
-                        ? "bg-blue-50 text-blue-700 font-medium"
-                        : "text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    All Roles
-                  </button>
-                  {roles?.map((role) => (
+          {isAdmin && (
+            <div className="relative role-filter">
+              <button
+                onClick={() => setRoleFilterOpen(!roleFilterOpen)}
+                className="inline-flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+              >
+                <User className="h-4 w-4" />
+                Role
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${
+                    roleFilterOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {roleFilterOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
+                  <div className="p-2">
+                    <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">
+                      User Role
+                    </div>
                     <button
-                      key={role.id}
-                      onClick={() => handleRoleFilterChange(role.id)} // Pass role.id instead of role object
+                      onClick={() => handleRoleFilterChange("")}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        filters.roleId === role.id
+                        filters.roleId === ""
                           ? "bg-blue-50 text-blue-700 font-medium"
                           : "text-slate-700 hover:bg-slate-50"
                       }`}
                     >
-                      {role.name}
+                      All Roles
                     </button>
-                  ))}
+                    {roles?.map((role) => (
+                      <button
+                        key={role.id}
+                        onClick={() => handleRoleFilterChange(role.id)} // Pass role.id instead of role object
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                          filters.roleId === role.id
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {role.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Sort */}
           <div className="relative sort-filter">
@@ -525,7 +548,7 @@ const AuditLogs = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - These won't be affected by search */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 py-6">
         <div className="bg-white border border-gray-200 rounded-2xl p-6 hover:scale-105 transition-transform duration-300 shadow-sm hover:shadow-lg">
           <div className="flex items-center gap-3">
@@ -583,7 +606,7 @@ const AuditLogs = () => {
         </div>
       )}
 
-      {/* Table */}
+      {/* Table - Search only applies to this content */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -761,7 +784,6 @@ const AuditLogs = () => {
                               </div>
                             </div>
                           </div>
-                          {/* Show full metadata dynamically */}
                           {/* Show full metadata dynamically */}
                           <div className="bg-white mt-6 rounded-lg p-4 border border-blue-100">
                             <h3 className="text-gray-900 font-semibold flex items-center gap-2 mb-3">

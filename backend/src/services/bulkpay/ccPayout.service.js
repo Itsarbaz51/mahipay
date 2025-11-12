@@ -84,20 +84,20 @@ export class CCPayoutService {
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: userId,
-          action: "SENDER_CREATED",
-          entityType: "cc_sender",
-          entityId: apiEntity.id,
-          ipAddress: reqIp,
-          metadata: this.safeJsonParse({
-            referenceId: referenceId,
-            senderId: bulkpeResponse.senderId,
-          }),
-          createdAt: new Date(),
-        },
-      });
+      // await tx.auditLog.create({
+      //   data: {
+      //     userId: userId,
+      //     action: "SENDER_CREATED",
+      //     entityType: "cc_sender",
+      //     entityId: apiEntity.id,
+      //     ipAddress: reqIp,
+      //     metadata: this.safeJsonParse({
+      //       referenceId: referenceId,
+      //       senderId: bulkpeResponse.senderId,
+      //     }),
+      //     createdAt: new Date(),
+      //   },
+      // });
 
       return {
         status: true,
@@ -169,21 +169,21 @@ export class CCPayoutService {
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: userId,
-          action: "CARD_IMAGE_UPLOADED",
-          entityType: "cc_sender",
-          entityId: senderEntity.id,
-          ipAddress: "SYSTEM",
-          metadata: this.safeJsonParse({
-            senderId: senderId,
-            cardImageType: cardImageType,
-            cardLastFour: uploadResponse.cardNo,
-          }),
-          createdAt: new Date(),
-        },
-      });
+      // await tx.auditLog.create({
+      //   data: {
+      //     userId: userId,
+      //     action: "CARD_IMAGE_UPLOADED",
+      //     entityType: "cc_sender",
+      //     entityId: senderEntity.id,
+      //     ipAddress: "SYSTEM",
+      //     metadata: this.safeJsonParse({
+      //       senderId: senderId,
+      //       cardImageType: cardImageType,
+      //       cardLastFour: uploadResponse.cardNo,
+      //     }),
+      //     createdAt: new Date(),
+      //   },
+      // });
 
       return {
         status: true,
@@ -305,20 +305,20 @@ export class CCPayoutService {
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: userId,
-          action: "BENEFICIARY_CREATED",
-          entityType: "cc_beneficiary",
-          entityId: apiEntity.id,
-          ipAddress: "SYSTEM",
-          metadata: this.safeJsonParse({
-            reference: reference,
-            beneficiaryId: bulkpeResponse.beneficiaryId,
-          }),
-          createdAt: new Date(),
-        },
-      });
+      // await tx.auditLog.create({
+      //   data: {
+      //     userId: userId,
+      //     action: "BENEFICIARY_CREATED",
+      //     entityType: "cc_beneficiary",
+      //     entityId: apiEntity.id,
+      //     ipAddress: "SYSTEM",
+      //     metadata: this.safeJsonParse({
+      //       reference: reference,
+      //       beneficiaryId: bulkpeResponse.beneficiaryId,
+      //     }),
+      //     createdAt: new Date(),
+      //   },
+      // });
 
       return {
         status: true,
@@ -554,22 +554,22 @@ export class CCPayoutService {
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: userId,
-          action: "COLLECTION_CREATED",
-          entityType: "cc_collection",
-          entityId: collectionEntity.id,
-          ipAddress: "SYSTEM",
-          metadata: this.safeJsonParse({
-            reference: reference,
-            collectionId: bulkpeResponse.collectionId,
-            amount: payload.amount,
-            transactionId: transaction.id,
-          }),
-          createdAt: new Date(),
-        },
-      });
+      // await tx.auditLog.create({
+      //   data: {
+      //     userId: userId,
+      //     action: "COLLECTION_CREATED",
+      //     entityType: "cc_collection",
+      //     entityId: collectionEntity.id,
+      //     ipAddress: "SYSTEM",
+      //     metadata: this.safeJsonParse({
+      //       reference: reference,
+      //       collectionId: bulkpeResponse.collectionId,
+      //       amount: payload.amount,
+      //       transactionId: transaction.id,
+      //     }),
+      //     createdAt: new Date(),
+      //   },
+      // });
 
       return {
         status: true,
@@ -846,22 +846,22 @@ export class CCPayoutService {
         },
       });
 
-      await tx.auditLog.create({
-        data: {
-          userId: transaction.userId,
-          action: "COLLECTION_STATUS_UPDATED",
-          entityType: "cc_collection",
-          entityId: collectionId,
-          ipAddress: "SYSTEM",
-          metadata: this.safeJsonParse({
-            collectionId: collectionId,
-            status: status,
-            utr: utr,
-            transactionId: transaction.id,
-          }),
-          createdAt: new Date(),
-        },
-      });
+      // await tx.auditLog.create({
+      //   data: {
+      //     userId: transaction.userId,
+      //     action: "COLLECTION_STATUS_UPDATED",
+      //     entityType: "cc_collection",
+      //     entityId: collectionId,
+      //     ipAddress: "SYSTEM",
+      //     metadata: this.safeJsonParse({
+      //       collectionId: collectionId,
+      //       status: status,
+      //       utr: utr,
+      //       transactionId: transaction.id,
+      //     }),
+      //     createdAt: new Date(),
+      //   },
+      // });
 
       return {
         success: true,

@@ -5,7 +5,6 @@ import {
   Navigate,
 } from "react-router-dom";
 
-import ProtectedRoute from "../components/ProtectedRoute";
 import MainLayout from "../layouts/MainLayout";
 import PublicLayout from "../layouts/PublicLayout";
 
@@ -36,6 +35,7 @@ import MembersTable from "../components/tabels/MembersTable";
 import WalletTable from "../components/tabels/Wallet";
 import FundRequestTable from "../components/tabels/FundRequestTable.jsx";
 import NoPermissionsPage from "../pages/NoPermissionsPage.jsx";
+import ProtectedRoute from "../layouts/ProtectedRoute.jsx";
 
 export const createRouter = () => {
   return createBrowserRouter(

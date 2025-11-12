@@ -219,10 +219,6 @@ class KycServices {
       return;
     }
 
-    if (requestingUser.id !== kyc.userId) {
-      throw ApiError.unauthorized("Unauthorized access");
-    }
-
     const kycWithRelations = kyc;
 
     const isOwner = requestingUser && kyc.userId === requestingUser.id;

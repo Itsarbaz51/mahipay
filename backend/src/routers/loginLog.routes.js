@@ -9,7 +9,7 @@ const loginLogRoutes = Router();
 loginLogRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   validateRequest(LoginLogsValidationSchemas.ListLoginLogsSchema),
   LoginLogController.index
 );
