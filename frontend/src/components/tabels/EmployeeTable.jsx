@@ -764,6 +764,7 @@ const EmployeeTable = () => {
           selectedUser={permissionUser}
           existingPermissions={permissionUser.EmployeePermissionsOwned || []}
           isLoading={isLoading}
+          type={"user"}
         />
       )}
     </div>

@@ -12,7 +12,7 @@ import {
   clearRoleError,
   clearRoleSuccess,
 } from "../redux/slices/roleSlice";
-import AddPermission from "./forms/AddPermission";
+import AddEmployeePermissions from "./forms/AddEmployeePermissions";
 import {
   getPermissionRoleById,
   upsertRolePermission,
@@ -124,10 +124,10 @@ export default function RoleManager() {
       };
 
       if (editRole) {
-        await dispatch(updateRole(editRole.id, submitData)).unwrap();
+        await dispatch(updateRole(editRole.id, submitData));
         setEditRole(null);
       } else {
-        await dispatch(createRole(submitData)).unwrap();
+        await dispatch(createRole(submitData));
       }
       setIsModalOpen(false);
 
@@ -152,7 +152,7 @@ export default function RoleManager() {
     if (activeTab === "employee") {
       if (confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
         try {
-          await dispatch(deleteRole(role.id)).unwrap();
+          await dispatch(deleteRole(role.id));
           // Refresh the correct role list
           const roleType = activeTab === "employee" ? "employee" : "business";
           dispatch(getAllRolesByType(roleType));
@@ -163,35 +163,35 @@ export default function RoleManager() {
     }
   };
 
-  const handlePermission = (role) => {
-    setPermissionRole(role);
-    setShowPermissionModal(true);
-    setPermissionMode("role");
-    setExistingPermissions(null);
+  // const handlePermission = (role) => {
+  //   setPermissionRole(role);
+  //   setShowPermissionModal(true);
+  //   setPermissionMode("role");
+  //   setExistingPermissions(null);
 
-    if (role.id) {
-      dispatch(getPermissionRoleById(role.id));
-    }
-  };
+  //   if (role.id) {
+  //     dispatch(getPermissionRoleById(role.id));
+  //   }
+  // };
 
-  const handlePermissionSubmit = async (permissionData) => {
-    try {
-      await dispatch(upsertRolePermission(permissionData)).unwrap();
-      handleClosePermissionModal();
-      // Refresh the correct role list
-      const roleType = activeTab === "employee" ? "employee" : "business";
-      dispatch(getAllRolesByType(roleType));
-    } catch (error) {
-      console.error("Permission update failed:", error);
-    }
-  };
+  // const handlePermissionSubmit = async (permissionData) => {
+  //   try {
+  //     await dispatch(upsertRolePermission(permissionData));
+  //     handleClosePermissionModal();
+  //     // Refresh the correct role list
+  //     const roleType = activeTab === "employee" ? "employee" : "business";
+  //     dispatch(getAllRolesByType(roleType));
+  //   } catch (error) {
+  //     console.error("Permission update failed:", error);
+  //   }
+  // };
 
-  const handleClosePermissionModal = () => {
-    setShowPermissionModal(false);
-    setPermissionRole(null);
-    setExistingPermissions(null);
-    setPermissionMode("role");
-  };
+  // const handleClosePermissionModal = () => {
+  //   setShowPermissionModal(false);
+  //   setPermissionRole(null);
+  //   setExistingPermissions(null);
+  //   setPermissionMode("role");
+  // };
 
   const handleCancel = () => {
     setEditRole(null);
@@ -296,7 +296,7 @@ export default function RoleManager() {
           roles={filteredRoles}
           onEdit={handleEdit}
           onDelete={handleDelete}
-          onPermission={handlePermission}
+          // onPermission={handlePermission}
           type={activeTab}
         />
       )}
@@ -335,12 +335,12 @@ export default function RoleManager() {
       />
 
       {showPermissionModal && permissionRole && (
-        <AddPermission
+        <AddEmployeePermissions
           mode={permissionMode}
           onSubmit={handlePermissionSubmit}
           onCancel={handleClosePermissionModal}
           selectedUser={permissionRole}
-          services={services}
+          type={"role"}
           existingPermissions={existingPermissions}
           isLoading={isLoading}
         />

@@ -8,6 +8,7 @@ const AddEmployeePermissions = ({
   selectedUser,
   existingPermissions = [],
   isLoading = false,
+  type, // "user" or "role"
 }) => {
   const [permissions, setPermissions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -17,10 +18,18 @@ const AddEmployeePermissions = ({
   const safePermissions = useCallback(() => {
     if (!existingPermissions || !Array.isArray(existingPermissions)) return [];
 
-    return existingPermissions
-      .filter((perm) => perm.isActive && perm.permission)
-      .map((perm) => perm.permission);
-  }, [existingPermissions]);
+    if (type === "user") {
+      // For user type: EmployeePermissionsOwned structure
+      return existingPermissions
+        .filter((perm) => perm.isActive && perm.permission)
+        .map((perm) => perm.permission);
+    } else {
+      // For role type: different structure (adjust based on your actual role permissions structure)
+      return existingPermissions
+        .filter((perm) => perm.isActive && (perm.permission || perm.name))
+        .map((perm) => perm.permission || perm.name);
+    }
+  }, [existingPermissions, type]);
 
   // Common permission suggestions
   const COMMON_PERMISSIONS = [
@@ -33,7 +42,7 @@ const AddEmployeePermissions = ({
     "settings",
     "profile",
     "logs",
-    "employee management"
+    "employee management",
   ];
 
   const MAX_PERMISSIONS = 20;
@@ -62,8 +71,6 @@ const AddEmployeePermissions = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Removed the minimum permission requirement check
-
     setIsSubmitting(true);
     setError("");
 
@@ -81,15 +88,44 @@ const AddEmployeePermissions = ({
     permissions.length >= MAX_PERMISSIONS ||
     isSubmitting;
 
+  // Get display data based on type
+  const getDisplayData = () => {
+    if (type === "user") {
+      return {
+        title:
+          mode === "add"
+            ? "Add Employee Permissions"
+            : "Edit Employee Permissions",
+        name: `${selectedUser?.firstName || ""} ${
+          selectedUser?.lastName || ""
+        }`.trim(),
+        email: selectedUser?.email,
+        phone: selectedUser?.phoneNumber,
+        identifier: selectedUser?.id,
+        identifierLabel: "User ID",
+      };
+    } else {
+      return {
+        title:
+          mode === "add" ? "Add Role Permissions" : "Edit Role Permissions",
+        name: selectedUser?.name || selectedUser?.roleName || "Unknown Role",
+        email: null, // Roles don't have email
+        phone: null, // Roles don't have phone
+        identifier: selectedUser?.id,
+        identifierLabel: "Role ID",
+      };
+    }
+  };
+
+  const displayData = getDisplayData();
+
   return (
     <div className="fixed inset-0 backdrop-blur-xs bg-black/40 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-800">
-              {mode === "add"
-                ? "Add Employee Permissions"
-                : "Edit Employee Permissions"}
+              {displayData.title}
             </h3>
             <button
               onClick={onCancel}
@@ -120,21 +156,29 @@ const AddEmployeePermissions = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* User Information */}
+            {/* Information Section */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Employee
+                {type === "user" ? "Employee" : "Role"}
               </label>
               <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
                 <div className="text-sm font-medium text-gray-900">
-                  {selectedUser?.firstName} {selectedUser?.lastName || ""}
+                  {displayData.name}
                 </div>
-                <div className="text-xs text-gray-600 mt-1">
-                  {selectedUser?.email} • {selectedUser?.phoneNumber}
-                </div>
+                {displayData.email && (
+                  <div className="text-xs text-gray-600 mt-1">
+                    {displayData.email}{" "}
+                    {displayData.phone && `• ${displayData.phone}`}
+                  </div>
+                )}
                 <div className="text-xs text-gray-500 mt-1">
-                  User ID: {selectedUser?.id}
+                  {displayData.identifierLabel}: {displayData.identifier}
                 </div>
+                {type === "role" && selectedUser?.description && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    Description: {selectedUser.description}
+                  </div>
+                )}
               </div>
             </div>
 
