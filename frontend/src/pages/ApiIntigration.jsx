@@ -18,6 +18,7 @@ function ApiIntegration() {
   const [showPopup, setShowPopup] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [testConnectionSuccess, setTestConnectionSuccess] = useState(false);
 
   const dispatch = useDispatch();
   const { serviceProviders } = useSelector((state) => state.services);
@@ -129,6 +130,7 @@ function ApiIntegration() {
     if (!selectedApi) return;
 
     setTestingConnection(true);
+    setTestConnectionSuccess(false);
     try {
       const validEnvs = envInputs.filter(
         (env) => env.key.trim() && env.value.trim()
@@ -136,10 +138,13 @@ function ApiIntegration() {
       const payload = { envConfig: validEnvs };
 
       await dispatch(ApiTesting(selectedApi.id, payload));
+      setTestConnectionSuccess(true);
       setShowSuccessToast(true);
+
       setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (error) {
-      throw console.error("Failed call api testing connection", error.message);
+      setTestConnectionSuccess(false);
+      throw console.error("Failed call api testing connection", error);
     } finally {
       setTestingConnection(false);
     }
@@ -159,7 +164,9 @@ function ApiIntegration() {
         })),
       };
 
-      await dispatch(envConfig({ id: selectedApi.id, payload })).unwrap();
+      await dispatch(envConfig({ id: selectedApi.id, payload }));
+      setTestConnectionSuccess(false);
+      setShowPopup(false);
     } catch (err) {
       console.error("❌ Save failed:", err);
     }
@@ -198,8 +205,12 @@ function ApiIntegration() {
           envInputs={envInputs}
           subServices={subServices}
           testingConnection={testingConnection}
-          onClose={() => setShowPopup(false)}
           onTestConnection={handleTestConnection}
+          testConnectionSuccess={testConnectionSuccess}
+          onClose={() => {
+            setShowPopup(false);
+            setTestConnectionSuccess(false);
+          }}
           onSave={handleSave}
           onUpdateEnv={updateEnvVariable}
           onToggleVisibility={toggleShowValue}

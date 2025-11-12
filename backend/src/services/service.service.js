@@ -19,7 +19,7 @@ export class ServiceProviderService {
     } = payload;
 
     let uploaded = null;
-    let currentUserId = req.user.id;
+    let currentUserId = req?.user?.id;
 
     try {
       // Validate required fields

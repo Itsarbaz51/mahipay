@@ -1,4 +1,3 @@
-// components/forms/IntegrationForm.js
 import React from "react";
 import {
   X,
@@ -59,40 +58,106 @@ const SubServiceToggle = React.memo(({ subService, onToggle }) => {
   );
 });
 
-// ✅ SERVICE-SPECIFIC FIELD CONFIGURATIONS
 const SERVICE_FIELD_CONFIGS = {
   RAZORPAY: [
-    { placeholder: "RAZORPAY_KEY_ID", keyHint: "rzp_test_..." },
-    { placeholder: "RAZORPAY_KEY_SECRET", keyHint: "Secret key" },
+    {
+      placeholder: "RAZORPAY_KEY_ID",
+      keyHint: "rzp_test_...",
+      autoFillKey: "RAZORPAY_KEY_ID", // ✅ Auto fill key name
+    },
+    {
+      placeholder: "RAZORPAY_KEY_SECRET",
+      keyHint: "Secret key",
+      autoFillKey: "RAZORPAY_KEY_SECRET", // ✅ Auto fill key name
+    },
   ],
   AEPS: [
-    { placeholder: "Aadhaar API Key", keyHint: "Aadhaar Key" },
-    { placeholder: "Aadhaar Secret", keyHint: "Aadhaar Secret" },
-    { placeholder: "Merchant ID", keyHint: "Merchant ID" },
+    {
+      placeholder: "Aadhaar API Key",
+      keyHint: "Aadhaar Key",
+      autoFillKey: "AEPS_API_KEY",
+    },
+    {
+      placeholder: "Aadhaar Secret",
+      keyHint: "Aadhaar Secret",
+      autoFillKey: "AEPS_SECRET",
+    },
+    {
+      placeholder: "Merchant ID",
+      keyHint: "Merchant ID",
+      autoFillKey: "AEPS_MERCHANT_ID",
+    },
   ],
   BBPS: [
-    { placeholder: "BBPS Username", keyHint: "Username" },
-    { placeholder: "BBPS Password", keyHint: "Password" },
-    { placeholder: "Agent Key", keyHint: "Agent Key" },
+    {
+      placeholder: "BBPS Username",
+      keyHint: "Username",
+      autoFillKey: "BBPS_USERNAME",
+    },
+    {
+      placeholder: "BBPS Password",
+      keyHint: "Password",
+      autoFillKey: "BBPS_PASSWORD",
+    },
+    {
+      placeholder: "Agent Key",
+      keyHint: "Agent Key",
+      autoFillKey: "BBPS_AGENT_KEY",
+    },
   ],
   DMT: [
-    { placeholder: "DMT API Key", keyHint: "API Key" },
-    { placeholder: "DMT Secret", keyHint: "Secret Key" },
-    { placeholder: "Sender ID", keyHint: "Sender ID" },
+    {
+      placeholder: "DMT API Key",
+      keyHint: "API Key",
+      autoFillKey: "DMT_API_KEY",
+    },
+    {
+      placeholder: "DMT Secret",
+      keyHint: "Secret Key",
+      autoFillKey: "DMT_SECRET",
+    },
+    {
+      placeholder: "Sender ID",
+      keyHint: "Sender ID",
+      autoFillKey: "DMT_SENDER_ID",
+    },
   ],
   RECHARGE: [
-    { placeholder: "Recharge API Key", keyHint: "API Key" },
-    { placeholder: "Recharge Secret", keyHint: "Secret" },
-    { placeholder: "Operator ID", keyHint: "Operator ID" },
+    {
+      placeholder: "Recharge API Key",
+      keyHint: "API Key",
+      autoFillKey: "RECHARGE_API_KEY",
+    },
+    {
+      placeholder: "Recharge Secret",
+      keyHint: "Secret",
+      autoFillKey: "RECHARGE_SECRET",
+    },
+    {
+      placeholder: "Operator ID",
+      keyHint: "Operator ID",
+      autoFillKey: "RECHARGE_OPERATOR_ID",
+    },
   ],
   CC_PAYOUT: [
-    { placeholder: "Payout API Key", keyHint: "API Key" },
-    { placeholder: "Payout Secret", keyHint: "Secret Key" },
-    { placeholder: "Client ID", keyHint: "Client ID" },
+    {
+      placeholder: "Payout API Key",
+      keyHint: "API Key",
+      autoFillKey: "CC_PAYOUT_API_KEY",
+    },
+    {
+      placeholder: "Payout Secret",
+      keyHint: "Secret Key",
+      autoFillKey: "CC_PAYOUT_SECRET",
+    },
+    {
+      placeholder: "Client ID",
+      keyHint: "Client ID",
+      autoFillKey: "CC_PAYOUT_CLIENT_ID",
+    },
   ],
 };
 
-// ENV VARIABLE INPUT COMPONENT WITH SERVICE-SPECIFIC PLACEHOLDERS
 function EnvVariableInput({
   env,
   index,
@@ -108,13 +173,24 @@ function EnvVariableInput({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // ✅ GET FIELD CONFIG FOR CURRENT SERVICE
   const getFieldConfig = () => {
     const config = SERVICE_FIELD_CONFIGS[serviceCode] || [];
-    return config[index] || { placeholder: "Enter value", keyHint: "Key" };
+    return (
+      config[index] || {
+        placeholder: "Enter value",
+        keyHint: "Key",
+        autoFillKey: `SERVICE_KEY_${index + 1}`,
+      }
+    );
   };
 
   const fieldConfig = getFieldConfig();
+
+  React.useEffect(() => {
+    if (fieldConfig.autoFillKey && (!env.key || env.key === "")) {
+      onUpdate(index, "key", fieldConfig.autoFillKey);
+    }
+  }, [fieldConfig.autoFillKey, index, env.key, onUpdate]);
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-white mb-4">
@@ -224,6 +300,7 @@ export default function IntegrationForm({
   onClose,
   onTestConnection,
   onSave,
+  testConnectionSuccess,
   onUpdateEnv,
   onToggleVisibility,
   subServices,
@@ -267,7 +344,7 @@ export default function IntegrationForm({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* ✅ SERVICE INFORMATION */}
+          {/*  SERVICE INFORMATION */}
           <ServiceInfo selectedApi={selectedApi} envInputs={envInputs} />
 
           {/* SUB-SERVICES SECTION */}
@@ -303,7 +380,7 @@ export default function IntegrationForm({
                   index={index}
                   onUpdate={onUpdateEnv}
                   onToggleVisibility={onToggleVisibility}
-                  serviceCode={selectedApi?.code} // ✅ Pass service code for field config
+                  serviceCode={selectedApi?.code}
                 />
               ))}
             </div>
@@ -336,26 +413,46 @@ export default function IntegrationForm({
           <button
             onClick={onTestConnection}
             disabled={testingConnection}
-            className="px-5 py-3 border-2 border-gray-300 rounded-xl text-gray-700 hover:bg-white disabled:opacity-50 flex items-center"
+            className={`px-5 py-3 border-2 rounded-xl flex items-center ${
+              testConnectionSuccess
+                ? "border-green-500 bg-green-50 text-green-700"
+                : testingConnection
+                ? "border-gray-300 text-gray-700 opacity-50"
+                : "border-gray-300 text-gray-700 hover:bg-white"
+            }`}
           >
             {testingConnection ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : testConnectionSuccess ? (
+              <Check className="w-4 h-4 mr-2" />
             ) : (
               <Wifi className="w-4 h-4 mr-2" />
             )}
-            {testingConnection ? "Testing..." : "Test Connection"}
+            {testingConnection
+              ? "Testing..."
+              : testConnectionSuccess
+              ? "Connection Successful"
+              : "Test Connection"}
           </button>
+
           <button
             onClick={onClose}
             className="px-5 py-3 border-2 border-gray-300 rounded-xl text-gray-700 hover:bg-white"
           >
             Cancel
           </button>
+
           <button
             onClick={onSave}
-            className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg font-bold flex items-center justify-center"
+            disabled={!testConnectionSuccess}
+            className={`flex-1 px-6 py-3 rounded-xl font-bold flex items-center justify-center ${
+              testConnectionSuccess
+                ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-lg cursor-pointer"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
-            <Check className="w-5 h-5 mr-2" /> Save Configuration
+            <Check className="w-5 h-5 mr-2" />
+            Save Configuration
           </button>
         </div>
       </div>
