@@ -336,12 +336,13 @@ const MembersTable = () => {
   };
 
   const handleLogin = async (user) => {
-    if (!user?.email || !user?.password) return;
+    const payload = {
+      username: user.username.trim(),
+      password: user.password.trim(),
+    };
 
     try {
-      await dispatch(
-        login({ emailOrUsername: user?.email, password: user?.password })
-      );
+      await dispatch(login(payload));
       toast.success(`Logged in as ${user?.username}`);
     } catch (err) {
       console.error("Login failed:", err);
