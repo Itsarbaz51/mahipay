@@ -130,8 +130,6 @@ const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
 
       const result = await dispatch(updateCredentials(userId, payload));
 
-      console.log(result);
-
       if (result?.success) {
         toast.success(result?.message);
 

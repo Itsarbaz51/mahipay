@@ -42,10 +42,6 @@ export async function sendCredentialsEmail(
       text: emailContent.text,
       html: emailContent.html,
     });
-
-    console.log(
-      `${userType} credentials email sent successfully for ${actionType} action to ${user.email}`
-    );
   } catch (emailError) {
     console.error(`Failed to send ${userType} credentials email:`, {
       userId: user.id,
@@ -77,10 +73,6 @@ export async function sendPasswordResetEmail(
       text: emailContent.text,
       html: emailContent.html,
     });
-
-    console.log(
-      `${userType} password reset email sent successfully to ${user.email}`
-    );
   } catch (emailError) {
     console.error(`Failed to send ${userType} password reset email:`, {
       userId: user.id,

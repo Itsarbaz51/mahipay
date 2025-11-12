@@ -20,10 +20,6 @@ export default function ManageServices() {
   }, [dispatch]);
 
   const toggleService = async (serviceId, currentStatus, isParent = false) => {
-    console.log(serviceId);
-    console.log(currentStatus);
-    console.log(isParent);
-
     try {
       setLocalLoading((prev) => ({ ...prev, [serviceId]: true }));
       const newStatus = !currentStatus;

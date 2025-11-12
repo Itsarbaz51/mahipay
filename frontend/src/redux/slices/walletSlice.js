@@ -114,7 +114,6 @@ export const deductFunds = (payload) => async (dispatch) => {
 
 // Get transactions
 export const getWalletTransactions = (trnType) => async (dispatch) => {
-  console.log(trnType);
 
   try {
     dispatch(walletRequest());
@@ -157,7 +156,6 @@ export const verifyPayment = (payload) => async (dispatch) => {
 
 //  update topup (Admin only)
 export const updateTopup = (topupData) => async (dispatch) => {
-  console.log(topupData);
 
   try {
     dispatch(walletRequest());
