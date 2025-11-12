@@ -21,20 +21,42 @@ export const useFundPermissions = (routePath = null) => {
     // Get user permissions from current user
     const userPermissions = currentUser?.userPermissions || [];
 
-    // Extract service codes from permissions
-    const availableServices = userPermissions
+    // Extract service codes from permissions with canView check
+    const servicePermissions = userPermissions
       .map((permission) => {
         // Handle both object and string formats
         if (typeof permission === "object") {
-          return permission?.service?.code || "";
-        }
-        return permission;
-      })
-      .filter((service) => Object.values(SERVICES).includes(service));
+          const serviceCode = permission?.service?.code;
+          const canView = permission?.canView;
 
-    // Check which services are available
-    const hasRazorpay = availableServices.includes(SERVICES.RAZORPAY);
-    const hasBankTransfer = availableServices.includes(SERVICES.BANK_TRANSFER);
+          // Only return service if canView is true and service code is valid
+          if (
+            serviceCode &&
+            canView === true &&
+            Object.values(SERVICES).includes(serviceCode)
+          ) {
+            return serviceCode;
+          }
+          return null;
+        }
+
+        // Handle string format - assume canView is true for strings
+        if (
+          typeof permission === "string" &&
+          Object.values(SERVICES).includes(permission)
+        ) {
+          return permission;
+        }
+
+        return null;
+      })
+      .filter((service) => service !== null); // Remove null values
+
+    console.log("Available services with canView=true:", servicePermissions);
+
+    // Check which services are available (only those with canView: true)
+    const hasRazorpay = servicePermissions.includes(SERVICES.RAZORPAY);
+    const hasBankTransfer = servicePermissions.includes(SERVICES.BANK_TRANSFER);
 
     // Determine visible services
     const visibleServices = [];
@@ -53,9 +75,9 @@ export const useFundPermissions = (routePath = null) => {
       // If no specific services required for this route, allow access
       if (!requiredServices || requiredServices.length === 0) return true;
 
-      // Check if user has at least one required service
+      // Check if user has at least one required service with canView: true
       return requiredServices.some((service) =>
-        availableServices.includes(service)
+        servicePermissions.includes(service)
       );
     };
 
@@ -77,8 +99,8 @@ export const useFundPermissions = (routePath = null) => {
       // Generic function to check any route
       canAccessRoute: isRouteAccessible,
 
-      // Available services array
-      availableServices,
+      // Available services array (only those with canView: true)
+      availableServices: servicePermissions,
     };
   }, [currentUser, routePath]);
 
