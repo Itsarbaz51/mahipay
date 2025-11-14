@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import PageHeader from "../components/ui/PageHeader";
-import ProfileTable from "../components/tabels/ProfileKYC";
-import { useSelector } from "react-redux";
+import ProfileTable from "../components/tabels/UserProfileKYC";
 import BankTable from "../components/tabels/BanksTable";
 import { Landmark, Shield } from "lucide-react";
 

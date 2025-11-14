@@ -114,7 +114,7 @@ const KYCStatusCard = ({ kycDetail }) => {
 };
 
 // ---------- Main Form ----------
-export default function AddProfileKYC() {
+export default function AddUserProfileKYC() {
   const dispatch = useDispatch();
   const addressState = useSelector((state) => state.address);
   const { kycDetail, loading } = useSelector((state) => state.kyc);

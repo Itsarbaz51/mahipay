@@ -13,7 +13,6 @@ import {
   User,
   AlertCircle,
   UsersRound,
-  RefreshCw,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { getbyId, getKycAll, verifyKyc } from "../../redux/slices/kycSlice";
@@ -22,10 +21,9 @@ import ConfirmCard from "../ui/ConfirmCard";
 import Kyc from "../../pages/view/Kyc";
 import Pagination from "../ui/Pagination";
 import { useDebounce } from "use-debounce";
-import { toast, ToastContainer } from "react-toastify";
 import RefreshToast from "../ui/RefreshToast";
 
-const ProfileTable = () => {
+const UserProfileKYC = () => {
   const dispatch = useDispatch();
 
   // UI State
@@ -261,10 +259,7 @@ const ProfileTable = () => {
 
             {/* Refresh Button */}
 
-            <RefreshToast
-              isLoading={loading}
-              onClick={fetchKycData}
-            />
+            <RefreshToast isLoading={loading} onClick={fetchKycData} />
           </div>
         </div>
 
@@ -461,4 +456,4 @@ const ProfileTable = () => {
   );
 };
 
-export default ProfileTable;
+export default UserProfileKYC;

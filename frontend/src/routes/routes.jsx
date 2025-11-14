@@ -28,7 +28,7 @@ import UnauthorizedPage from "../pages/UnauthorizedPage.jsx";
 import RequestKYC from "../pages/RequestKYC.jsx";
 import Logs from "../pages/Logs.jsx";
 import VerifyResetPassword from "../pages/VerifyResetPassword.jsx";
-import AddProfileKYC from "../components/forms/AddProfileKYC";
+import AddUserProfileKYC from "../components/forms/AddUserProfileKYC.jsx";
 
 import EmployeeTable from "../components/tabels/EmployeeTable";
 import MembersTable from "../components/tabels/MembersTable";
@@ -82,7 +82,7 @@ export const createRouter = () => {
           path="kyc-submit"
           element={
             <ProtectedRoute>
-              <AddProfileKYC />
+              <AddUserProfileKYC />
             </ProtectedRoute>
           }
         />

@@ -19,6 +19,7 @@ import {
   Download,
   Eye,
 } from "lucide-react";
+import PayoutDashboard from "../components/forms/PayoutDashboard";
 
 // Sample pending transactions data
 const mockPendingTransactions = [
@@ -683,6 +684,7 @@ const TransactionsPage = () => {
           </div>
         )}
       </div>
+      <PayoutDashboard />
     </div>
   );
 };
