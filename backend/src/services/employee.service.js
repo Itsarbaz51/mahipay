@@ -4,6 +4,7 @@ import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
 import { sendCredentialsEmail } from "../utils/sendCredentialsEmail.js";
+import AuditLogService from "./auditLog.service.js";
 
 class EmployeeServices {
   // COMMON USER SELECT FIELDS (DRY Principle)
@@ -143,7 +144,8 @@ class EmployeeServices {
     employeeId,
     permissions,
     adminId,
-    actionType = "EMPLOYEE_PERMISSIONS_UPDATED"
+    req,
+    res
   ) {
     // Validate employee exists
     const employee = await Prisma.user.findUnique({
@@ -267,7 +269,7 @@ class EmployeeServices {
     // Create audit log
     await AuditLogService.createAuditLog({
       userId: adminId,
-      action: actionType,
+      action: "EMPLOYEE_PERMISSIONS_UPDATED",
       entityType: "EMPLOYEE",
       entityId: employeeId,
       ipAddress: req ? Helper.getClientIP(req) : null,
@@ -452,7 +454,12 @@ class EmployeeServices {
     return updatedUser;
   }
 
-  static async updateProfileImage(employeeId, profileImagePath, req = null) {
+  static async updateProfileImage(
+    employeeId,
+    profileImagePath,
+    req = null,
+    res = null
+  ) {
     try {
       // Find employee with role information
       const employee = await Prisma.user.findUnique({
@@ -969,23 +976,33 @@ class EmployeeServices {
   }
 
   // STATUS MANAGEMENT METHODS
-  static async deactivateEmployee(employeeId, deactivatedBy, reason) {
+  static async deactivateEmployee(
+    employeeId,
+    deactivatedBy,
+    reason,
+    req = null,
+    res = null
+  ) {
     return this.updateEmployeeStatus(
       employeeId,
       deactivatedBy,
       "IN_ACTIVE",
       "EMPLOYEE_DEACTIVATED",
-      reason
+      reason,
+      req,
+      res
     );
   }
 
-  static async reactivateEmployee(employeeId, reactivatedBy, reason) {
+  static async reactivateEmployee(employeeId, reactivatedBy, reason, req, res) {
     return this.updateEmployeeStatus(
       employeeId,
       reactivatedBy,
       "ACTIVE",
-      "EMPLOYEE_REACTIVATED",
-      reason
+      "EMPLOYEE_ACTIVATED",
+      reason,
+      req,
+      res
     );
   }
 
@@ -1057,18 +1074,6 @@ class EmployeeServices {
       }
     );
   }
-
-  // static async createAuditLog(userId, action, entityId, metadata = {}) {
-  //   await Prisma.auditLog.create({
-  //     data: {
-  //       userId,
-  //       action,
-  //       entityType: "User",
-  //       entityId,
-  //       metadata,
-  //     },
-  //   });
-  // }
 
   static async authorizeEmployeeUpdate(
     currentUser,
@@ -1182,7 +1187,9 @@ class EmployeeServices {
     changedBy,
     status,
     action,
-    reason
+    reason,
+    req,
+    res
   ) {
     const [user, changer] = await Promise.all([
       Prisma.user.findUnique({
