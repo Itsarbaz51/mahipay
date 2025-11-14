@@ -188,14 +188,15 @@ const EmployeeTable = () => {
 
   const handleLogin = async (employee) => {
     const payload = {
-      username: employee.username.trim(),
+      emailOrUsername: employee.username.trim(),
       password: employee.password.trim(),
     };
 
     try {
       await dispatch(login(payload));
-      toast.success(`Logged in as ${employee.firstName}`);
+      toast.success(`Logged in as ${employee.firstName || employee.username}`);
     } catch (error) {
+      console.error("Login failed:", error);
       toast.error("Login failed");
     }
   };
