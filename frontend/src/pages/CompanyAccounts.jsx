@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Plus, Edit, Trash2, Building, User, Download } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   addBank,
@@ -8,6 +8,8 @@ import {
   deleteBank,
 } from "../redux/slices/bankSlice";
 import AddBank from "../components/forms/AddBank";
+import RefreshToast from "../components/ui/RefreshToast";
+import ConfirmCard from "../components/ui/ConfirmCard";
 
 export const AccountType = Object.freeze({
   PERSONAL: "PERSONAL",
@@ -15,9 +17,9 @@ export const AccountType = Object.freeze({
 });
 
 const statusStyles = {
-  PENDING: "bg-yellow-100 text-yellow-800",
-  VERIFIED: "bg-green-100 text-green-700",
-  REJECT: "bg-red-100 text-red-700",
+  PENDING: "bg-amber-50 text-amber-700 border border-amber-200",
+  VERIFIED: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  REJECT: "bg-red-50 text-red-700 border border-red-200",
 };
 
 const CompanyAccounts = () => {
@@ -37,11 +39,18 @@ const CompanyAccounts = () => {
   const [editingAccountId, setEditingAccountId] = useState(null);
   const [showAccountForm, setShowAccountForm] = useState(false);
 
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState(null);
+
   const { myBankList, isLoading } = useSelector((state) => state.bank);
 
-  useEffect(() => {
+  const fetchHandle = useCallback(() => {
     dispatch(getAllMyBanks());
   }, [dispatch]);
+
+  useEffect(() => {
+    fetchHandle();
+  }, [fetchHandle]);
 
   const handleAccountChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -111,9 +120,13 @@ const CompanyAccounts = () => {
     Object.entries(accountForm).forEach(([key, value]) => {
       if (value !== null) formData.append(key, value);
     });
-    await dispatch(addBank(formData));
-    await dispatch(getAllMyBanks());
-    resetForm();
+
+    const result = await dispatch(addBank(formData));
+
+    if (result?.success) {
+      await dispatch(getAllMyBanks());
+      resetForm();
+    }
   };
 
   const handleEditAccount = async () => {
@@ -122,9 +135,15 @@ const CompanyAccounts = () => {
     Object.entries(accountForm).forEach(([key, value]) => {
       if (value !== null) formData.append(key, value);
     });
-    await dispatch(updateBank({ id: editingAccountId, data: formData }));
-    await dispatch(getAllMyBanks());
-    resetForm();
+    const result = await dispatch(
+      updateBank({ id: editingAccountId, data: formData })
+    );
+    console.log(result);
+
+    if (result?.success) {
+      await dispatch(getAllMyBanks());
+      resetForm();
+    }
   };
 
   const handleEditClick = (account) => {
@@ -142,11 +161,22 @@ const CompanyAccounts = () => {
     setShowAccountForm(true);
   };
 
-  const handleDeleteAccount = async (id) => {
-    if (window.confirm("Are you sure you want to delete this account?")) {
-      await dispatch(deleteBank(id));
-      await dispatch(getAllMyBanks());
-    }
+  const confirmDelete = async () => {
+    if (!selectedBankId) return;
+    await dispatch(deleteBank(selectedBankId));
+    await dispatch(getAllMyBanks());
+    setSelectedBankId(null);
+    setShowConfirm(false);
+  };
+
+  const cancelDelete = () => {
+    setSelectedBankId(null);
+    setShowConfirm(false);
+  };
+
+  const handleDeleteClick = (id) => {
+    setSelectedBankId(id);
+    setShowConfirm(true);
   };
 
   const getInitials = (name) =>
@@ -157,179 +187,277 @@ const CompanyAccounts = () => {
       .toUpperCase()
       .substring(0, 2);
 
+  const getAccountTypeIcon = (type) => {
+    return type === AccountType.BUSINESS ? (
+      <Building className="h-4 w-4" />
+    ) : (
+      <User className="h-4 w-4" />
+    );
+  };
+
   return (
-    <div className="">
+    <div>
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold ">Bank Accounts</h1>
-        <p className="text-gray-600 mt-1">
-          Manage your company's banking information
+        <h1 className="text-3xl font-bold text-gray-900">Bank Accounts</h1>
+        <p className="text-gray-600 mt-2 text-lg">
+          Manage your company's banking information and verification status
         </p>
       </div>
 
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/10 backdrop-blur-xs bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-[90%] max-w-sm">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              Confirm Deletion
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this bank account? This action
+              cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-gray-300 shadow-sm">
-          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-xl font-semibold ">Bank Accounts</h2>
-            <button
-              onClick={() => setShowAccountForm(!showAccountForm)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Account
-            </button>
+        {/* Accounts Card */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Bank Accounts
+              </h2>
+              <p className="text-gray-500 text-sm mt-1">
+                {Object.values(myBankList || {}).filter(Boolean).length}{" "}
+                account(s) registered
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <RefreshToast isLoading={isLoading} onClick={fetchHandle} />
+              <button
+                onClick={() => setShowAccountForm(!showAccountForm)}
+                className="inline-flex items-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Account
+              </button>
+            </div>
           </div>
 
+          {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50/80">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Account Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Account Number
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    status
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                    Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                     Bank Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Action
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {Object.values(myBankList || []).filter(Boolean).length > 0 ? (
-                  Object.values(myBankList || [])
+              <tbody className="bg-white divide-y divide-gray-100">
+                {Object.values(myBankList || {}).filter(Boolean).length > 0 ? (
+                  Object.values(myBankList || {})
                     .filter((account) => account && typeof account === "object")
-                    .map((account, i) => (
+                    .map((account) => (
                       <React.Fragment key={account.id || account.accountNumber}>
                         {account?.bankRejectionReason && (
-                          <tr key={i} className="bg-red-50">
-                            <td
-                              colSpan={6}
-                              className="px-6 py-3 text-red-700 text-sm font-medium"
-                            >
-                              Rejection Reason: "{account.bankRejectionReason}"
-                              for this account number {account.accountNumber}
+                          <tr className="bg-red-50/50">
+                            <td colSpan={6} className="px-6 py-3">
+                              <div className="flex items-center text-red-700 text-sm">
+                                <div className="bg-red-100 rounded-full p-1 mr-3">
+                                  <svg
+                                    className="h-4 w-4"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <span className="font-medium">
+                                    Rejection Reason:
+                                  </span>{" "}
+                                  {account.bankRejectionReason}
+                                  <span className="text-red-600 ml-2">
+                                    (Account: {account.accountNumber})
+                                  </span>
+                                </div>
+                              </div>
                             </td>
                           </tr>
                         )}
-                        <tr
-                          key={account.id || Math.random()}
-                          className={`hover:bg-gray-50 ${
-                            account?.bankRejectionReason &&
-                            "bg-red-50 text-red-700 hover:bg-red-100"
-                          }`}
-                        >
-                          <td className="px-6 py-4">
+                        <tr className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-5">
                             <div className="flex items-center">
-                              <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium text-sm">
+                              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm shadow-sm">
                                 {getInitials(account?.accountHolder || "NA")}
                               </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-medium ">
+                              <div className="ml-4">
+                                <div className="text-sm font-semibold text-gray-900">
                                   {account?.accountHolder || "-"}
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-500 mt-0.5">
                                   {account?.phoneNumber || "-"}
                                 </div>
                               </div>
                             </div>
                           </td>
 
-                          <td className="px-6 py-4 font-mono text-sm ">
-                            {String(account?.accountNumber || "-")}
+                          <td className="px-6 py-5">
+                            <div className="font-mono text-sm font-medium text-gray-900 bg-gray-50 px-3 py-1.5 rounded-lg inline-block">
+                              {String(account?.accountNumber || "-")}
+                            </div>
                           </td>
 
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                                account?.accountType === AccountType.BUSINESS
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-green-100 text-green-700"
-                              }`}
-                            >
-                              {account?.accountType === AccountType.BUSINESS
-                                ? "Business"
-                                : "Personal"}
-                            </span>
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
+                                  account?.accountType === AccountType.BUSINESS
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-green-100 text-green-700"
+                                }`}
+                              >
+                                {getAccountTypeIcon(account?.accountType)}
+                                <span className="ml-1.5">
+                                  {account?.accountType === AccountType.BUSINESS
+                                    ? "Business"
+                                    : "Personal"}
+                                </span>
+                              </span>
+                            </div>
                           </td>
 
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-5">
                             {account?.status ? (
                               <span
-                                className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                className={`inline-flex px-3 py-1.5 text-xs font-medium rounded-full ${
                                   statusStyles[account.status.toUpperCase()] ||
                                   "bg-gray-100 text-gray-700"
                                 }`}
                               >
-                                {account.status}
+                                {account.status.charAt(0).toUpperCase() +
+                                  account.status.slice(1).toLowerCase()}
                               </span>
                             ) : (
                               "-"
                             )}
                           </td>
 
-                          <td className="px-6 py-4 text-sm  flex items-center space-x-3">
-                            {account?.bankProofFile ? (
-                              <a
-                                href={account.bankProofFile}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block"
-                              >
-                                <img
-                                  src={account.bankProofFile}
-                                  alt={account.bankName || "Bank Proof"}
-                                  className="w-12 h-12 object-cover rounded-md border border-gray-200 hover:scale-105 transition-transform"
-                                />
-                              </a>
-                            ) : (
-                              <div className="w-12 h-12 flex items-center justify-center rounded-md bg-gray-100 text-gray-400 text-xs">
-                                No Image
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-4">
+                              {account?.bankProofFile ? (
+                                <a
+                                  href={account.bankProofFile}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="group relative"
+                                >
+                                  <div className="w-14 h-14 rounded-xl border-2 border-gray-200 group-hover:border-blue-300 overflow-hidden shadow-sm transition-all">
+                                    <img
+                                      src={account.bankProofFile}
+                                      alt={account.bankName || "Bank Proof"}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                    />
+                                  </div>
+                                  <div className="absolute inset-0 bg-black/30 bg-opacity-0 group-hover:bg-opacity-10 transition-all rounded-xl flex items-center justify-center">
+                                    <Download className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </a>
+                              ) : (
+                                <div className="w-14 h-14 flex items-center justify-center rounded-xl bg-gray-100 text-gray-400 text-xs border border-gray-200">
+                                  No Image
+                                </div>
+                              )}
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {account?.bankName || "-"}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  IFSC: {account?.ifscCode || "-"}
+                                </div>
                               </div>
-                            )}
-                            <div>
-                              {account?.bankName || "-"} <br />
-                              <span className="text-xs text-gray-500">
-                                IFSC: {account?.ifscCode || "-"}
-                              </span>
                             </div>
                           </td>
 
-                          <td className="px-6 py-4 space-x-3">
-                            <button
-                              onClick={() => handleEditClick(account)}
-                              className="text-blue-600 hover:text-blue-800"
-                              title="Edit"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteAccount(account?.id)}
-                              className="text-red-600 hover:text-red-800"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleEditClick(account)}
+                                className="inline-flex items-center p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                                title="Edit"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(account?.id)}
+                                className="inline-flex items-center p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       </React.Fragment>
                     ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center">
-                      <div className="text-gray-400 text-lg mb-2">
-                        No accounts found
+                    <td colSpan="6" className="px-6 py-16 text-center">
+                      <div className="text-gray-400 mb-4">
+                        <svg
+                          className="h-16 w-16 mx-auto opacity-50"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1}
+                            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                          />
+                        </svg>
                       </div>
-                      <div className="text-gray-500 text-sm">
-                        Add your first company account to get started
+                      <div className="text-gray-500 text-lg font-medium mb-2">
+                        No bank accounts found
+                      </div>
+                      <div className="text-gray-400 text-sm max-w-sm mx-auto">
+                        Get started by adding your first company bank account to
+                        manage payments and transfers
                       </div>
                     </td>
                   </tr>
@@ -339,6 +467,7 @@ const CompanyAccounts = () => {
           </div>
         </div>
 
+        {/* Add/Edit Form */}
         {showAccountForm && (
           <AddBank
             accountForm={accountForm}

@@ -6,9 +6,10 @@ import {
   envConfig,
   toggleStatusApiIntigration,
 } from "../redux/slices/serviceSlice";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Cpu, Shield, Zap } from "lucide-react";
 import IntegrationTable from "../components/tabels/IntegrationTable";
 import IntegrationForm from "../components/forms/IntegrationForm";
+import RefreshToast from "../components/ui/RefreshToast";
 
 function ApiIntegration() {
   const [integrations, setIntegrations] = useState([]);
@@ -21,11 +22,17 @@ function ApiIntegration() {
   const [testConnectionSuccess, setTestConnectionSuccess] = useState(false);
 
   const dispatch = useDispatch();
-  const { serviceProviders } = useSelector((state) => state.services);
+  const { serviceProviders, isLoading } = useSelector(
+    (state) => state.services
+  );
 
-  useEffect(() => {
+  const fetchHandle = useCallback(() => {
     dispatch(allServices("all"));
   }, [dispatch]);
+
+  useEffect(() => {
+    fetchHandle();
+  }, [fetchHandle]);
 
   useEffect(() => {
     if (Array.isArray(serviceProviders?.allApiIntigration)) {
@@ -172,31 +179,116 @@ function ApiIntegration() {
     }
   };
 
+  const activeCount = integrations.filter(
+    (integration) => integration.connected
+  ).length;
+
   return (
     <div>
       {/* Header */}
       <div className="mb-12">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-4xl font-bold text-gray-900">API Integrations</h1>
-          <div className="flex items-center space-x-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-sm font-medium text-gray-700">
-              {serviceProviders.count}
-              Active
-            </span>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-blue-100 rounded-xl">
+                <Cpu className="w-6 h-6 text-blue-600" />
+              </div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900">
+                API Integrations
+              </h1>
+            </div>
+            <p className="text-gray-600 text-lg max-w-2xl">
+              Connect and manage your service provider APIs securely with
+              encrypted configurations.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Status Card */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-sm font-semibold text-gray-700">
+                  {activeCount} Active
+                </span>
+              </div>
+              <div className="w-px h-6 bg-gray-300" />
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-gray-400" />
+                <span className="text-sm font-medium text-gray-600">
+                  {integrations.length} Total
+                </span>
+              </div>
+            </div>
+
+            <RefreshToast isLoading={isLoading} onClick={fetchHandle} />
           </div>
         </div>
-        <p className="text-gray-600 text-lg max-w-2xl">
-          Connect and manage your service provider APIs securely.
-        </p>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-xl shadow-sm">
+                <Zap className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-700">
+                  Connected APIs
+                </p>
+                <p className="text-2xl font-bold text-blue-900">
+                  {activeCount}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-xl shadow-sm">
+                <Cpu className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  Total Services
+                </p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {integrations.length}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white rounded-xl shadow-sm">
+                <Shield className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-emerald-700">Secure</p>
+                <p className="text-2xl font-bold text-emerald-900">100%</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Integration Table */}
-      <IntegrationTable
-        integrations={integrations}
-        onConnect={handleConnect}
-        onDisconnect={handleDisconnectBtn}
-      />
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Service Providers
+          </h2>
+          <p className="text-gray-500 text-sm mt-1">
+            Manage API connections and configurations for all service providers
+          </p>
+        </div>
+        <IntegrationTable
+          integrations={integrations}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnectBtn}
+        />
+      </div>
 
       {/* Popup Form */}
       {showPopup && selectedApi && (
@@ -220,17 +312,39 @@ function ApiIntegration() {
 
       {/* Success Toast */}
       {showSuccessToast && (
-        <div className="fixed top-4 right-4 z-[60] animate-in slide-in-from-top">
-          <div className="bg-white rounded-xl shadow-2xl border-2 border-green-200 p-4 flex items-center space-x-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+        <div className="fixed top-6 right-6 z-[60] animate-in slide-in-from-right duration-500">
+          <div className="bg-white rounded-xl shadow-2xl border border-emerald-200 p-4 flex items-center space-x-3 min-w-[280px]">
+            <div className="flex-shrink-0">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-gray-900">Success!</p>
-              <p className="text-sm text-gray-600">
-                Configuration saved successfully
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900 text-sm">
+                Connection Successful!
+              </p>
+              <p className="text-sm text-gray-600 mt-0.5">
+                API configuration tested successfully
               </p>
             </div>
+            <button
+              onClick={() => setShowSuccessToast(false)}
+              className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       )}

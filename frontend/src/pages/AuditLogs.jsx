@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { getAuditLogs } from "../redux/slices/logsSlice";
 import { getAllRoles } from "../redux/slices/roleSlice";
+import RefreshToast from "../components/ui/RefreshToast";
 
 const AuditLogs = () => {
   const dispatch = useDispatch();
@@ -118,16 +119,44 @@ const AuditLogs = () => {
   };
 
   const getActionColor = (action) => {
-    if (action?.includes("SUCCESS")) return "text-green-600";
-    if (action?.includes("FAILED")) return "text-red-600";
-    if (action?.includes("ERROR")) return "text-red-600";
+    if (!action) return "text-blue-600";
+    if (action.includes("UPDATED")) return "text-yellow-600";
+
+    if (
+      ["SUCCESS", "VERIFIED", "REGISTERED", "CREATE", "ACTIVATED"].some((key) =>
+        action.includes(key)
+      )
+    )
+      return "text-green-600";
+    if (
+      ["FAILED", "REJECT", "ERROR", "LOGOUT", "DELETED", "DEACTIVATED"].some(
+        (keyword) => action.includes(keyword)
+      )
+    ) {
+      return "text-red-600";
+    }
+
     return "text-blue-600";
   };
 
   const getActionBg = (action) => {
-    if (action?.includes("SUCCESS")) return "bg-green-50 border-green-200";
-    if (action?.includes("FAILED")) return "bg-red-50 border-red-200";
-    if (action?.includes("ERROR")) return "bg-red-50 border-red-200";
+    if (!action) return "bg-blue-50 border-blue-200";
+    if (action.includes("UPDATED")) return "bg-yellow-50 border-yellow-200";
+
+    if (
+      ["SUCCESS", "VERIFIED", "REGISTERED", "CREATE", "ACTIVATED"].some((key) =>
+        action.includes(key)
+      )
+    )
+      return "bg-green-50 border-green-200";
+
+    if (
+      ["FAILED", "ERROR", "LOGOUT", "REJECT", "DELETED", "DEACTIVATED"].some(
+        (keyword) => action.includes(keyword)
+      )
+    )
+      return "bg-red-50 border-red-200";
+
     return "bg-blue-50 border-blue-200";
   };
 
@@ -355,9 +384,12 @@ const AuditLogs = () => {
       logsList?.data?.paginatedLogs.length ||
       0;
 
-    const successEvents = logsList?.data?.paginatedLogs.filter((log) =>
-      log.message?.action?.includes("SUCCESS")
-    ).length;
+    const successEvents =
+      logsList?.data?.paginatedLogs?.filter((log) =>
+        ["SUCCESS", "CREATED", "VERIFIED", "REGISTERED", "ACTIVATED"].some(
+          (keyword) => log.message?.action?.includes(keyword)
+        )
+      )?.length || 0;
 
     const successRate =
       totalEvents > 0 ? (successEvents / totalEvents) * 100 : 0;
@@ -529,14 +561,7 @@ const AuditLogs = () => {
           </div>
 
           {/* Refresh */}
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 text-sm font-medium shadow-sm"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
+          <RefreshToast isLoading={loading} onClick={handleRefresh} />
 
           {/* Clear Filters Button */}
           <button
@@ -622,7 +647,7 @@ const AuditLogs = () => {
                   Action
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                  Role
+                  Role Type
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
                   Timestamp
@@ -657,6 +682,9 @@ const AuditLogs = () => {
                             </div>
                             <div className="text-xs text-gray-600">
                               {log.user?.email}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              +91-{log.user?.phoneNumber}
                             </div>
                           </div>
                         </div>
@@ -716,7 +744,38 @@ const AuditLogs = () => {
                     {expandedLog === index && (
                       <tr className="bg-blue-50">
                         <td colSpan="8" className="px-6 py-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* parent details  */}
+                            <div className="bg-white rounded-lg p-4 border border-blue-100">
+                              <h3 className="text-gray-900 font-semibold flex items-center gap-2 mb-3">
+                                <Activity className="w-4 h-4 text-blue-600" />
+                                Parents Details
+                              </h3>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Email:</span>
+                                  <span className="text-gray-900 font-mono font-medium">
+                                    {log.user?.parent?.email || "N/A"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">
+                                    Phone Number:
+                                  </span>
+                                  <span className="text-gray-900 font-mono text-xs font-medium">
+                                    {log.user?.parent?.phoneNumber || "N/A"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">
+                                    Hierarchy Level:
+                                  </span>
+                                  <span className="text-green-600 font-semibold">
+                                    {log.user?.parent?.hierarchyLevel || "N/A"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                             {/* Device Information */}
                             <div className="bg-white rounded-lg p-4 border border-blue-100">
                               <h3 className="text-gray-900 font-semibold flex items-center gap-2 mb-3">

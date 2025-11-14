@@ -22,6 +22,8 @@ import ConfirmCard from "../ui/ConfirmCard";
 import Kyc from "../../pages/view/Kyc";
 import Pagination from "../ui/Pagination";
 import { useDebounce } from "use-debounce";
+import { toast, ToastContainer } from "react-toastify";
+import RefreshToast from "../ui/RefreshToast";
 
 const ProfileTable = () => {
   const dispatch = useDispatch();
@@ -258,16 +260,11 @@ const ProfileTable = () => {
             </div>
 
             {/* Refresh Button */}
-            <button
+
+            <RefreshToast
+              isLoading={loading}
               onClick={fetchKycData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              disabled={loading}
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              />
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
+            />
           </div>
         </div>
 

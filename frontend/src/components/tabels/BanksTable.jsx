@@ -24,6 +24,7 @@ import Bank from "../../pages/view/Bank";
 import Pagination from "../ui/Pagination";
 import { useDebounce } from "use-debounce";
 import StateCard from "../ui/StateCard";
+import RefreshToast from "../ui/RefreshToast";
 
 // Constants
 const TABLE_LIMIT = 10;
@@ -365,16 +366,7 @@ const BankTable = () => {
               </select>
             </div>
 
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 min-w-[100px] justify-center"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              {isRefreshing ? "Refreshing..." : "Refresh"}
-            </button>
+            <RefreshToast isLoading={isRefreshing} onClick={handleRefresh} />
           </div>
         </div>
 

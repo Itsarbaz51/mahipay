@@ -1,8 +1,6 @@
-// userSlice.js
 import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { logout } from "./authSlice";
 
 const initialState = {
   users: [], // Business users

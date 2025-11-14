@@ -64,7 +64,6 @@ class AuditLogService {
         });
       }
 
-      // ✅ Apply field-specific filters (roleId filter remove kiya)
       if (filters) {
         if (filters.action) {
           const action = filters.action.toLowerCase();
@@ -84,8 +83,6 @@ class AuditLogService {
           );
         }
 
-        // ❌ roleId filter yahan se remove kiya
-
         if (filters.deviceType && filters.deviceType !== "all") {
           const deviceType = filters.deviceType.toLowerCase();
           filteredLogs = filteredLogs.filter((log) => {
@@ -104,7 +101,6 @@ class AuditLogService {
           });
         }
 
-        // ✅ Global search — only for admins
         if (userRole?.toUpperCase() === "ADMIN" && filters.search) {
           const term = filters.search.toLowerCase();
           filteredLogs = filteredLogs.filter((log) => {
@@ -114,7 +110,6 @@ class AuditLogService {
         }
       }
 
-      // ✅ Sorting
       const sortBy = filters.sortBy || "timestamp";
       const sortOrder = filters.sortOrder || "desc";
 
@@ -134,7 +129,6 @@ class AuditLogService {
         return 0;
       });
 
-      // ✅ Pagination
       const currentPage = Math.max(1, parseInt(page));
       const pageSize = Math.max(1, Math.min(parseInt(limit), 100));
       const totalItems = filteredLogs.length;
@@ -142,7 +136,6 @@ class AuditLogService {
       const skip = (currentPage - 1) * pageSize;
       const enrichedLogs = filteredLogs.slice(skip, skip + pageSize);
 
-      // ✅ Enrich logs with user info from Prisma with roleId filter
       const uniqueUserIds = [
         ...new Set(
           enrichedLogs
@@ -153,12 +146,10 @@ class AuditLogService {
 
       let users = [];
       if (uniqueUserIds.length > 0) {
-        // ✅ Prisma query mein roleId filter add kiya
         const userWhereClause = {
           id: { in: uniqueUserIds },
         };
 
-        // Agar roleId filter diya gaya hai to add karo
         if (filters?.roleId) {
           userWhereClause.roleId = filters.roleId;
         }
@@ -171,18 +162,23 @@ class AuditLogService {
             lastName: true,
             email: true,
             phoneNumber: true,
-            roleId: true, // RoleId bhi select karo filter ke liye
+            roleId: true,
+            parent: {
+              select: {
+                email: true,
+                phoneNumber: true,
+                hierarchyLevel: true,
+              },
+            },
           },
         });
       }
 
-      // ✅ Map users to logs - roleId filter ke baad bache hue users ke logs hi rakhna
       const paginatedLogs = enrichedLogs
         .map((log) => {
           const logUserId = log.userId || log.message?.userId;
           const user = users.find((u) => u.id === logUserId);
 
-          // Agar user nahi mila (roleId filter ke karan) to null return karo
           if (!user) return null;
 
           return {
@@ -193,11 +189,12 @@ class AuditLogService {
               lastName: user.lastName,
               email: user.email,
               phoneNumber: user.phoneNumber,
-              roleId: user.roleId, // RoleId bhi include karo response mein
+              roleId: user.roleId,
+              parent: user.parent,
             },
           };
         })
-        .filter((log) => log !== null); // Null logs remove karo
+        .filter((log) => log !== null);
 
       const pagination = {
         page: currentPage,

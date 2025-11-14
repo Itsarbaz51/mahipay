@@ -73,7 +73,8 @@ class EmployeeController {
     const user = await EmployeeServices.updateProfileImage(
       employeeId,
       req.file.path,
-      req
+      req,
+      res
     );
 
     const safeUser = Helper.serializeUser(user, req, res);

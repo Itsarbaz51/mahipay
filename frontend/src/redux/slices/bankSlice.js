@@ -105,6 +105,7 @@ export const updateBank = (payload) => async (dispatch) => {
       payload.data
     );
     dispatch(bankActionSuccess(data));
+    return data;
   } catch (error) {
     const errMsg = error?.response?.data?.message || error?.message;
     dispatch(bankFail(errMsg));

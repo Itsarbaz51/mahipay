@@ -374,6 +374,10 @@ export class BankDetailService {
 
       return createBank;
     } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
       throw ApiError.internal("Failed to Add bank account", error.message);
     } finally {
       if (bankProofFile?.path) {
@@ -546,6 +550,9 @@ export class BankDetailService {
 
       return updateBank;
     } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
       throw ApiError.internal("update bank failed:", error.message);
     } finally {
       // Clean up temporary files
@@ -741,7 +748,7 @@ export class BankDetailService {
     if (req) {
       await AuditLogService.createAuditLog({
         userId: userId,
-        action: `BANK_VERIFICATION_${record.status.toUpperCase()}`,
+        action: `BANK_VERIFICATION_${updatedBank.status.toUpperCase()}`,
         entityType: "BANK",
         entityId: id,
         ipAddress: Helper.getClientIP(req),

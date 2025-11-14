@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useDebounce } from "use-debounce";
 import { getLoginLogs } from "../redux/slices/logsSlice";
 import { getAllRoles } from "../redux/slices/roleSlice";
+import RefreshToast from "../components/ui/RefreshToast";
 
 const ITEMS_PER_PAGE = 10;
 const DEBOUNCE_DELAY = 400;
@@ -495,6 +496,7 @@ const LoginLogs = () => {
                 </div>
               )}
             </div>
+            <RefreshToast isLoading={isRefreshing} onClick={handleRefresh} />
 
             {/* Clear Filters Button - Only show when filters are active */}
             {hasActiveFilters && (
@@ -506,18 +508,6 @@ const LoginLogs = () => {
                 Clear Filters
               </button>
             )}
-
-            {/* Refresh */}
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="inline-flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 text-sm font-medium shadow-sm"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
           </div>
         </div>
 

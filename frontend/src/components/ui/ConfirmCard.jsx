@@ -44,10 +44,11 @@ function ConfirmCard({
         {user && (
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
             <p className="font-medium text-gray-900">
-              {user?.firstName || user?.profile?.name} {user?.lastName}
+              {user?.firstName || user?.profile?.name || user?.accountHolder}{" "}
+              {user?.lastName}
             </p>
             <p className="text-sm text-gray-600">
-              {user?.email || user?.profile?.email}
+              {user?.email || user?.profile?.email || user?.accountNumber}
             </p>
             <p className="text-sm text-gray-600">{user?.role?.name}</p>
           </div>
@@ -130,7 +131,7 @@ function ConfirmCard({
             onClick={handleSubmit}
             disabled={isSubmitting}
             className={`px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              isDeactivate || isDelete || isReject
+              isDeactivate || isDelete  || isReject
                 ? "bg-red-600 hover:bg-red-700"
                 : "bg-green-600 hover:bg-green-700"
             }`}

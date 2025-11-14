@@ -1,5 +1,5 @@
 import {
-  Cable,
+  Cpu,
   CreditCard,
   Settings as SettingsIcon,
   UserCog,
@@ -16,7 +16,7 @@ import ApiIntegration from "./ApiIntigration";
 
 const Settings = () => {
   const { currentUser = {} } = useSelector((state) => state.auth);
-  const roleName = currentUser?.role?.name || "";
+  const currentUserRole = currentUser?.role || "";
 
   // Define all tabs
   const allTabs = [
@@ -25,44 +25,88 @@ const Settings = () => {
       label: "General Settings",
       icon: SettingsIcon,
       adminOnly: true,
+      employee: true,
     },
     {
       id: "accounts",
       label: "Company Accounts",
       icon: CreditCard,
       adminOnly: false,
+      employee: false,
     },
-    { id: "services", label: "Services", icon: UserCog, adminOnly: true },
-    { id: "role", label: "Roles Management", icon: UserCog, adminOnly: true },
+    {
+      id: "services",
+      label: "Services",
+      icon: UserCog,
+      adminOnly: true,
+      employee: true,
+    },
+    {
+      id: "role",
+      label: "Roles Management",
+      icon: UserCog,
+      adminOnly: true,
+      employee: true,
+    },
     {
       id: "api-intigration",
       label: "API Intigration",
-      icon: Cable,
+      icon: Cpu,
       adminOnly: true,
+      employee: true,
     },
   ];
 
   const tabs =
-    roleName === "ADMIN" ? allTabs : allTabs.filter((tab) => !tab.adminOnly);
+    currentUserRole.name === "ADMIN" || currentUserRole.type == "employee"
+      ? allTabs
+      : allTabs.filter((tab) => !tab.adminOnly);
 
   const defaultTab =
-    roleName === "ADMIN" ? "general" : tabs[0]?.id || "accounts";
+    currentUserRole.name === "ADMIN" || currentUserRole.type == "employee"
+      ? "general"
+      : tabs[0]?.id || "accounts";
   const [activeTab, setActiveTab] = useState(defaultTab);
 
   const renderActiveTab = () => {
     switch (activeTab) {
       case "general":
-        return roleName === "ADMIN" ? <MainSettings /> : <NoAccess />;
+        return currentUserRole.name === "ADMIN" ||
+          currentUserRole.type == "employee" ? (
+          <MainSettings />
+        ) : (
+          <NoAccess />
+        );
       case "accounts":
         return <CompanyAccounts />;
       case "services":
-        return roleName === "ADMIN" ? <ManageServices /> : <NoAccess />;
+        return currentUserRole.name === "ADMIN" ||
+          currentUserRole.type == "employee" ? (
+          <ManageServices />
+        ) : (
+          <NoAccess />
+        );
       case "role":
-        return roleName === "ADMIN" ? <RoleManager /> : <NoAccess />;
+        return currentUserRole.name === "ADMIN" ||
+          currentUserRole.type == "employee" ? (
+          <RoleManager />
+        ) : (
+          <NoAccess />
+        );
       case "api-intigration":
-        return roleName === "ADMIN" ? <ApiIntegration /> : <NoAccess />;
+        return currentUserRole.name === "ADMIN" ||
+          currentUserRole.type == "employee" ? (
+          <ApiIntegration />
+        ) : (
+          <NoAccess />
+        );
       default:
-        return roleName === "ADMIN" ? <MainSettings /> : <NoAccess />;
+        return currentUserRole.name === "ADMIN" ||
+          currentUserRole.type == "employee" ? (
+          <MainSettings />
+        ) : (
+          <NoAccess />
+        );
     }
   };
 
