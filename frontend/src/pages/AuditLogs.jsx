@@ -17,15 +17,14 @@ import {
   ChevronUp,
   Activity,
   Search,
-  ChevronLeft,
-  ChevronRight,
   ArrowUpDown,
-  RefreshCw,
   FileText,
+  X,
 } from "lucide-react";
 import { getAuditLogs } from "../redux/slices/logsSlice";
 import { getAllRoles } from "../redux/slices/roleSlice";
 import RefreshToast from "../components/ui/RefreshToast";
+import Pagination from "../components/ui/Pagination"; // Import Pagination component
 
 const AuditLogs = () => {
   const dispatch = useDispatch();
@@ -240,135 +239,6 @@ const AuditLogs = () => {
     };
   }, [deviceFilterOpen, roleFilterOpen, sortOpen]);
 
-  // Render pagination controls
-  const renderPagination = () => {
-    if (!logsList?.data?.pagination) return null;
-
-    const { pagination } = logsList.data;
-    const currentPageNum = pagination.currentPage || pagination.page || 1;
-    const totalPages = pagination.totalPages || 1;
-    const hasNext = pagination.hasNext || false;
-    const hasPrev = pagination.hasPrev || false;
-
-    const pages = [];
-    const maxVisiblePages = 5;
-
-    let startPage = Math.max(
-      1,
-      currentPageNum - Math.floor(maxVisiblePages / 2)
-    );
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    // Previous button
-    pages.push(
-      <button
-        key="prev"
-        onClick={() => setCurrentPage(currentPageNum - 1)}
-        disabled={!hasPrev}
-        className={`px-3 py-1 rounded-lg border border-slate-300 text-sm font-medium flex items-center gap-1 ${
-          !hasPrev
-            ? "text-slate-400 cursor-not-allowed bg-slate-100"
-            : "text-slate-700 hover:bg-slate-50 hover:border-slate-400"
-        }`}
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Previous
-      </button>
-    );
-
-    // First page
-    if (startPage > 1) {
-      pages.push(
-        <button
-          key={1}
-          onClick={() => setCurrentPage(1)}
-          className={`px-3 py-1 rounded-lg border text-sm font-medium ${
-            1 === currentPageNum
-              ? "bg-blue-500 text-white border-blue-500"
-              : "border-slate-300 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          1
-        </button>
-      );
-      if (startPage > 2) {
-        pages.push(
-          <span key="ellipsis1" className="px-2 text-slate-500">
-            ...
-          </span>
-        );
-      }
-    }
-
-    // Page numbers
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(
-        <button
-          key={i}
-          onClick={() => setCurrentPage(i)}
-          className={`px-3 py-1 rounded-lg border text-sm font-medium ${
-            i === currentPageNum
-              ? "bg-blue-500 text-white border-blue-500"
-              : "border-slate-300 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    // Last page
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pages.push(
-          <span key="ellipsis2" className="px-2 text-slate-500">
-            ...
-          </span>
-        );
-      }
-      pages.push(
-        <button
-          key={totalPages}
-          onClick={() => setCurrentPage(totalPages)}
-          className={`px-3 py-1 rounded-lg border text-sm font-medium ${
-            totalPages === currentPageNum
-              ? "bg-blue-500 text-white border-blue-500"
-              : "border-slate-300 text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          {totalPages}
-        </button>
-      );
-    }
-
-    // Next button
-    pages.push(
-      <button
-        key="next"
-        onClick={() => setCurrentPage(currentPageNum + 1)}
-        disabled={!hasNext}
-        className={`px-3 py-1 rounded-lg border border-slate-300 text-sm font-medium flex items-center gap-1 ${
-          !hasNext
-            ? "text-slate-400 cursor-not-allowed bg-slate-100"
-            : "text-slate-700 hover:bg-slate-50 hover:border-slate-400"
-        }`}
-      >
-        Next
-        <ChevronRight className="w-4 h-4" />
-      </button>
-    );
-
-    return (
-      <div className="flex items-center gap-2 flex-wrap justify-center">
-        {pages}
-      </div>
-    );
-  };
-
   // Calculate stats
   const calculateStats = () => {
     if (
@@ -414,6 +284,16 @@ const AuditLogs = () => {
 
   const stats = calculateStats();
 
+  // Check if any filters are active for Clear Filters button
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.deviceType !== "all" ||
+      filters.roleId !== "" ||
+      filters.sort !== "desc" ||
+      searchTerm !== ""
+    );
+  }, [filters, searchTerm]);
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden p-6">
       {/* Header with Filters */}
@@ -422,6 +302,7 @@ const AuditLogs = () => {
         <div className="relative w-full max-w-md">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Search users, IPs, actions..."
             value={searchTerm}
@@ -505,7 +386,7 @@ const AuditLogs = () => {
                     {roles?.map((role) => (
                       <button
                         key={role.id}
-                        onClick={() => handleRoleFilterChange(role.id)} // Pass role.id instead of role object
+                        onClick={() => handleRoleFilterChange(role.id)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                           filters.roleId === role.id
                             ? "bg-blue-50 text-blue-700 font-medium"
@@ -563,13 +444,16 @@ const AuditLogs = () => {
           {/* Refresh */}
           <RefreshToast isLoading={loading} onClick={handleRefresh} />
 
-          {/* Clear Filters Button */}
-          <button
-            onClick={clearFilters}
-            className="inline-flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
-          >
-            Clear Filters
-          </button>
+          {/* Clear Filters Button - Only show when filters are active */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-2 px-4 py-3 border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 text-sm font-medium"
+            >
+              <X className="h-4 w-4" />
+              Clear Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -745,7 +629,7 @@ const AuditLogs = () => {
                       <tr className="bg-blue-50">
                         <td colSpan="8" className="px-6 py-6">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* parent details  */}
+                            {/* Parent details */}
                             <div className="bg-white rounded-lg p-4 border border-blue-100">
                               <h3 className="text-gray-900 font-semibold flex items-center gap-2 mb-3">
                                 <Activity className="w-4 h-4 text-blue-600" />
@@ -937,8 +821,8 @@ const AuditLogs = () => {
         </div>
 
         {/* Pagination */}
-        {logsList?.data.pagination &&
-          logsList?.data.pagination?.totalItems > 0 && (
+        {logsList?.data?.pagination &&
+          logsList?.data?.pagination?.totalItems > 0 && (
             <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <span className="text-sm text-slate-600">
@@ -946,7 +830,12 @@ const AuditLogs = () => {
                   {logsList.data.pagination.totalItems} logs
                 </span>
 
-                {renderPagination()}
+                {/* Use Pagination Component */}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={logsList.data.pagination.totalPages}
+                  onPageChange={setCurrentPage}
+                />
 
                 <span className="text-xs text-slate-500">
                   Last updated: {new Date().toLocaleTimeString()}

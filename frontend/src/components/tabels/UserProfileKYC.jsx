@@ -268,6 +268,7 @@ const UserProfileKYC = () => {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-4">#</th>
                 <th className="px-6 py-4">Profile</th>
                 <th className="px-6 py-4">Contact Info</th>
                 <th className="px-6 py-4">Documents</th>
@@ -281,10 +282,13 @@ const UserProfileKYC = () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {kycProfiles.length > 0 ? (
-                kycProfiles.map((kyc) => {
+                kycProfiles.map((kyc, i) => {
                   const { classes, icon } = getStatusConfig(kyc.status);
                   return (
                     <tr key={kyc.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {(currentPage - 1) * limit + i + 1}
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="w-12 h-12 rounded-full bg-gray-200 flex justify-center items-center overflow-hidden">
