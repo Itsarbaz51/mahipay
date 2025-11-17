@@ -46,12 +46,12 @@ export class CommissionSettingController {
       );
   });
 
-  static getByCreatedBy = asyncHandler(async (req, res) => {
+  static getAll = asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) throw ApiError.unauthorized("Unauthorized");
 
     const settings =
-      await CommissionSettingService.getCommissionSettingsByCreatedBy(userId);
+      await CommissionSettingService.getCommissionSettingsAll(userId);
 
     return res
       .status(200)
@@ -59,50 +59,6 @@ export class CommissionSettingController {
         ApiResponse.success(
           settings,
           "Commission settings fetched successfully",
-          200
-        )
-      );
-  });
-
-  static getAll = asyncHandler(async (req, res) => {
-    const { scope, roleId, targetUserId, serviceId, isActive } = req.query;
-
-    const filters = {};
-
-    if (scope) filters.scope = scope;
-    if (typeof roleId === "string") filters.roleId = roleId;
-    if (typeof targetUserId === "string") filters.targetUserId = targetUserId;
-    if (typeof serviceId === "string") filters.serviceId = serviceId;
-    if (typeof isActive === "string") filters.isActive = isActive === "true";
-
-    const settings =
-      await CommissionSettingService.getCommissionSettings(filters);
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          settings,
-          "Commission settings fetched successfully",
-          200
-        )
-      );
-  });
-
-  static deactivate = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-
-    if (!id) throw ApiError.badRequest("Id is required");
-
-    const setting =
-      await CommissionSettingService.deactivateCommissionSetting(id);
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          setting,
-          "Commission setting deactivated successfully",
           200
         )
       );

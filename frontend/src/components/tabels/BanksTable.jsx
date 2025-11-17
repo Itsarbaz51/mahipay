@@ -76,7 +76,9 @@ const BankTable = () => {
 
   const totalPages = useMemo(() => bankMeta?.totalPages || 1, [bankMeta]);
   const isAdmin = useMemo(
-    () => currentUser.role?.name === "ADMIN",
+    () =>
+      currentUser.role?.name === "ADMIN" ||
+      currentUser.role?.type === "employee",
     [currentUser]
   );
 

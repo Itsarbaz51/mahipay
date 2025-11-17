@@ -6,9 +6,11 @@ class AuditLogsController {
   static getAuditLogs = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, ...filters } = req.body;
 
-    const userRole = req.user?.role?.type || req.user?.role;
+    // Role type directly pass karo service ko
+    const userRoleType = req.user?.role?.type; // Yehi important hai
     const userId = req.user?.id;
 
+   
     if (!userId) {
       throw new ApiError("User not authenticated", 401);
     }
@@ -20,7 +22,7 @@ class AuditLogsController {
       page: parsedPage,
       limit: parsedLimit,
       filters,
-      userRole,
+      userRole: userRoleType, // Role type pass karo
       userId,
     });
 

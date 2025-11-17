@@ -182,65 +182,6 @@ export const getAllRolesByType = (type) => async (dispatch) => {
   }
 };
 
-// Get business roles for user registration
-export const getBusinessRoles = () => async (dispatch) => {
-  try {
-    dispatch(roleRequest());
-    const { data } = await axios.get(`/roles/business`);
-
-    const roles = data.data?.roles || data.data || [];
-    dispatch(setBusinessRoles(roles));
-    dispatch(roleSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to fetch business roles";
-    dispatch(roleFail(errMsg));
-    throw new Error(errMsg);
-  }
-};
-
-// Get employee roles for employee registration
-export const getEmployeeRoles = () => async (dispatch) => {
-  try {
-    dispatch(roleRequest());
-    const { data } = await axios.get(`/roles/employee`);
-
-    const roles = data.data?.roles || data.data || [];
-    dispatch(setEmployeeRoles(roles));
-    dispatch(roleSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to fetch employee roles";
-    dispatch(roleFail(errMsg));
-    throw new Error(errMsg);
-  }
-};
-
-// Get role by ID
-export const getRoleById = (roleId) => async (dispatch) => {
-  try {
-    dispatch(roleRequest());
-    const { data } = await axios.get(`/roles/${roleId}`);
-
-    dispatch(setCurrentRole(data.data));
-    dispatch(roleSuccess(data));
-    return data;
-  } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to fetch role";
-    dispatch(roleFail(errMsg));
-    throw new Error(errMsg);
-  }
-};
-
 // Create new role
 export const createRole = (roleData) => async (dispatch) => {
   try {

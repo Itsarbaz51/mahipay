@@ -11,7 +11,7 @@ const systemSettingRoutes = Router();
 systemSettingRoutes.get(
   "/show",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   SystemSettingController.show
 );
 
@@ -35,7 +35,7 @@ systemSettingRoutes.delete(
 systemSettingRoutes.post(
   "/upsert",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   upload.fields([
     { name: "companyLogo", maxCount: 1 },
     { name: "favIcon", maxCount: 1 },

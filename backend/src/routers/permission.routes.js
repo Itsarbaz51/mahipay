@@ -37,7 +37,7 @@ permissionRoutes.delete(
 permissionRoutes.post(
   "/user-upsert",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(PermissionValidationSchemas.createOrUpdateUserPermission),
   UserPermissionController.createOrUpdate
 );
@@ -45,7 +45,7 @@ permissionRoutes.post(
 permissionRoutes.get(
   "/user-permission/:userId",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   UserPermissionController.getByUser
 );
 

@@ -8,6 +8,14 @@ import AuditLogService from "./auditLog.service.js";
 
 class EmployeeServices {
   // COMMON USER SELECT FIELDS (DRY Principle)
+  static roleSelectFields = {
+    id: true,
+    name: true,
+    level: true,
+    description: true,
+    type: true,
+  };
+
   static userSelectFields = {
     id: true,
     username: true,
@@ -23,16 +31,8 @@ class EmployeeServices {
     updatedAt: true,
   };
 
-  static roleSelectFields = {
-    id: true,
-    name: true,
-    level: true,
-    description: true,
-    type: true,
-  };
-
   // EMPLOYEE REGISTRATION
-  static async register(payload) {
+  static async register(payload, req = null, res = null) {
     const {
       username,
       firstName,
@@ -112,6 +112,12 @@ class EmployeeServices {
         permissions: permissions,
       });
 
+      // Get current user role for audit log
+      const currentUser = await Prisma.user.findUnique({
+        where: { id: parentId },
+        include: { role: true },
+      });
+
       // Audit log
       await AuditLogService.createAuditLog({
         userId: parentId,
@@ -124,7 +130,8 @@ class EmployeeServices {
           employeeEmail: user.email,
           employeeRole: user.role.name,
           permissionsCount: permissions.length,
-          roleName: req?.user?.role,
+          roleName: currentUser?.role?.name, // Use currentUser instead of req.user
+          roleType: currentUser?.role?.type,
           createdBy: parentId,
         },
       });
@@ -335,6 +342,7 @@ class EmployeeServices {
 
   // EMPLOYEE PROFILE UPDATE
   static async updateProfile(userId, updateData, currentUserId) {
+    // Remove req, res parameters
     const { username, phoneNumber, firstName, lastName, email, roleId } =
       updateData;
 
@@ -350,62 +358,33 @@ class EmployeeServices {
     ]);
 
     if (!currentUser) {
-      await AuditLogService.createAuditLog({
-        userId: currentUserId,
-        action: "EMPLOYEE_PROFILE_UPDATE_FAILED",
-        entityType: "EMPLOYEE",
-        entityId: userId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "CURRENT_USER_NOT_FOUND",
-          roleName: req?.user?.role,
-          updatedBy: currentUserId,
-        },
-      });
       throw ApiError.unauthorized("Current user not found");
     }
+
     if (!userToUpdate) {
-      await AuditLogService.createAuditLog({
-        userId: currentUserId,
-        action: "EMPLOYEE_PROFILE_UPDATE_FAILED",
-        entityType: "EMPLOYEE",
-        entityId: userId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "EMPLOYEE_NOT_FOUND",
-          roleName: req?.user?.role,
-          updatedBy: currentUserId,
-        },
-      });
       throw ApiError.notFound("Employee not found");
     }
 
     if (userToUpdate.role.type !== "employee") {
-      await AuditLogService.createAuditLog({
-        userId: currentUserId,
-        action: "EMPLOYEE_PROFILE_UPDATE_FAILED",
-        entityType: "EMPLOYEE",
-        entityId: userId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "NOT_AN_EMPLOYEE",
-          roleName: req?.user?.role,
-          updatedBy: currentUserId,
-        },
-      });
       throw ApiError.badRequest("Can only update employees");
     }
-    // Authorization check
-    await this.authorizeEmployeeUpdate(
-      currentUser,
-      userToUpdate,
-      userId,
-      email,
-      roleId
-    );
+
+    // Authorization check - ADMIN aur employee dono update kar sakte hain
+    const isAdmin = currentUser.role.name === "ADMIN";
+    const isEmployee = currentUser.role.type === "employee";
+
+    // ADMIN aur employee dono ko full access hai kisi bhi employee ka profile update karne ka
+    if (!isAdmin && !isEmployee) {
+      const canUpdate = await this.checkPermission(
+        currentUserId,
+        "UPDATE_EMPLOYEE"
+      );
+      if (!canUpdate) {
+        throw ApiError.forbidden(
+          "You don't have permission to update employee profiles"
+        );
+      }
+    }
 
     // Check unique constraints
     await this.checkUniqueConstraints(userId, { username, phoneNumber, email });
@@ -419,7 +398,7 @@ class EmployeeServices {
         email,
         roleId,
       },
-      currentUser.role.name === "ADMIN"
+      isAdmin // Only admin can change role
     );
 
     const updatedUser = await Prisma.user.update({
@@ -436,21 +415,23 @@ class EmployeeServices {
       await this.regenerateCredentialsAndNotify(userId, email);
     }
 
+    // Simple audit log without req, res
     await AuditLogService.createAuditLog({
       userId: currentUserId,
       action: "EMPLOYEE_PROFILE_UPDATED",
       entityType: "EMPLOYEE",
       entityId: userId,
-      ipAddress: req ? Helper.getClientIP(req) : null,
       metadata: {
-        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
         updatedFields: Object.keys(updateData),
         emailChanged: !!email,
         roleChanged: !!roleId,
-        roleName: req?.user?.role,
-        updatedBy: currentUserId,
+        roleName: currentUser.role.name,
+        roleType: currentUser.role.type,
+        isAdminAction: isAdmin,
+        isEmployeeAction: isEmployee,
       },
     });
+
     return updatedUser;
   }
 
@@ -493,6 +474,7 @@ class EmployeeServices {
         });
         throw ApiError.notFound("Employee not found");
       }
+
       // Ensure it's an employee user
       if (employee.role.type !== "employee") {
         await AuditLogService.createAuditLog({
@@ -510,13 +492,37 @@ class EmployeeServices {
         });
         throw ApiError.badRequest("Can only update employee profile images");
       }
-      // Authorization check - only admin or the employee themselves can update
+
+      // Get current user with role information
       const currentUserId = req?.user?.id;
-      const isAdmin = req?.user?.role === "ADMIN";
+      let currentUserRoleType = req?.user?.role?.type;
+      let currentUserRoleName = req?.user?.role?.name;
+
+      // If role info not in request, fetch from database
+      if (!currentUserRoleType || !currentUserRoleName) {
+        const currentUser = await Prisma.user.findUnique({
+          where: { id: currentUserId },
+          include: {
+            role: {
+              select: {
+                type: true,
+                name: true,
+              },
+            },
+          },
+        });
+        currentUserRoleType = currentUser?.role?.type;
+        currentUserRoleName = currentUser?.role?.name;
+      }
+
+      // Authorization check - ADMIN aur employee dono kisi bhi employee ka profile update kar sakte hain
+      const isAdmin = currentUserRoleName === "ADMIN";
+      const isEmployee = currentUserRoleType === "employee";
       const isUpdatingOwnProfile = employeeId === currentUserId;
 
-      if (!isUpdatingOwnProfile && !isAdmin) {
-        // Check if current user has permission to update employees
+      // ADMIN aur employee dono ko full access hai kisi bhi employee ka profile update karne ka
+      if (!isAdmin && !isEmployee) {
+        // Agar user na admin hai na employee, to check karo UPDATE_EMPLOYEE permission
         const canUpdate = await this.checkPermission(
           currentUserId,
           "UPDATE_EMPLOYEE"
@@ -531,12 +537,13 @@ class EmployeeServices {
             metadata: {
               ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
               reason: "INSUFFICIENT_PERMISSIONS",
-              roleName: req?.user?.role,
+              roleName: currentUserRoleName,
+              roleType: currentUserRoleType,
               updatedBy: currentUserId,
             },
           });
           throw ApiError.forbidden(
-            "You don't have permission to update this employee's profile image"
+            "You don't have permission to update employee profile images"
           );
         }
       }
@@ -598,8 +605,11 @@ class EmployeeServices {
           ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
           oldImageDeleted: oldImageDeleted,
           isOwnProfile: isUpdatingOwnProfile,
-          roleName: req?.user?.role,
+          roleName: currentUserRoleName,
+          roleType: currentUserRoleType,
           updatedBy: currentUserId,
+          isAdminAction: isAdmin,
+          isEmployeeAction: isEmployee,
         },
       });
 
@@ -632,7 +642,9 @@ class EmployeeServices {
   static async deleteEmployee(
     employeeId,
     deletedBy,
-    reason = "No reason provided"
+    reason = "No reason provided",
+    req = null,
+    res = null
   ) {
     try {
       // Validate inputs
@@ -641,11 +653,11 @@ class EmployeeServices {
       }
 
       if (!deletedBy) {
-        throw ApiError.unauthorized("Admin authentication required");
+        throw ApiError.unauthorized("Authentication required");
       }
 
-      // Get employee and admin details
-      const [employee, admin] = await Promise.all([
+      // Get employee and current user details
+      const [employee, currentUser] = await Promise.all([
         Prisma.user.findUnique({
           where: { id: employeeId },
           include: {
@@ -670,15 +682,19 @@ class EmployeeServices {
           metadata: {
             ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
             reason: "EMPLOYEE_NOT_FOUND",
-            roleName: req?.user?.role,
+            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
             deletedBy: deletedBy,
           },
         });
         throw ApiError.notFound("Employee not found");
       }
 
-      // Validate admin privileges
-      if (!admin || admin.role.name !== "ADMIN") {
+      // Authorization check - ADMIN aur employee dono delete kar sakte hain
+      const isAdmin = currentUser?.role?.name === "ADMIN";
+      const isEmployee = currentUser?.role?.type === "employee";
+
+      // ADMIN aur employee dono ko full access hai employee delete karne ka
+      if (!isAdmin && !isEmployee) {
         await AuditLogService.createAuditLog({
           userId: deletedBy,
           action: "EMPLOYEE_DELETION_FAILED",
@@ -687,15 +703,17 @@ class EmployeeServices {
           ipAddress: req ? Helper.getClientIP(req) : null,
           metadata: {
             ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "NON_ADMIN_DELETION",
-            roleName: req?.user?.role,
+            reason: "INSUFFICIENT_PERMISSIONS",
+            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
+            roleType: currentUser?.role?.type,
             deletedBy: deletedBy,
           },
         });
         throw ApiError.forbidden(
-          "Only administrators can permanently delete employees"
+          "Only administrators and employees can permanently delete employees"
         );
       }
+
       // Ensure we're only deleting employees
       if (employee.role.type !== "employee") {
         await AuditLogService.createAuditLog({
@@ -707,7 +725,7 @@ class EmployeeServices {
           metadata: {
             ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
             reason: "NON_EMPLOYEE_DELETION",
-            roleName: req?.user?.role,
+            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
             deletedBy: deletedBy,
           },
         });
@@ -730,7 +748,7 @@ class EmployeeServices {
           metadata: {
             ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
             reason: "EMPLOYEE_HAS_SUBORDINATES",
-            roleName: req?.user?.role,
+            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
             deletedBy: deletedBy,
           },
         });
@@ -779,8 +797,11 @@ class EmployeeServices {
           employeeEmail: employee.email,
           employeeRole: employee.role.name,
           deletionReason: reason,
-          roleName: req?.user?.role,
+          roleName: currentUser?.role?.name, // Use currentUser instead of req.user
+          roleType: currentUser?.role?.type,
           deletedBy: deletedBy,
+          isAdminAction: isAdmin,
+          isEmployeeAction: isEmployee,
         },
       });
       return {
@@ -793,9 +814,11 @@ class EmployeeServices {
           role: result.role.name,
         },
         deletionDetails: {
-          deletedBy: admin.id,
+          deletedBy: currentUser.id,
           reason: reason,
           timestamp: new Date(),
+          deletedByRole: currentUser.role.name,
+          deletedByRoleType: currentUser.role.type,
         },
       };
     } catch (error) {
@@ -805,7 +828,6 @@ class EmployeeServices {
         throw error;
       }
 
-      // Handle Prisma errors
       // Handle Prisma errors
       if (error.code === "P2025") {
         await AuditLogService.createAuditLog({
@@ -817,7 +839,7 @@ class EmployeeServices {
           metadata: {
             ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
             reason: "EMPLOYEE_NOT_FOUND_OR_ALREADY_DELETED",
-            roleName: req?.user?.role,
+            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
             deletedBy: deletedBy,
           },
         });
@@ -834,7 +856,7 @@ class EmployeeServices {
           ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
           reason: "UNKNOWN_ERROR",
           error: error.message,
-          roleName: req?.user?.role,
+          roleName: currentUser?.role?.name, // Use currentUser instead of req.user
           deletedBy: deletedBy,
         },
       });
@@ -876,12 +898,53 @@ class EmployeeServices {
 
     const skip = (page - 1) * limit;
 
-    // Build query conditions
-    const whereConditions = {
-      parentId,
+    // Get parent user with role information
+    const parent = await Prisma.user.findUnique({
+      where: { id: parentId },
+      include: { role: true },
+    });
+
+    if (!parent) {
+      throw ApiError.notFound("Parent user not found");
+    }
+
+    let targetParentId = parentId;
+    let whereConditions = {
       role: { type: "employee" },
       deletedAt: null,
     };
+
+    // If parent is employee, use admin's ID instead
+    if (parent.role?.type === "employee") {
+      const adminUser = await Prisma.user.findFirst({
+        where: {
+          role: {
+            name: "ADMIN",
+          },
+        },
+      });
+
+      if (!adminUser) {
+        throw new Error("Admin user not found");
+      }
+
+      targetParentId = adminUser.id;
+    }
+
+    // Build query based on user role
+    if (parent.role?.name === "ADMIN" || parent.role?.type === "employee") {
+      // For ADMIN and employee users, show all employees (no parent filter)
+      whereConditions = {
+        ...whereConditions,
+        // No parentId filter for admin and employee
+      };
+    } else {
+      // For other users, show only their children
+      whereConditions = {
+        ...whereConditions,
+        parentId: targetParentId,
+      };
+    }
 
     // Add status filter
     if (status !== "ALL") {
@@ -918,11 +981,6 @@ class EmployeeServices {
       Prisma.user.count({ where: whereConditions }),
     ]);
 
-    const parent = await Prisma.user.findUnique({
-      where: { id: parentId },
-      include: { role: true },
-    });
-
     const safeUsers = users.map((user) =>
       this.sanitizeUserData(user, parent.role)
     );
@@ -933,6 +991,12 @@ class EmployeeServices {
       page: parseInt(page),
       limit: parseInt(limit),
       totalPages: Math.ceil(total / parseInt(limit)),
+      meta: {
+        parentRole: parent.role.name,
+        parentRoleType: parent.role.type,
+        isEmployeeViewingAdminData: parent.role?.type === "employee",
+        targetParentId: targetParentId,
+      },
     };
   }
 
@@ -1037,8 +1101,15 @@ class EmployeeServices {
     });
 
     if (!parent) throw ApiError.badRequest("Invalid parentId");
-    if (parent.role.name !== "ADMIN") {
-      throw ApiError.forbidden("Only admin users can create employees");
+
+    // FIXED: ADMIN aur employee dono create kar sakte hain
+    const isAdmin = parent.role.name === "ADMIN";
+    const isEmployee = parent.role.type === "employee";
+
+    if (!isAdmin && !isEmployee) {
+      throw ApiError.forbidden(
+        "Only admin and employee users can create employees"
+      );
     }
 
     return {
@@ -1155,10 +1226,14 @@ class EmployeeServices {
     return payload;
   }
 
-  static sanitizeUserData(user, currentUser) {
+  static sanitizeUserData(user, currentUserRole) {
     const serialized = Helper.serializeUser(user);
 
-    if (currentUser.role === "ADMIN" || currentUser.name === "ADMIN") {
+    // ADMIN can see decrypted passwords
+    if (
+      currentUserRole.name === "ADMIN" ||
+      currentUserRole.type === "employee"
+    ) {
       if (serialized.password) {
         try {
           serialized.password = CryptoService.decrypt(serialized.password);
@@ -1170,16 +1245,9 @@ class EmployeeServices {
       return safeData;
     }
 
-    if (
-      (currentUser.role === "employee" && user.id === currentUser.id) ||
-      (currentUser.name === "ADMIN" && user.id === currentUser.id)
-    ) {
-      const { password, transactionPin, refreshToken, ...safeData } =
-        serialized;
-      return safeData;
-    }
-
-    throw ApiError.forbidden("Access denied to employee data");
+    // For employee and other users, remove sensitive data
+    const { password, transactionPin, refreshToken, ...safeData } = serialized;
+    return safeData;
   }
 
   static async updateEmployeeStatus(
@@ -1188,8 +1256,8 @@ class EmployeeServices {
     status,
     action,
     reason,
-    req,
-    res
+    req = null,
+    res = null
   ) {
     const [user, changer] = await Promise.all([
       Prisma.user.findUnique({
@@ -1212,7 +1280,7 @@ class EmployeeServices {
         metadata: {
           ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
           reason: "EMPLOYEE_NOT_FOUND",
-          roleName: req?.user?.role,
+          roleName: changer?.role?.name, // Use changer instead of req.user
           changedBy: changedBy,
         },
       });
@@ -1229,7 +1297,7 @@ class EmployeeServices {
         metadata: {
           ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
           reason: "NOT_AN_EMPLOYEE",
-          roleName: req?.user?.role,
+          roleName: changer?.role?.name, // Use changer instead of req.user
           changedBy: changedBy,
         },
       });
@@ -1237,7 +1305,13 @@ class EmployeeServices {
         `Can only ${action.toLowerCase().split("_")[1]} employees`
       );
     }
-    if (!changer || changer.role.name !== "ADMIN") {
+
+    // Authorization check - ADMIN aur employee dono status change kar sakte hain
+    const isAdmin = changer?.role?.name === "ADMIN";
+    const isEmployee = changer?.role?.type === "employee";
+
+    // ADMIN aur employee dono ko full access hai employee status change karne ka
+    if (!isAdmin && !isEmployee) {
       await AuditLogService.createAuditLog({
         userId: changedBy,
         action: `${action}_FAILED`,
@@ -1247,12 +1321,13 @@ class EmployeeServices {
         metadata: {
           ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
           reason: "UNAUTHORIZED",
-          roleName: req?.user?.role,
+          roleName: changer?.role?.name, // Use changer instead of req.user
+          roleType: changer?.role?.type,
           changedBy: changedBy,
         },
       });
       throw ApiError.forbidden(
-        `Only administrators can ${action.toLowerCase().split("_")[1]} employees`
+        `Only administrators and employees can ${action.toLowerCase().split("_")[1]} employees`
       );
     }
 
@@ -1268,7 +1343,7 @@ class EmployeeServices {
           reason: "ALREADY_IN_STATE",
           currentStatus: user.status,
           attemptedStatus: status,
-          roleName: req?.user?.role,
+          roleName: changer?.role?.name, // Use changer instead of req.user
           changedBy: changedBy,
         },
       });
@@ -1301,8 +1376,11 @@ class EmployeeServices {
         previousStatus: user.status,
         newStatus: status,
         reason: reason || "No reason provided",
-        roleName: req?.user?.role,
+        roleName: changer?.role?.name, // Use changer instead of req.user
+        roleType: changer?.role?.type,
         changedBy: changedBy,
+        isAdminAction: isAdmin,
+        isEmployeeAction: isEmployee,
       },
     });
 

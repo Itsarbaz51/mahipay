@@ -26,7 +26,7 @@ kycRoutes.post(
 kycRoutes.get(
   "/user-kyc-show/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["business", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   UserKycController.show
 );
 
@@ -49,7 +49,7 @@ kycRoutes.post(
 kycRoutes.put(
   "/user-verify",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(KycValidationSchemas.VerificationKycSchema),
   UserKycController.verification
 );

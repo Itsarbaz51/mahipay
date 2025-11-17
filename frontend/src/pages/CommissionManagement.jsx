@@ -232,7 +232,8 @@ const CommissionManagement = () => {
               {isLoading ? "Refreshing..." : "Refresh"}
             </button>
 
-            {currentUser.role.name === "ADMIN" && (
+            {(currentUser.role.name === "ADMIN" ||
+              currentUser.role.type === "employee") && (
               <ButtonField
                 name="Add Commission"
                 isOpen={() => {
@@ -267,15 +268,17 @@ const CommissionManagement = () => {
       />
 
       {/* Add/Edit Commission Modal */}
-      {currentUser.role.name === "ADMIN" && showForm && (
-        <div className="fixed inset-0 flex justify-center items-center bg-black/50 z-50">
-          <AddCommissionModal
-            onClose={handleFormClose}
-            onSuccess={handleFormSuccess}
-            editData={selectedCommission}
-          />
-        </div>
-      )}
+      {(currentUser.role.name === "ADMIN" ||
+        currentUser.role.type === "employee") &&
+        showForm && (
+          <div className="fixed inset-0 flex justify-center items-center bg-black/50 z-50">
+            <AddCommissionModal
+              onClose={handleFormClose}
+              onSuccess={handleFormSuccess}
+              editData={selectedCommission}
+            />
+          </div>
+        )}
     </div>
   );
 };

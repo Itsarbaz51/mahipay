@@ -7,7 +7,7 @@ const router = express.Router();
 router.post(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business"]),
+  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
   AuditLogsController.getAuditLogs
 );
 

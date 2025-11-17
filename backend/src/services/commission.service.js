@@ -157,9 +157,46 @@ export class CommissionSettingService {
     return Helper.serializeCommission(settings);
   }
 
-  static async getCommissionSettingsByCreatedBy(userId) {
+  static async getCommissionSettingsAll(userId) {
+    // Get user with role information
+    const userWithRole = await Prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: {
+          select: {
+            type: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!userWithRole) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const userRoleType = userWithRole.role.type;
+    let targetUserId = userId;
+
+    // If user is employee, use admin's ID
+    if (userRoleType === "employee") {
+      const adminUser = await Prisma.user.findFirst({
+        where: {
+          role: {
+            name: "ADMIN",
+          },
+        },
+      });
+
+      if (!adminUser) {
+        throw new Error("Admin user not found");
+      }
+
+      targetUserId = adminUser.id;
+    }
+
     const settings = await Prisma.commissionSetting.findMany({
-      where: { createdBy: userId, isActive: true },
+      where: {},
       include: {
         service: {
           select: {
@@ -193,63 +230,6 @@ export class CommissionSettingService {
     });
 
     return Helper.serializeCommission(settings);
-  }
-
-  static async getCommissionSettings(filters) {
-    const { scope, roleId, targetUserId, serviceId, isActive = true } = filters;
-
-    // Convert string boolean to actual boolean
-    const isActiveBool =
-      typeof isActive === "string" ? isActive === "true" : isActive;
-
-    const settings = await Prisma.commissionSetting.findMany({
-      where: {
-        ...(scope ? { scope } : {}),
-        ...(roleId ? { roleId } : {}),
-        ...(targetUserId ? { targetUserId } : {}),
-        ...(serviceId ? { serviceId } : {}),
-        isActive: isActiveBool,
-      },
-      include: {
-        service: {
-          select: { id: true, code: true, name: true, isActive: true },
-        },
-        role: { select: { id: true, name: true, level: true } },
-        targetUser: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        createdByUser: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
-
-    return Helper.serializeCommission(settings);
-  }
-
-  static async deactivateCommissionSetting(id) {
-    const setting = await Prisma.commissionSetting.findUnique({
-      where: { id },
-    });
-    if (!setting) throw ApiError.notFound("Commission setting not found");
-
-    return await Prisma.commissionSetting.update({
-      where: { id },
-      data: { isActive: false },
-    });
   }
 }
 

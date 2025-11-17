@@ -73,21 +73,16 @@ const MembersTable = () => {
   // Users state
   const usersState = useSelector((state) => state.users || {});
 
-  // ✅ CURRENT LOGGED-IN USER ka data get karo
+  //  CURRENT LOGGED-IN USER ka data get karo
   const authState = useSelector((state) => state.auth || {});
   const currentLoggedInUser = authState.currentUser || {};
-  const currentUserRole = currentLoggedInUser?.role?.name || "";
+  const currentUserRole = currentLoggedInUser?.role || "";
 
   const {
     users = [],
     isLoading = false,
     currentUser: viewedUser = null,
-    pagination = {
-      page: 1,
-      limit: 10,
-      total: 0,
-      totalPages: 0,
-    },
+    pagination,
     error: userError,
     success: userSuccess,
   } = usersState;
@@ -101,10 +96,11 @@ const MembersTable = () => {
     useSelector((state) => state.services.serviceProviders.allActiveServices) ||
     [];
 
-  // ✅ Check if current user is ADMIN
-  const isAdminUser = currentUserRole === "ADMIN";
+  //  Check if current user is ADMIN
+  const isAdminUser =
+    currentUserRole?.name === "ADMIN" || currentUserRole.type === "employee";
 
-  // ✅ FIXED: Correct loadUsers function
+  //  FIXED: Correct loadUsers function
   const loadUsers = useCallback(
     async (page = 1, searchTerm = "", forceRefresh = false) => {
       try {
@@ -132,7 +128,7 @@ const MembersTable = () => {
     [dispatch, limit]
   );
 
-  // ✅ FIXED: Page change handler
+  //  FIXED: Page change handler
   const handlePageChange = useCallback(
     (page) => {
       if (page >= 1 && page <= totalPages) {
@@ -142,7 +138,7 @@ const MembersTable = () => {
     [totalPages, loadUsers, search]
   );
 
-  // ✅ FIXED: Manual refresh
+  //  FIXED: Manual refresh
   const handleManualRefresh = useCallback(() => {
     loadUsers(1, search, true);
     toast.info("Refreshing data...");
@@ -173,7 +169,7 @@ const MembersTable = () => {
     }
   }, [userError, userSuccess, dispatch]);
 
-  // ✅ FIXED: Initial load only once
+  //  FIXED: Initial load only once
   useEffect(() => {
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
@@ -181,7 +177,7 @@ const MembersTable = () => {
     }
   }, [loadUsers]);
 
-  // ✅ FIXED: Search with debouncing
+  //  FIXED: Search with debouncing
   useEffect(() => {
     if (!initialLoadRef.current) return;
 
@@ -522,7 +518,7 @@ const MembersTable = () => {
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                 Role
               </th>
-              {currentUserRole === "ADMIN" && (
+              {isAdminUser && (
                 <>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
                     Password
@@ -548,13 +544,13 @@ const MembersTable = () => {
           <tbody className="divide-y divide-gray-100">
             {isLoading ? (
               <tr>
-                <td colSpan={currentUserRole === "ADMIN" ? 10 : 8}>
+                <td colSpan={isAdminUser ? 10 : 8}>
                   <EmptyState type="loading" />
                 </td>
               </tr>
             ) : filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={currentUserRole === "ADMIN" ? 10 : 8}>
+                <td colSpan={isAdminUser ? 10 : 8}>
                   <EmptyState
                     type={search ? "search" : "empty"}
                     search={search}
@@ -632,7 +628,7 @@ const MembersTable = () => {
                     </span>
                   </td>
 
-                  {currentUserRole === "ADMIN" && (
+                  {isAdminUser && (
                     <>
                       <td className="px-6 py-5">
                         <div className="flex items-center space-x-2">
@@ -793,7 +789,7 @@ const MembersTable = () => {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {totalPages >= 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}

@@ -51,7 +51,7 @@ class ServiceProviderController {
 
     let serviceProviders;
 
-    if (user.role === "ADMIN") {
+    if (user.role === "ADMIN" || user.roleType === "employee") {
       // ADMIN can see all services based on type
       switch (type) {
         case "active":

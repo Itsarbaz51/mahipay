@@ -50,17 +50,20 @@ class KycServices {
       throw ApiError.notFound("User not found");
     }
 
-    // Modified logic: ADMIN ko saare users, SUPER ADMIN ko apne created users
     let targetUserIds = [];
 
-    if (user.role.name.toUpperCase() === "ADMIN") {
-      // ADMIN ke liye saare users
+    // Modified logic: ADMIN aur EMPLOYEE ko saare users, others ko apne created users
+    if (
+      user.role.name.toUpperCase() === "ADMIN" ||
+      user.role.type === "employee"
+    ) {
+      // ADMIN aur EMPLOYEE ke liye saare users
       const allUsers = await Prisma.user.findMany({
         select: { id: true },
       });
       targetUserIds = allUsers.map((user) => user.id);
     } else {
-      // SUPER ADMIN ke liye sirf apne created users
+      // Other users ke liye sirf apne created users
       targetUserIds = user.children.map((child) => child.id);
     }
 
@@ -174,6 +177,9 @@ class KycServices {
         limit: limitNum,
         total,
         totalPages: Math.ceil(total / limitNum),
+        userRole: user.role.name,
+        userRoleType: user.role.type,
+        isEmployeeViewingAllData: user.role.type === "employee",
       },
     };
 

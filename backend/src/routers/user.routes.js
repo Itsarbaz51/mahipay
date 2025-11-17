@@ -7,7 +7,7 @@ import UserValidationSchemas from "../validations/userValidation.schemas.js";
 
 const userRoutes = Router();
 
-// ✅ GET CURRENT BUSINESS USER
+//  GET CURRENT BUSINESS USER
 userRoutes.get(
   "/me",
   AuthMiddleware.isAuthenticated,
@@ -15,7 +15,7 @@ userRoutes.get(
   UserController.getCurrentUser
 );
 
-// ✅ GET BUSINESS USERS BY ROLE
+//  GET BUSINESS USERS BY ROLE
 userRoutes.get(
   "/role/:roleId",
   AuthMiddleware.isAuthenticated,
@@ -29,7 +29,7 @@ userRoutes.get(
   UserController.getAllUsersByRole
 );
 
-// ✅ GET BUSINESS USERS BY CHILDREN ID
+//  GET BUSINESS USERS BY CHILDREN ID
 userRoutes.get(
   "/children/:userId",
   AuthMiddleware.isAuthenticated,
@@ -43,7 +43,7 @@ userRoutes.get(
   UserController.getAllUsersByChildrenId
 );
 
-// ✅ GET BUSINESS USERS COUNT BY PARENT ID
+//  GET BUSINESS USERS COUNT BY PARENT ID
 userRoutes.get(
   "/count/parent/:parentId",
   AuthMiddleware.isAuthenticated,
@@ -57,7 +57,7 @@ userRoutes.get(
   UserController.getAllUsersCountByParentId
 );
 
-// ✅ GET BUSINESS USERS COUNT BY CHILDREN ID
+//  GET BUSINESS USERS COUNT BY CHILDREN ID
 userRoutes.get(
   "/count/children/:userId",
   AuthMiddleware.isAuthenticated,
@@ -71,7 +71,7 @@ userRoutes.get(
   UserController.getAllUsersCountByChildrenId
 );
 
-// ✅ GET BUSINESS USER BY ID
+//  GET BUSINESS USER BY ID
 userRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
@@ -85,7 +85,7 @@ userRoutes.get(
   UserController.getUserById
 );
 
-// ✅ REGISTER BUSINESS USER
+//  REGISTER BUSINESS USER
 userRoutes.post(
   "/register",
   upload.single("profileImage"),
@@ -101,7 +101,7 @@ userRoutes.post(
   UserController.register
 );
 
-// ✅ UPDATE BUSINESS USER PROFILE
+//  UPDATE BUSINESS USER PROFILE
 userRoutes.put(
   "/:userId/profile",
   AuthMiddleware.isAuthenticated,
@@ -116,7 +116,7 @@ userRoutes.put(
   UserController.updateProfile
 );
 
-// ✅ UPDATE BUSINESS USER PROFILE IMAGE
+//  UPDATE BUSINESS USER PROFILE IMAGE
 userRoutes.put(
   "/:userId/profile-image",
   AuthMiddleware.isAuthenticated,
@@ -132,7 +132,7 @@ userRoutes.put(
   UserController.updateProfileImage
 );
 
-// ✅ GET ALL BUSINESS USERS BY PARENT ID
+//  GET ALL BUSINESS USERS BY PARENT ID
 userRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
@@ -146,32 +146,29 @@ userRoutes.get(
   UserController.getAllRoleTypeUsersByParentId
 );
 
-// ✅ DEACTIVATE BUSINESS USER
+//  DEACTIVATE BUSINESS USER
 userRoutes.patch(
   "/:userId/deactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(UserValidationSchemas.deactivateUser),
   UserController.deactivateUser
 );
 
-// ✅ REACTIVATE BUSINESS USER
+//  REACTIVATE BUSINESS USER
 userRoutes.patch(
   "/:userId/reactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(UserValidationSchemas.reactivateUser),
   UserController.reactivateUser
 );
 
-// ✅ DELETE BUSINESS USER
+//  DELETE BUSINESS USER
 userRoutes.delete(
   "/:userId/delete",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
-  AuthMiddleware.authorizeBusinessRoles(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "employee"]),
   validateRequest(UserValidationSchemas.deleteUser),
   UserController.deleteUser
 );

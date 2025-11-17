@@ -13,10 +13,7 @@ import {
   Mail,
   Key,
 } from "lucide-react";
-import {
-  getCurrentUserProfile,
-  updateUserProfileImage,
-} from "../redux/slices/userSlice";
+import { updateUserProfileImage } from "../redux/slices/userSlice";
 import { logout, passwordReset } from "../redux/slices/authSlice";
 import ForgotCredentialsModal from "../components/forms/ForgotCredentialsModal";
 import AddMember from "../components/forms/AddMember";
@@ -44,22 +41,6 @@ const UserProfilePage = ({ onClose }) => {
   const currentUserRole = userData?.role?.name || "";
   const isAdminUser = currentUserRole === "ADMIN";
 
-  useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
-    try {
-      setLoading(true);
-      await dispatch(getCurrentUserProfile());
-    } catch (error) {
-      setError(error.message);
-      console.error("Failed to fetch user profile:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleProfileImageUpdate = async (file) => {
     try {
       setLoading(true);
@@ -69,7 +50,6 @@ const UserProfilePage = ({ onClose }) => {
 
       await dispatch(updateUserProfileImage(userData.id, formData));
       setSuccess("Profile image updated successfully!");
-      await fetchUserProfile();
     } catch (error) {
       setError(error.message);
     } finally {
@@ -79,7 +59,6 @@ const UserProfilePage = ({ onClose }) => {
 
   const handleProfileUpdateSuccess = () => {
     setSuccess("Profile updated successfully!");
-    fetchUserProfile();
     setShowProfileModal(false);
   };
 
@@ -178,26 +157,6 @@ const UserProfilePage = ({ onClose }) => {
     );
   }
 
-  if (error && !userData) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-md max-w-md w-full mx-4">
-          <div className="flex items-center space-x-2 text-red-600 mb-4">
-            <XCircle className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Error</h2>
-          </div>
-          <p className="text-gray-700">{error}</p>
-          <button
-            onClick={fetchUserProfile}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   if (!userData) {
     return (
       <div className="flex justify-center items-center min-h-screen text-gray-500">
@@ -247,26 +206,30 @@ const UserProfilePage = ({ onClose }) => {
         </div>
 
         <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-bold text-blue-600">
-              {userData.wallets?.[0]
-                ? formatCurrency(userData.wallets[0].balance)
-                : "₹0.00"}
+          {authUser?.role?.type !== "employee" && (
+            <div>
+              <div className="text-2xl font-bold text-blue-600">
+                {userData.wallets?.[0]
+                  ? formatCurrency(userData.wallets[0].balance)
+                  : "₹0.00"}
+              </div>
+              <div className="text-xs text-gray-500">Balance</div>
             </div>
-            <div className="text-xs text-gray-500">Balance</div>
-          </div>
+          )}
           <div>
             <div className="text-2xl font-bold text-green-600">
               {userData.children?.length || 0}
             </div>
             <div className="text-xs text-gray-500">Children</div>
           </div>
-          <div>
-            <div className="text-2xl font-bold text-purple-600">
-              {userData.kycInfo?.isKycSubmitted ? "Verified" : "Pending"}
+          {authUser?.role?.type !== "employee" && (
+            <div>
+              <div className="text-2xl font-bold text-purple-600">
+                {userData.kycInfo?.isKycSubmitted ? "Verified" : "Pending"}
+              </div>
+              <div className="text-xs text-gray-500">KYC</div>
             </div>
-            <div className="text-xs text-gray-500">KYC</div>
-          </div>
+          )}
         </div>
       </div>
     </div>

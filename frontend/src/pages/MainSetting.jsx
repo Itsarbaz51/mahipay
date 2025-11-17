@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Upload, Save, Loader2, X } from "lucide-react";
 import {
   fetchSystemSetting,
@@ -130,7 +130,7 @@ const MainSetting = () => {
     }
   };
 
-  // ✅ HELPER: Convert input into FormData
+  //  HELPER: Convert input into FormData
   const buildFormData = (payload) => {
     const formData = new FormData();
 
@@ -186,6 +186,12 @@ const MainSetting = () => {
     <div className="">
       <div className="">
         <div className="bg-white rounded-lg shadow-md p-6">
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-2">
+              Settings saved successfully!
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Company Information */}
             <div className="border-b pb-6">
@@ -317,11 +323,6 @@ const MainSetting = () => {
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                 {error}
-              </div>
-            )}
-            {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-                Settings saved successfully!
               </div>
             )}
 

@@ -80,7 +80,9 @@ const CommissionTable = ({
             <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase">
               TDS/GST
             </th>
-            {currentUser.role.name === "ADMIN" && (
+            {console.log(currentUser.role)}
+            {(currentUser.role.name === "ADMIN" ||
+              currentUser.role.type === "employee") && (
               <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase">
                 Actions
               </th>
@@ -202,7 +204,8 @@ const CommissionTable = ({
                   </div>
                 </td>
 
-                {currentUser.role.name === "ADMIN" && (
+                {(currentUser.role.name === "ADMIN" ||
+                  currentUser.role.type === "employee") && (
                   <td className="px-6 py-5 text-center relative">
                     <div className="inline-block relative">
                       <button

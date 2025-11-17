@@ -526,7 +526,7 @@ export default function UserProfileView({
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 overflow-y-auto p-4">
       {/* Centered Modal Container */}
-      <div className="relative bg-white rounded-3xl shadow-2xl my-8 max-w-5xl w-full transform transition-all duration-500 scale-100 opacity-100 animate-in fade-in zoom-in duration-300">
+      <div className="relative bg-white rounded-3xl shadow-2xl my-8 max-w-5xl w-full transform transition-all duration-500 scale-100 opacity-100 animate-in fade-in zoom-in">
         {/* Sticky Header with Close Button */}
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 rounded-t-3xl p-6 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">

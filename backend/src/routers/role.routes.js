@@ -6,7 +6,7 @@ import RoleValidationSchemas from "../validations/roleValidation.schemas.js";
 
 const roleRoutes = Router();
 
-// ✅ GET ROLES BY TYPE (employee or business)
+//  GET ROLES BY TYPE (employee or business)
 roleRoutes.get(
   "/type/:type",
   AuthMiddleware.isAuthenticated,
@@ -20,7 +20,7 @@ roleRoutes.get(
   RoleController.getAllRolesByType
 );
 
-// ✅ GET BUSINESS ROLES FOR USER REGISTRATION
+//  GET BUSINESS ROLES FOR USER REGISTRATION
 roleRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
@@ -28,42 +28,7 @@ roleRoutes.get(
   RoleController.getAllRoles
 );
 
-roleRoutes.get(
-  "/business",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  RoleController.getBusinessRoles
-);
-
-// ✅ GET EMPLOYEE ROLES FOR EMPLOYEE REGISTRATION
-roleRoutes.get(
-  "/employee",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
-  RoleController.getEmployeeRoles
-);
-
-// ✅ GET ROLE BY ID
-roleRoutes.get(
-  "/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  RoleController.getRolebyId
-);
-
-// ✅ CREATE EMPLOYEE ROLE (Only ADMIN can create employee roles)
+//  CREATE EMPLOYEE ROLE (Only ADMIN can create employee roles)
 roleRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
@@ -72,7 +37,7 @@ roleRoutes.post(
   RoleController.createRole
 );
 
-// ✅ UPDATE EMPLOYEE ROLE (Only ADMIN can update employee roles)
+//  UPDATE EMPLOYEE ROLE (Only ADMIN can update employee roles)
 roleRoutes.put(
   "/:id",
   AuthMiddleware.isAuthenticated,
@@ -81,7 +46,7 @@ roleRoutes.put(
   RoleController.updateRole
 );
 
-// ✅ DELETE EMPLOYEE ROLE (Only ADMIN can delete employee roles)
+//  DELETE EMPLOYEE ROLE (Only ADMIN can delete employee roles)
 roleRoutes.delete(
   "/:id",
   AuthMiddleware.isAuthenticated,

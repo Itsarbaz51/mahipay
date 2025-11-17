@@ -53,14 +53,37 @@ class AuditLogService {
 
       let filteredLogs = logs;
 
-      if (userRole?.toUpperCase() !== "ADMIN" && userId) {
+      let userRoleType = null;
+      let userRoleName = null;
+      if (userId) {
+        const user = await Prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            role: {
+              select: {
+                type: true,
+                name: true,
+              },
+            },
+          },
+        });
+        userRoleType = user?.role?.type;
+        userRoleName = user?.role?.name;
+      }
+
+      const isAdmin = userRoleName === "ADMIN";
+      const isEmployee = userRoleType === "employee";
+      const isAdminOrEmployee = isAdmin || isEmployee;
+
+      if (!isAdminOrEmployee && userId) {
         filteredLogs = filteredLogs.filter((log) => {
           const logUserId =
             log.userId ||
             log.user?.id ||
             log.message?.userId ||
             log.message?.metadata?.userId;
-          return logUserId && logUserId.toString() === userId.toString();
+          const match = logUserId && logUserId.toString() === userId.toString();
+          return match;
         });
       }
 
@@ -101,7 +124,7 @@ class AuditLogService {
           });
         }
 
-        if (userRole?.toUpperCase() === "ADMIN" && filters.search) {
+        if (isAdminOrEmployee && filters.search) {
           const term = filters.search.toLowerCase();
           filteredLogs = filteredLogs.filter((log) => {
             const combined = JSON.stringify(log).toLowerCase();
@@ -206,6 +229,11 @@ class AuditLogService {
         showingFrom: totalItems > 0 ? skip + 1 : 0,
         showingTo: totalItems > 0 ? Math.min(skip + pageSize, totalItems) : 0,
         totalItems: totalItems,
+        userRoleType: userRoleType,
+        userRoleName: userRoleName,
+        isAdmin: isAdmin,
+        isEmployee: isEmployee,
+        isAdminOrEmployee: isAdminOrEmployee,
       };
 
       return {

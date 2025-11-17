@@ -358,7 +358,8 @@ class UserServices {
       throw ApiError.badRequest("Can only update business users");
     }
 
-    const isAdmin = currentUser.role.name === "ADMIN";
+    const isAdmin =
+      currentUser.role.name === "ADMIN" || currentUser.role.type === "employee";
     const isUpdatingOwnProfile = userId === currentUserId;
 
     const isEmailChanged = email && email !== userToUpdate.email;
@@ -917,6 +918,7 @@ class UserServices {
 
   // GET ALL BUSINESS USERS BY PARENT ID
   static async getAllRoleTypeUsersByParentId(parentId, options = {}) {
+    // Get parent user with role information
     const parent = await Prisma.user.findUnique({
       where: { id: parentId },
       include: {
@@ -939,7 +941,7 @@ class UserServices {
     const skip = (page - 1) * limit;
     const isAll = status === "ALL";
 
-    // Get only business type roles
+    // Get business type roles (exclude ADMIN)
     const businessRoles = await Prisma.role.findMany({
       where: {
         type: "business",
@@ -952,21 +954,46 @@ class UserServices {
 
     const businessRoleIds = businessRoles.map((role) => role.id);
 
-    let queryWhere =
-      parent.role?.name === "ADMIN"
-        ? {
-            roleId: {
-              in: businessRoleIds,
-            },
-            ...(isAll ? {} : { status }),
-          }
-        : {
-            parentId,
-            roleId: {
-              in: businessRoleIds,
-            },
-            ...(isAll ? {} : { status }),
-          };
+    let targetParentId = parentId;
+
+    // If parent user is employee, use admin's ID instead
+    if (parent.role?.type === "employee") {
+      const adminUser = await Prisma.user.findFirst({
+        where: {
+          role: {
+            name: "ADMIN",
+          },
+        },
+      });
+
+      if (!adminUser) {
+        throw new Error("Admin user not found");
+      }
+
+      targetParentId = adminUser.id;
+    }
+
+    let queryWhere = {};
+
+    // Build query based on user role
+    if (parent.role?.name === "ADMIN" || parent.role?.type === "employee") {
+      // For ADMIN and employee users, show all business users (no parent filter)
+      queryWhere = {
+        roleId: {
+          in: businessRoleIds,
+        },
+        ...(isAll ? {} : { status }),
+      };
+    } else {
+      // For other users, show only their children
+      queryWhere = {
+        parentId: targetParentId,
+        roleId: {
+          in: businessRoleIds,
+        },
+        ...(isAll ? {} : { status }),
+      };
+    }
 
     if (search && search.trim() !== "") {
       const searchTerm = search.toLowerCase();
@@ -1062,7 +1089,8 @@ class UserServices {
 
     let safeUsers;
 
-    if (parent.role.name === "ADMIN") {
+    // Only ADMIN can see decrypted passwords/pins
+    if (parent.role.name === "ADMIN" || parent.role?.type === "employee") {
       safeUsers = filteredUsers.map((user) => {
         const serialized = Helper.serializeUser(user);
 
@@ -1087,6 +1115,7 @@ class UserServices {
         return serialized;
       });
     } else {
+      // For employee and other users, remove sensitive data
       safeUsers = filteredUsers.map((user) => {
         const serialized = Helper.serializeUser(user);
         const { password, transactionPin, refreshToken, ...safeUser } =
@@ -1095,7 +1124,16 @@ class UserServices {
       });
     }
 
-    return { users: safeUsers, total: filteredUsers.length };
+    return {
+      users: safeUsers,
+      total: filteredUsers.length,
+      meta: {
+        parentRole: parent.role.name,
+        parentRoleType: parent.role.type,
+        isEmployeeViewingAdminData: parent.role?.type === "employee",
+        targetParentId: targetParentId,
+      },
+    };
   }
 
   // BUSINESS USER DEACTIVATION
@@ -1578,7 +1616,8 @@ class UserServices {
         throw ApiError.unauthorized("Invalid deleter user");
       }
 
-      const isAdmin = deleter.role.name === "ADMIN";
+      const isAdmin =
+        deleter.role.name === "ADMIN" || deleter.role.type === "employee";
       if (!isAdmin) {
         await AuditLogService.createAuditLog({
           userId: deletedBy,

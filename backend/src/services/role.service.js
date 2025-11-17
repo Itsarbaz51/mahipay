@@ -36,9 +36,8 @@ class RoleServices {
   };
 
   static async getAllRolesByType(options) {
-    const { currentUserRoleLevel, type } = options;
+    const { currentUserRoleLevel, type, currentUser } = options;
 
-    // Validate input parameters
     if (!type) {
       throw new Error("Type parameter is required");
     }
@@ -53,8 +52,16 @@ class RoleServices {
       type: type,
     };
 
-    // Add role level filter if currentUserRoleLevel is provided
-    if (typeof currentUserRoleLevel === "number") {
+    where.NOT = {
+      name: "ADMIN",
+    };
+
+    // Role level logic based on current user's role
+    if (currentUser?.role?.name === "ADMIN") {
+      delete where.level;
+    } else if (currentUser?.role?.type === "employee") {
+      delete where.level;
+    } else if (typeof currentUserRoleLevel === "number") {
       where.level = { gt: currentUserRoleLevel };
     }
 
@@ -80,7 +87,6 @@ class RoleServices {
         },
       });
 
-      // Transform roles to DTO
       const roleDTOs = roles.map((role) => ({
         id: role.id,
         name: role.name,
@@ -102,7 +108,6 @@ class RoleServices {
         updatedAt: role.updatedAt,
         userCount: role._count.users,
         permissionCount: role._count.rolePermissions,
-        isActive: role.isActive !== undefined ? role.isActive : true,
       }));
 
       return {
@@ -110,68 +115,22 @@ class RoleServices {
         meta: {
           total: roleDTOs.length,
           type: type,
-          filteredByLevel: typeof currentUserRoleLevel === "number",
+          filteredByLevel:
+            typeof currentUserRoleLevel === "number" &&
+            currentUser?.role?.name !== "ADMIN" &&
+            currentUser?.role?.type !== "employee",
+          currentUserRoleName: currentUser?.role?.name,
+          currentUserRoleType: currentUser?.role?.type,
+          currentUserRoleLevel: currentUserRoleLevel,
+          excludedAdminRole: true,
         },
       };
     } catch (error) {
       console.error("Error in getAllRolesByType:", error);
-      throw new Error(`Failed to fetch ${type} roles: ${error.message}`);
+      throw ApiError.internal(
+        `Failed to fetch ${type} roles: ${error.message}`
+      );
     }
-  }
-
-  static async getRolebyId(id) {
-    const role = await Prisma.role.findUnique({
-      where: { id },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        rolePermissions: {
-          include: {
-            service: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-                isActive: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            users: true,
-          },
-        },
-      },
-    });
-
- 
-   
-    return {
-      id: role.id,
-      name: role.name,
-      type: role.type,
-      level: role.level,
-      description: role.description,
-      createdBy: role.createdBy || "",
-      createdAt: role.createdAt,
-      updatedAt: role.updatedAt,
-      userCount: role._count.users,
-      permissions: role.rolePermissions.map((rp) => ({
-        id: rp.id,
-        service: rp.service,
-        canView: rp.canView,
-        canEdit: rp.canEdit,
-        canSetCommission: rp.canSetCommission,
-        canProcess: rp.canProcess,
-      })),
-    };
   }
 
   static async createRole(payload, req = null, res = null) {
@@ -576,54 +535,6 @@ class RoleServices {
     });
 
     return true;
-  }
-
-  // Additional method to check if user can manage this role
-  static async canUserManageRole(userRoleLevel, targetRoleLevel) {
-    return userRoleLevel < targetRoleLevel;
-  }
-
-  // Get business roles for user registration
-  static async getBusinessRolesForUser(currentUserRoleLevel) {
-    const where = {
-      type: "business",
-    };
-
-    // Add role level filter if currentUserRoleLevel is provided
-    if (typeof currentUserRoleLevel === "number") {
-      where.level = { gt: currentUserRoleLevel };
-    }
-
-    const roles = await Prisma.role.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        level: true,
-        description: true,
-      },
-      orderBy: { level: "asc" },
-    });
-
-    return roles;
-  }
-
-  // Get employee roles for employee registration
-  static async getEmployeeRolesForAdmin() {
-    const roles = await Prisma.role.findMany({
-      where: {
-        type: "employee",
-      },
-      select: {
-        id: true,
-        name: true,
-        level: true,
-        description: true,
-      },
-      orderBy: { level: "asc" },
-    });
-
-    return roles;
   }
 }
 

@@ -20,7 +20,6 @@ export class BankDetailService {
 
     let allChildIds = [];
 
-    // Recursively get all descendants
     const getDescendants = async (parentId) => {
       const children = await Prisma.user.findMany({
         where: { parentId },
@@ -32,7 +31,6 @@ export class BankDetailService {
       const childIds = children.map((child) => child.id);
       let descendantIds = [...childIds];
 
-      // Get grandchildren recursively
       for (const childId of childIds) {
         const grandchildren = await getDescendants(childId);
         descendantIds.push(...grandchildren);
@@ -82,12 +80,14 @@ export class BankDetailService {
 
     let where = {};
 
-    if (role === "ADMIN") {
-      where.userId = { not: userId };
+    // Modified logic: ADMIN aur EMPLOYEE ko saare banks dikhao (excluding ADMIN's own banks)
+    if (user.role.name === "ADMIN" || user.role.type === "employee") {
+      where.userId = { not: userId }; // Don't show admin's own banks
       where.user = {
-        role: { is: { name: { not: "ADMIN" } } },
+        role: { is: { name: { not: "ADMIN" } } }, // Don't show other admin users' banks
       };
     } else {
+      // Other users ke liye sirf apne children ke banks
       const childIds = await this.getAllChildrenIds(userId);
       if (!childIds.length) {
         return {
@@ -126,6 +126,9 @@ export class BankDetailService {
         limit: limitNum,
         total,
         totalPages: Math.ceil(total / limitNum),
+        userRole: user.role.name,
+        userRoleType: user.role.type,
+        isEmployeeViewingAllData: user.role.type === "employee",
       },
     };
 
@@ -154,11 +157,31 @@ export class BankDetailService {
       throw ApiError.unauthorized("User not found");
     }
 
+    const userRoleType = user.role.type;
+    let targetUserId = userId;
+
+    if (userRoleType === "employee") {
+      const adminUser = await Prisma.user.findFirst({
+        where: {
+          role: {
+            name: "ADMIN",
+          },
+        },
+      });
+
+      if (!adminUser) {
+        throw new Error("Admin user not found");
+      }
+
+      targetUserId = adminUser.id;
+    }
+
     const records = await Prisma.bankDetail.findMany({
-      where: { userId },
+      where: { userId: targetUserId },
     });
 
-    if (!records) throw ApiError.notFound("No bank details found");
+    if (!records || records.length === 0)
+      throw ApiError.notFound("No bank details found");
 
     const safely = await Helper.serializeUser(records);
     return safely;
@@ -238,22 +261,26 @@ export class BankDetailService {
     try {
       const userExists = await Prisma.user.findUnique({
         where: { id: payload.userId },
-        select: { role: true },
+        include: {
+          role: {
+            select: {
+              type: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!userExists) {
-        // Audit log for user not found
         if (req) {
           await AuditLogService.createAuditLog({
             userId: payload.userId,
             action: "BANK_CREATION_FAILED",
             entityType: "BANK",
-            entityId: req.user.id,
+            entityId: req.user?.id,
             ipAddress: Helper.getClientIP(req),
             metadata: {
               ...Helper.generateCommonMetadata(req, res),
-              roleType: userExists.role.type,
-              roleName: userExists.role.name,
               reason: "USER_NOT_FOUND",
             },
           });
@@ -261,12 +288,32 @@ export class BankDetailService {
         throw ApiError.notFound("User not found");
       }
 
+      const userRoleType = userExists.role.type;
+      let targetUserId = payload.userId;
+
+      if (userRoleType === "employee") {
+        const adminUser = await Prisma.user.findFirst({
+          where: {
+            role: {
+              name: "ADMIN",
+            },
+          },
+        });
+
+        if (!adminUser) {
+          throw new Error("Admin user not found");
+        }
+        targetUserId = adminUser.id;
+      }
+
       const exists = await Prisma.bankDetail.findFirst({
-        where: { accountNumber: rest.accountNumber },
+        where: {
+          accountNumber: rest.accountNumber,
+          userId: targetUserId,
+        },
       });
 
       if (exists) {
-        // Audit log for duplicate account number
         if (req) {
           await AuditLogService.createAuditLog({
             userId: payload.userId,
@@ -280,6 +327,7 @@ export class BankDetailService {
               roleName: userExists.role.name,
               reason: "DUPLICATE_ACCOUNT_NUMBER",
               accountNumber: rest.accountNumber,
+              targetUserId: targetUserId,
             },
           });
         }
@@ -304,6 +352,7 @@ export class BankDetailService {
               roleType: userExists.role.type,
               roleName: userExists.role.name,
               reason: "PROOF_UPLOAD_FAILED",
+              targetUserId: targetUserId,
             },
           });
         }
@@ -312,27 +361,30 @@ export class BankDetailService {
 
       if (payload.isPrimary) {
         await Prisma.bankDetail.updateMany({
-          where: { userId: payload.userId },
+          where: { userId: targetUserId },
           data: { isPrimary: false },
         });
       }
 
       let status = "PENDING";
 
-      if (userExists.role.name === "ADMIN") {
+      if (
+        userExists.role.name === "ADMIN" ||
+        userExists.role.type === "employee"
+      ) {
         status = "VERIFIED";
       }
 
       const createBank = await Prisma.bankDetail.create({
         data: {
           ...rest,
+          userId: targetUserId,
           bankProofFile: proofUrl,
           status,
         },
       });
 
       if (!createBank) {
-        // Audit log for bank creation failure
         if (req) {
           await AuditLogService.createAuditLog({
             userId: payload.userId,
@@ -345,6 +397,7 @@ export class BankDetailService {
               roleType: userExists.role.type,
               roleName: userExists.role.name,
               reason: "DATABASE_CREATION_FAILED",
+              targetUserId: targetUserId,
             },
           });
         }
@@ -368,6 +421,8 @@ export class BankDetailService {
             status: createBank.status,
             isPrimary: createBank.isPrimary,
             proofUploaded: !!proofUrl,
+            targetUserId: targetUserId,
+            isEmployeeAction: userRoleType === "employee",
           },
         });
       }
@@ -390,34 +445,43 @@ export class BankDetailService {
     try {
       const userExists = await Prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true },
+        include: {
+          role: {
+            select: {
+              type: true,
+              name: true,
+            },
+          },
+        },
       });
 
       if (!userExists) {
-        // Audit log for user not found
-        if (req) {
-          await AuditLogService.createAuditLog({
-            userId: userId,
-            action: "BANK_CREATION_FAILED",
-            entityType: "BANK",
-            entityId: req.user.id,
-            ipAddress: Helper.getClientIP(req),
-            metadata: {
-              ...Helper.generateCommonMetadata(req, res),
-              roleType: userExists.role.type,
-              roleName: userExists.role.name,
-              reason: "USER_NOT_FOUND",
-            },
-          });
-        }
         throw ApiError.notFound("User not found");
       }
 
-      // Fetch existing record
-      const record = await Prisma.bankDetail.findUnique({ where: { id } });
+      const userRoleType = userExists.role.type;
+      let targetUserId = userId;
 
-      if (!record || record.userId !== userId) {
-        // Audit log for unauthorized update attempt
+      if (userRoleType === "employee") {
+        const adminUser = await Prisma.user.findFirst({
+          where: {
+            role: {
+              name: "ADMIN",
+            },
+          },
+        });
+
+        if (!adminUser) {
+          throw new Error("Admin user not found");
+        }
+        targetUserId = adminUser.id;
+      }
+
+      const record = await Prisma.bankDetail.findUnique({
+        where: { id },
+      });
+
+      if (!record || record.userId !== targetUserId) {
         if (req) {
           await AuditLogService.createAuditLog({
             userId: userId,
@@ -431,36 +495,15 @@ export class BankDetailService {
               roleName: userExists.role.name,
               reason: "UNAUTHORIZED_ACCESS",
               actualOwnerId: record?.userId,
+              targetUserId: targetUserId,
             },
           });
         }
         throw ApiError.forbidden("Unauthorized access");
       }
 
-      // If record doesn't exist
-      if (!record) {
-        // Audit log for bank not found
-        if (req) {
-          await AuditLogService.createAuditLog({
-            userId: userId,
-            action: "BANK_UPDATE_FAILED",
-            entityType: "BANK",
-            entityId: id,
-            ipAddress: Helper.getClientIP(req),
-            metadata: {
-              ...Helper.generateCommonMetadata(req, res),
-              roleType: userExists.role.type,
-              roleName: userExists.role.name,
-              reason: "BANK_NOT_FOUND",
-            },
-          });
-        }
-        throw ApiError.notFound("Bank not found");
-      }
-
       let proofUrl;
 
-      // Upload new proof if provided
       if (payload.bankProofFile) {
         if (record.bankProofFile) {
           await S3Service.delete({ fileUrl: record.bankProofFile });
@@ -472,10 +515,9 @@ export class BankDetailService {
         );
       }
 
-      // If isPrimary = true, make others false
       if (payload.isPrimary) {
         await Prisma.bankDetail.updateMany({
-          where: { userId },
+          where: { userId: targetUserId },
           data: { isPrimary: false },
         });
       }
@@ -491,7 +533,10 @@ export class BankDetailService {
         newRejectionReason = null;
       }
 
-      if (userExists.role.name === "ADMIN") {
+      if (
+        userExists.role.name === "ADMIN" ||
+        userExists.role.type === "employee"
+      ) {
         newStatus = "VERIFIED";
       }
 
@@ -506,7 +551,6 @@ export class BankDetailService {
       });
 
       if (!updateBank) {
-        // Audit log for update failure
         if (req) {
           await AuditLogService.createAuditLog({
             userId: userId,
@@ -519,13 +563,13 @@ export class BankDetailService {
               roleType: userExists.role.type,
               roleName: userExists.role.name,
               reason: "DATABASE_UPDATE_FAILED",
+              targetUserId: targetUserId,
             },
           });
         }
         throw ApiError.internal("Failed to update bank details");
       }
 
-      // Audit log for successful bank update
       if (req) {
         await AuditLogService.createAuditLog({
           userId: userId,
@@ -544,6 +588,8 @@ export class BankDetailService {
             fieldsUpdated: Object.keys(payload).filter(
               (key) => key !== "bankProofFile"
             ),
+            targetUserId: targetUserId,
+            isEmployeeAction: userRoleType === "employee",
           },
         });
       }
@@ -555,7 +601,6 @@ export class BankDetailService {
       }
       throw ApiError.internal("update bank failed:", error.message);
     } finally {
-      // Clean up temporary files
       const allFiles = [payload.bankProofFile?.path].filter(Boolean);
       for (const filePath of allFiles) {
         await Helper.deleteOldImage(filePath);
@@ -566,33 +611,41 @@ export class BankDetailService {
   static async destroy(id, userId, req = null, res = null) {
     const userExists = await Prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      include: {
+        role: {
+          select: {
+            type: true,
+            name: true,
+          },
+        },
+      },
     });
 
     if (!userExists) {
-      // Audit log for user not found
-      if (req) {
-        await AuditLogService.createAuditLog({
-          userId: userId,
-          action: "BANK_CREATION_FAILED",
-          entityType: "BANK",
-          entityId: req.user.id,
-          ipAddress: Helper.getClientIP(req),
-          metadata: {
-            ...Helper.generateCommonMetadata(req, res),
-            roleType: userExists.role.type,
-            roleName: userExists.role.name,
-            reason: "USER_NOT_FOUND",
-          },
-        });
-      }
       throw ApiError.notFound("User not found");
+    }
+
+    const userRoleType = userExists.role.type;
+    let targetUserId = userId;
+
+    if (userRoleType === "employee") {
+      const adminUser = await Prisma.user.findFirst({
+        where: {
+          role: {
+            name: "ADMIN",
+          },
+        },
+      });
+
+      if (!adminUser) {
+        throw new Error("Admin user not found");
+      }
+      targetUserId = adminUser.id;
     }
 
     const record = await Prisma.bankDetail.findUnique({ where: { id } });
 
-    if (!record || record.userId !== userId) {
-      // Audit log for unauthorized deletion attempt
+    if (!record || record.userId !== targetUserId) {
       if (req) {
         await AuditLogService.createAuditLog({
           userId: userId,
@@ -606,6 +659,7 @@ export class BankDetailService {
             roleName: userExists.role.name,
             reason: "UNAUTHORIZED_ACCESS",
             actualOwnerId: record?.userId,
+            targetUserId: targetUserId,
           },
         });
       }
@@ -615,7 +669,6 @@ export class BankDetailService {
     const deleteBank = await Prisma.bankDetail.delete({ where: { id } });
 
     if (!deleteBank) {
-      // Audit log for deletion failure
       if (req) {
         await AuditLogService.createAuditLog({
           userId: userId,
@@ -628,13 +681,21 @@ export class BankDetailService {
             roleType: userExists.role.type,
             roleName: userExists.role.name,
             reason: "DATABASE_DELETION_FAILED",
+            targetUserId: targetUserId,
           },
         });
       }
       throw ApiError.internal("Failed to delete bank");
     }
 
-    // Audit log for successful bank deletion
+    if (record.bankProofFile) {
+      try {
+        await S3Service.delete({ fileUrl: record.bankProofFile });
+      } catch (s3Error) {
+        console.error("Failed to delete bank proof from S3:", s3Error);
+      }
+    }
+
     if (req) {
       await AuditLogService.createAuditLog({
         userId: userId,
@@ -649,6 +710,8 @@ export class BankDetailService {
           bankName: record.bankName,
           accountNumber: record.accountNumber?.substring(0, 3) + "***",
           status: record.status,
+          targetUserId: targetUserId,
+          isEmployeeAction: userRoleType === "employee",
         },
       });
     }
@@ -711,7 +774,8 @@ export class BankDetailService {
       select: { role: true },
     });
 
-    const isAdmin = user?.role?.name === "ADMIN";
+    const isAdmin =
+      user?.role?.name === "ADMIN" || user?.role?.type === "employee";
 
     if (!isAdmin && record.userId !== userId) {
       // Audit log for unauthorized verification attempt

@@ -48,10 +48,13 @@ class EmployeeController {
     const user = await EmployeeServices.updateProfile(
       employeeId,
       req.body,
-      currentUserId
+      currentUserId,
+      req,
+      res
     );
 
-    const safeUser = Helper.serializeUser(userreq, req, res);
+    // Fix: Change 'userreq' to 'user'
+    const safeUser = Helper.serializeUser(user, req, res); // 'userreq' se change kiya 'user'
 
     return res
       .status(200)
@@ -63,7 +66,6 @@ class EmployeeController {
         )
       );
   });
-
   // EMPLOYEE PROFILE IMAGE UPDATE
   static updateProfileImage = asyncHandler(async (req, res) => {
     const { employeeId } = req.params;

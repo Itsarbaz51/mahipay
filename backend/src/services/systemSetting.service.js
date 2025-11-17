@@ -22,8 +22,46 @@ class SystemSettingService {
     };
   }
   static async upsert(data, userId, req = null, res = null) {
+    // Get user with role information to determine role type
+    const userWithRole = await Prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: {
+          select: {
+            type: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!userWithRole) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const userRoleType = userWithRole.role.type;
+    let targetUserId = userId;
+
+    // If user has employee role type, use admin's user ID for settings
+    if (userRoleType === "employee") {
+      const adminUser = await Prisma.user.findFirst({
+        where: {
+          role: {
+            name: "ADMIN",
+          },
+        },
+      });
+
+      if (!adminUser) {
+        throw new Error("Admin user not found");
+      }
+
+      targetUserId = adminUser.id;
+    }
+
+    // Check if settings exist for the target user (admin or current user)
     const existing = await Prisma.systemSetting.findFirst({
-      where: { userId },
+      where: { userId: targetUserId },
     });
 
     let companyLogoUrl = existing?.companyLogo ?? null;
@@ -58,7 +96,7 @@ class SystemSettingService {
       }
 
       const payload = {
-        userId,
+        userId: targetUserId, // Use targetUserId (admin ID for employees)
         companyName: data.companyName || "",
         companyLogo: companyLogoUrl || "",
         favIcon: favIconUrl || "",
@@ -71,7 +109,7 @@ class SystemSettingService {
         linkedinUrl: data.linkedinUrl || "",
         websiteUrl: data.websiteUrl || "",
         updatedAt: new Date(),
-        createdAt: new Date(),
+        ...(existing ? {} : { createdAt: new Date() }), // Only set createdAt for new records
       };
 
       let result;
@@ -104,7 +142,7 @@ class SystemSettingService {
 
       // Create audit log for successful operation
       await AuditLogService.createAuditLog({
-        userId: userId,
+        userId: userId, // Log the actual user who performed the action
         action: `SYSTEM_SETTINGS_${operationType}`,
         entityType: "SYSTEM_SETTINGS",
         entityId: result.id,
@@ -113,10 +151,13 @@ class SystemSettingService {
           ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
           operation: operationType.toLowerCase(),
           updatedFields: updatedFields,
-          roleName: req.user.role,
+          roleName: userWithRole.role.name, // Use actual role name from database
+          userRoleType: userRoleType, // Add role type for clarity
+          targetUserId: targetUserId, // Log which user's settings were modified
           fileOperations: fileOperations,
           companyName: data.companyName || existing?.companyName,
           updatedBy: userId,
+          isEmployeeModifyingAdminSettings: userRoleType === "employee", // Flag for employee actions
         },
       });
 
@@ -132,9 +173,12 @@ class SystemSettingService {
           ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
           error: error.message,
           operation: existing ? "update" : "create",
-          roleName: req.user.role,
+          roleName: userWithRole.role.name,
+          userRoleType: userRoleType,
+          targetUserId: targetUserId,
           fileOperations: fileOperations,
           updatedBy: userId,
+          isEmployeeModifyingAdminSettings: userRoleType === "employee",
         },
       });
 
@@ -163,8 +207,50 @@ class SystemSettingService {
   }
 
   static async getById(userId) {
-    const setting = await Prisma.systemSetting.findFirst({ where: { userId } });
-    if (!setting) return;
+    // Get user with role information to determine role type
+    const userWithRole = await Prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: {
+          select: {
+            type: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!userWithRole) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const userRoleType = userWithRole.role.type;
+    let targetUserId = userId;
+
+    if (userRoleType === "employee") {
+      const adminUser = await Prisma.user.findFirst({
+        where: {
+          role: {
+            name: "ADMIN",
+          },
+        },
+        include: {
+          role: true,
+        },
+      });
+
+      if (!adminUser) {
+        throw new Error("Admin user not found");
+      }
+
+      targetUserId = adminUser.id;
+    }
+
+    const setting = await Prisma.systemSetting.findFirst({
+      where: { userId: targetUserId },
+    });
+
+    if (!setting) return null;
 
     const mapped = this.mapToSystemSetting(setting);
     return mapped;

@@ -69,6 +69,7 @@ const EmployeeTable = () => {
   // Derived values
   const currentUserRole = currentUser?.role?.name || "";
   const isAdminUser = currentUserRole === "ADMIN";
+  const isEmployee = currentUser?.role?.type === "employee";
   const totalPages = pagination?.totalPages || 0;
   const totalEmployees = pagination?.total || 0;
 
@@ -400,7 +401,7 @@ const EmployeeTable = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 ROLE
               </th>
-              {isAdminUser && (
+              {(isEmployee || isAdminUser) && (
                 <>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     PASSWORD
@@ -422,13 +423,13 @@ const EmployeeTable = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {isLoading ? (
               <tr>
-                <td colSpan={isAdminUser ? 8 : 6}>
+                <td colSpan={isEmployee || isAdminUser ? 8 : 6}>
                   <EmptyState type="loading" />
                 </td>
               </tr>
             ) : filteredEmployees.length === 0 ? (
               <tr>
-                <td colSpan={isAdminUser ? 8 : 6}>
+                <td colSpan={isEmployee || isAdminUser ? 8 : 6}>
                   <EmptyState
                     type={search ? "search" : "empty"}
                     search={search}
@@ -508,7 +509,7 @@ const EmployeeTable = () => {
                       </span>
                     </td>
 
-                    {isAdminUser && (
+                    {(isEmployee || isAdminUser) && (
                       <>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-2">
@@ -592,7 +593,7 @@ const EmployeeTable = () => {
                           <ActionsMenu
                             type="employee"
                             user={employee}
-                            isAdminUser={isAdminUser}
+                            isAdminUser={isEmployee || isAdminUser}
                             onView={handleViewUser}
                             onEdit={(employee) => {
                               setSelectedUser(employee);
@@ -673,7 +674,7 @@ const EmployeeTable = () => {
       {showViewProfile && selectedUser && (
         <UserProfileView
           userId={selectedUser.id}
-          isAdminUser={isAdminUser}
+          isAdminUser={isEmployee || isAdminUser}
           onClose={() => {
             setShowViewProfile(false);
             setSelectedUser(null);
@@ -727,7 +728,7 @@ const EmployeeTable = () => {
             onClose={handleFormClose}
             onSuccess={handleFormSuccess}
             editData={selectedUser}
-            isAdmin={isAdminUser}
+            isAdmin={isEmployee || isAdminUser}
             type="employee"
           />
         </div>

@@ -9,8 +9,6 @@ import {
 
 const commissionRoutes = Router();
 
-// Commission Setting Routes
-
 // Get commission settings by role or user (ADMIN only)
 commissionRoutes.get(
   "/setting",
@@ -25,7 +23,7 @@ commissionRoutes.get(
   "/setting/created-by-me",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize(["business", "employee"]),
-  CommissionSettingController.getByCreatedBy
+  CommissionSettingController.getAll
 );
 
 // Create or update commission setting (ADMIN only)

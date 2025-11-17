@@ -24,10 +24,9 @@ class RoleController {
   });
 
   static getAllRolesByType = asyncHandler(async (req, res) => {
-    const userRoleLevel = req.user?.roleLevel;
+    const currentUser = req.user;
     const { type } = req.params;
 
-    // Validate type parameter
     if (!type || !["employee", "business"].includes(type)) {
       return res
         .status(400)
@@ -40,10 +39,16 @@ class RoleController {
     }
 
     const options = {
-      ...(typeof userRoleLevel === "number" && {
-        currentUserRoleLevel: userRoleLevel,
-      }),
+      currentUserRoleLevel: currentUser?.roleLevel,
       type: type,
+      currentUser: {
+        id: currentUser?.id,
+        role: {
+          type: currentUser?.roleType,
+          name: currentUser?.role,
+          level: currentUser?.roleLevel,
+        },
+      },
     };
 
     const roles = await RoleServices.getAllRolesByType(options);
@@ -54,30 +59,6 @@ class RoleController {
         : "Business roles fetched successfully";
 
     return res.status(200).json(ApiResponse.success(roles, message, 200));
-  });
-
-  static getRolebyId = asyncHandler(async (req, res) => {
-    const userRoleLevel = req.user?.roleLevel;
-    const roleId = req.params.id;
-
-    if (!roleId) {
-      throw ApiError.badRequest("Role ID is required");
-    }
-
-    const role = await RoleServices.getRolebyId(roleId, req.user.id, req, res);
-
-    if (!role) {
-      throw ApiError.notFound("Role not found");
-    }
-
-    // Check if user has permission to view this role
-    if (userRoleLevel && role.level <= userRoleLevel) {
-      throw ApiError.forbidden("Insufficient permissions to view this role");
-    }
-
-    return res
-      .status(200)
-      .json(ApiResponse.success(role, "Role fetched successfully", 200));
   });
 
   static createRole = asyncHandler(async (req, res) => {
@@ -226,30 +207,6 @@ class RoleController {
       .status(200)
       .json(
         ApiResponse.success(null, "Employee role deleted successfully", 200)
-      );
-  });
-
-  // Get business roles for user registration
-  static getBusinessRoles = asyncHandler(async (req, res) => {
-    const userRoleLevel = req.user?.roleLevel;
-
-    const roles = await RoleServices.getBusinessRolesForUser(userRoleLevel);
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(roles, "Business roles fetched successfully", 200)
-      );
-  });
-
-  // Get employee roles for employee registration
-  static getEmployeeRoles = asyncHandler(async (req, res) => {
-    const roles = await RoleServices.getEmployeeRolesForAdmin();
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(roles, "Employee roles fetched successfully", 200)
       );
   });
 }
