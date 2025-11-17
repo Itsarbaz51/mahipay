@@ -11,24 +11,18 @@ import {
   X,
   Download,
   Eye,
-  Filter,
 } from "lucide-react";
 import ButtonField from "../ui/ButtonField";
 import HeaderSection from "../ui/HeaderSection";
 import FundRequestForm from "../forms/AddFundRequest";
 import { useSelector } from "react-redux";
-import { usePermissions, SERVICES } from "../hooks/usePermissions";
+import { usePermissions } from "../hooks/usePermissions";
 
 // Constants
 const STATUS_TYPES = {
   PENDING: "pending",
   APPROVED: "approved",
   REJECTED: "rejected",
-};
-
-const PAYMENT_METHODS = {
-  RAZORPAY: "razorpay",
-  BANK_TRANSFER: "bank_transfer",
 };
 
 // Utility functions
@@ -136,18 +130,32 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// Search and Filter Component - UPDATED
+// Search and Filter Component - FIXED: Now using fundTabs directly
 const SearchFilterBar = ({
   searchTerm,
   onSearchChange,
   onRefresh,
-  showPaymentButtons,
   onMethodSelect,
-  visibleServices, // NEW: Pass visible services
+  fundTabs, // FIXED: Using fundTabs directly from permissions
 }) => {
-  // Show payment buttons only if user has at least one service
-  const shouldShowPaymentButtons =
-    showPaymentButtons && visibleServices.length > 0;
+  // Show payment buttons only if user has at least one payment method tab
+  const shouldShowPaymentButtons = fundTabs.length > 0;
+
+  // Map fundTabs to button configuration
+  const getButtonConfig = (tab) => {
+    const config = {
+      razorpay: {
+        icon: CreditCard,
+        label: "Razorpay",
+      },
+      "bank-transfer": {
+        icon: Landmark,
+        label: "Bank Transfer",
+      },
+    };
+
+    return config[tab.id] || { icon: CreditCard, label: tab.label };
+  };
 
   return (
     <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -172,26 +180,20 @@ const SearchFilterBar = ({
 
       {shouldShowPaymentButtons && (
         <div className="grid grid-cols-2 gap-2">
-          {/* Show Razorpay button only if service is available */}
-          {visibleServices.includes(SERVICES.RAZORPAY) && (
-            <ButtonField
-              isOpen={() => onMethodSelect(PAYMENT_METHODS.RAZORPAY)}
-              name="Razorpay"
-              icon={CreditCard}
-              type="button"
-              className="min-w-[120px]"
-            />
-          )}
-          {/* Show Bank Transfer button only if service is available */}
-          {visibleServices.includes(SERVICES.BANK_TRANSFER) && (
-            <ButtonField
-              isOpen={() => onMethodSelect(PAYMENT_METHODS.BANK_TRANSFER)}
-              name="Bank Transfer"
-              icon={Landmark}
-              type="button"
-              className="min-w-[120px]"
-            />
-          )}
+          {/* Show buttons based on fundTabs from permissions */}
+          {fundTabs.map((tab) => {
+            const buttonConfig = getButtonConfig(tab);
+            return (
+              <ButtonField
+                key={tab.id}
+                isOpen={() => onMethodSelect(tab.id)}
+                name={buttonConfig.label}
+                icon={buttonConfig.icon}
+                type="button"
+                className="min-w-[120px]"
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -271,7 +273,7 @@ const PermissionDeniedView = () => {
   );
 };
 
-// Main Fund Request Content Component
+// Main Fund Request Content Component - FIXED: Using fundTabs directly
 const FundRequestContent = () => {
   const [step, setStep] = useState("select-method");
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -284,8 +286,9 @@ const FundRequestContent = () => {
   const { fundRequests, addFundRequest, updateRequestStatus } =
     useFundRequests();
 
-  // Use fund permissions hook
-  const { visibleServices } = usePermissions();
+  // Use fund permissions hook - FIXED: Now properly using fundTabs
+  const permissions = usePermissions("/request-fund");
+  const fundTabs = permissions.getPageTabs("/request-fund");
 
   const [savedAccounts] = useState([
     {
@@ -477,7 +480,27 @@ const FundRequestContent = () => {
     [updateRequestStatus]
   );
 
-  const isAdmin = currentUser.role.name === "ADMIN";
+  const isAdmin = currentUser?.role?.name === "ADMIN";
+
+  // Show no access message if no payment methods are available for non-admin users
+  if (!isAdmin && fundTabs.length === 0) {
+    return (
+      <div>
+        <HeaderSection
+          title="Fund Request"
+          tagLine="Manage your fund requests"
+          totalCount="0"
+          stats={[
+            { label: "Pending", value: 0 },
+            { label: "Approved", value: 0 },
+          ]}
+        />
+        <div className="mt-8">
+          <PermissionDeniedView />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="">
@@ -506,10 +529,11 @@ const FundRequestContent = () => {
                   ? "Manage and review fund requests from users"
                   : "Add funds to your account using secure payment methods"}
               </p>
-              {/* Show available services info */}
-              {!isAdmin && (
+              {/* Show available payment methods info from fundTabs */}
+              {!isAdmin && fundTabs.length > 0 && (
                 <div className="mt-2 text-sm text-gray-500">
-                  Available services: {visibleServices.join(", ")}
+                  Available payment methods:{" "}
+                  {fundTabs.map((tab) => tab.label).join(", ")}
                 </div>
               )}
             </div>
@@ -518,9 +542,8 @@ const FundRequestContent = () => {
               searchTerm={searchTerm}
               onSearchChange={(e) => setSearchTerm(e.target.value)}
               onRefresh={() => window.location.reload()}
-              showPaymentButtons={!isAdmin && step === "select-method"}
               onMethodSelect={handleMethodSelect}
-              visibleServices={visibleServices} // Pass visible services
+              fundTabs={fundTabs} // FIXED: Passing fundTabs directly
             />
           </div>
         </div>
@@ -568,7 +591,7 @@ const FundRequestContent = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    {currentUser.role.name === "ADMIN" && (
+                    {isAdmin && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
@@ -599,7 +622,7 @@ const FundRequestContent = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={request.status} />
                       </td>
-                      {currentUser.role.name === "ADMIN" && (
+                      {isAdmin && (
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <ActionButtons
                             onApprove={() =>
@@ -647,13 +670,13 @@ const FundRequestContent = () => {
   );
 };
 
-// Main Component
+// Main Component - FIXED: Proper permission checking
 const FundRequestTable = () => {
   // Use fund permissions hook at the top level
-  const { isRouteAccessible } = usePermissions();
+  const permissions = usePermissions("/request-fund");
 
   // Conditionally render based on route accessibility
-  if (!isRouteAccessible) {
+  if (!permissions.canAccessRoute("/request-fund")) {
     return <PermissionDeniedView />;
   }
 

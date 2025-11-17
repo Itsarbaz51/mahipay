@@ -2,7 +2,6 @@ import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { RouteUtils } from "../../components/hooks/usePermissionMonitor";
 
 // Configure axios once
 if (!axios.defaults.baseURL) {
@@ -18,7 +17,6 @@ const initialState = {
   success: null,
   isAuthenticated: false,
   userType: null, // 'business' or 'employee'
-  lastPermissionUpdate: null, // Track permission changes
 };
 
 const authSlice = createSlice({
@@ -46,11 +44,6 @@ const authSlice = createSlice({
       if (userData) {
         state.currentUser = userData;
         state.userType = userData.roleType || userData.role?.type || "business";
-
-        // Track permission update time for employees
-        if (userData.role?.type === "employee" && userData.userPermissions) {
-          state.lastPermissionUpdate = Date.now();
-        }
 
         // Ensure permissions are included for employee users
         if (userData.role?.type === "employee" && !userData.permissions) {
@@ -84,7 +77,6 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.currentUser = null;
         state.userType = null;
-        state.lastPermissionUpdate = null;
       } else {
         // Stay logged in for normal business logic errors
         state.isAuthenticated = true;
@@ -118,7 +110,6 @@ const authSlice = createSlice({
       state.success = null;
       state.error = null;
       state.userType = null;
-      state.lastPermissionUpdate = null;
     },
     clearError: (state) => {
       state.error = null;
@@ -128,24 +119,7 @@ const authSlice = createSlice({
     },
     updateUser: (state, action) => {
       if (state.currentUser) {
-        const previousPermissions = state.currentUser.userPermissions || [];
-        const newPermissions = action.payload.userPermissions || [];
-
-        // Track permission changes
-        const changeType = RouteUtils.detectPermissionChange(
-          previousPermissions,
-          newPermissions
-        );
-
         state.currentUser = { ...state.currentUser, ...action.payload };
-
-        // Track permission changes for employees
-        if (
-          state.currentUser.role?.type === "employee" &&
-          changeType !== "no_change"
-        ) {
-          state.lastPermissionUpdate = Date.now();
-        }
       }
     },
     setAuthentication: (state, action) => {
@@ -153,7 +127,6 @@ const authSlice = createSlice({
       if (!action.payload) {
         state.currentUser = null;
         state.userType = null;
-        state.lastPermissionUpdate = null;
       }
     },
     setLoading: (state, action) => {
@@ -166,7 +139,6 @@ const authSlice = createSlice({
       state.success = null;
       state.error = null;
       state.userType = null;
-      state.lastPermissionUpdate = null;
     },
     setUserType: (state, action) => {
       state.userType = action.payload;
@@ -175,7 +147,6 @@ const authSlice = createSlice({
       if (state.currentUser) {
         state.currentUser.userPermissions = action.payload;
         state.currentUser.permissions = action.payload;
-        state.lastPermissionUpdate = Date.now();
       }
     },
   },
@@ -266,35 +237,6 @@ export const verifyAuth = () => async (dispatch) => {
   }
 };
 
-// Enhanced verifyAuth with permission change detection
-export const verifyAuthWithPermissionCheck =
-  () => async (dispatch, getState) => {
-    dispatch(setLoading(true));
-    try {
-      const { data } = await axios.get(`/auth/me`);
-      const previousState = getState().auth;
-
-      dispatch(setAuthentication(true));
-      dispatch(authSuccess(data));
-
-      // Check if permissions changed significantly
-      const oldPermissions = previousState.currentUser?.userPermissions || [];
-      const newPermissions =
-        data.user?.userPermissions || data.userPermissions || [];
-
-      if (
-        JSON.stringify(oldPermissions.sort()) !==
-        JSON.stringify(newPermissions.sort())
-      )
-        return data;
-    } catch (error) {
-      dispatch(setAuthentication(false));
-      dispatch(logoutUser());
-    } finally {
-      dispatch(setLoading(false));
-    }
-  };
-
 export const updateCredentials =
   (userId, credentialsData) => async (dispatch) => {
     try {
@@ -375,8 +317,6 @@ export const verifyEmail = (token) => async (dispatch) => {
 export const selectCurrentUser = (state) => state.auth.currentUser;
 export const selectUserPermissions = (state) =>
   state.auth.currentUser?.userPermissions || [];
-export const selectLastPermissionUpdate = (state) =>
-  state.auth.lastPermissionUpdate;
 export const selectIsEmployee = (state) =>
   state.auth.currentUser?.role?.type === "employee";
 

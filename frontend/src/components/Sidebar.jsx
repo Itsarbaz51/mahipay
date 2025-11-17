@@ -10,12 +10,7 @@ import {
   LogOut,
   History,
   Wallet,
-  LogInIcon,
-  Landmark,
   BadgeIndianRupee,
-  RedoDot,
-  HandCoins,
-  Logs,
   FileCode,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
@@ -36,115 +31,170 @@ const Sidebar = () => {
   const dispatch = useDispatch();
   const { currentUser, isAuthenticated } = useSelector((state) => state.auth);
 
-  // Use fund permissions hook
-  const { showAddFund } = usePermissions();
+  // Use unified permissions hook
+  const permissions = usePermissions();
 
   const handleLogout = () => {
     dispatch(logout());
   };
 
-  // Base menu items structure
+  // Base menu items structure - IMPROVED: Better permission checks
   const baseMenuItems = [
-    // --- MAIN ---
     {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: BarChart3,
-      path: "/dashboard",
-      permission: "dashboard",
-      staticRoles: STATIC_BUSINESS_ROLES,
+      title: "Main",
+      items: [
+        {
+          id: "dashboard",
+          label: "Dashboard",
+          icon: BarChart3,
+          path: "/dashboard",
+          permission: "dashboard",
+          staticRoles: STATIC_BUSINESS_ROLES,
+        },
+        {
+          id: "add-fund",
+          label: "Add Fund",
+          icon: BadgeIndianRupee,
+          path: "/request-fund",
+          permission: "fund request",
+          // FIXED: Better show condition
+          show: permissions.showAddFund,
+          staticRoles: [
+            "STATE HEAD",
+            "MASTER DISTRIBUTOR",
+            "DISTRIBUTOR",
+            "RETAILER",
+          ],
+        },
+        {
+          id: "members",
+          label: "Members",
+          icon: Users,
+          path: "/members",
+          permission: "members",
+          staticRoles: [
+            "ADMIN",
+            "STATE HEAD",
+            "MASTER DISTRIBUTOR",
+            "DISTRIBUTOR",
+          ],
+        },
+        {
+          id: "commission",
+          label: "Commission",
+          icon: Percent,
+          path: "/commission",
+          permission: "commission",
+          staticRoles: STATIC_BUSINESS_ROLES,
+        },
+        {
+          id: "transactions",
+          label: "Transactions",
+          icon: History,
+          path: "/transactions",
+          permission: "transactions",
+          staticRoles: STATIC_BUSINESS_ROLES,
+        },
+      ].filter((item) => {
+        // FIXED: Better show condition check
+        if (item.show !== undefined) {
+          return item.show === true;
+        }
+        return true;
+      }),
     },
     {
-      id: "add-fund",
-      label: "Add Fund",
-      icon: BadgeIndianRupee,
-      path: "/request-fund",
-      permission: "fund request",
-      staticRoles: STATIC_BUSINESS_ROLES,
-      // This item will be conditionally shown based on showAddFund
-    },
-    {
-      id: "members",
-      label: "Members",
-      icon: Users,
-      path: "/members",
-      permission: "members",
-      staticRoles: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
-    },
-    {
-      id: "commission",
-      label: "Commission",
-      icon: Percent,
-      path: "/commission",
-      permission: "commission",
-      staticRoles: STATIC_BUSINESS_ROLES,
-    },
-    {
-      id: "transactions",
-      label: "Transactions",
-      icon: History,
-      path: "/transactions",
-      permission: "transactions",
-      staticRoles: STATIC_BUSINESS_ROLES,
-    },
-
-    // --- SERVICE ---
-    {
-      id: "payout",
-      label: "Payouts",
-      icon: ArrowDownCircle,
-      path: "/card-payout",
-      permission: "payout",
-      staticRoles: [
-        "STATE HEAD",
-        "MASTER DISTRIBUTOR",
-        "DISTRIBUTOR",
-        "RETAILER",
+      title: "Services",
+      items: [
+        {
+          id: "payout",
+          label: "Payouts",
+          icon: ArrowDownCircle,
+          path: "/card-payout",
+          permission: "payout",
+          staticRoles: [
+            "STATE HEAD",
+            "MASTER DISTRIBUTOR",
+            "DISTRIBUTOR",
+            "RETAILER",
+          ],
+        },
       ],
     },
-
-    // --- ADMIN ONLY ---
     {
-      id: "request-kyc",
-      label: "KYC Request",
-      icon: Shield,
-      path: "/kyc-request",
-      permission: "kyc request",
-      staticRoles: ["ADMIN", "STATE HEAD", "MASTER DISTRIBUTOR", "DISTRIBUTOR"],
+      title: "Administration",
+      items: [
+        {
+          id: "request-kyc",
+          label: "KYC Request",
+          icon: Shield,
+          path: "/kyc-request",
+          permission: "kyc request",
+          // NEW: Hide if employee doesn't have permission
+          show: permissions.hasKycRequest,
+          staticRoles: [
+            "ADMIN",
+            "STATE HEAD",
+            "MASTER DISTRIBUTOR",
+            "DISTRIBUTOR",
+          ],
+        },
+        {
+          id: "employee-management",
+          label: "Employee Management",
+          icon: Users,
+          path: "/employee-management",
+          permission: "employee management",
+          // NEW: Hide if employee doesn't have permission
+          show: permissions.hasEmployeeManagement,
+          staticRoles: ["ADMIN"],
+        },
+        {
+          id: "reports",
+          label: "Reports",
+          icon: BarChart3,
+          path: "/reports",
+          permission: "reports",
+          // NEW: Hide if employee doesn't have permission
+          show: permissions.hasReports,
+          staticRoles: ["ADMIN"],
+        },
+        {
+          id: "logs",
+          label: "Logs",
+          icon: FileCode,
+          path: "/logs",
+          permission: "logs",
+          // NEW: Hide if employee doesn't have permission
+          show: permissions.hasLogs,
+          staticRoles: STATIC_BUSINESS_ROLES,
+        },
+      ].filter((item) => {
+        // FIXED: Better show condition check
+        if (item.show !== undefined) {
+          return item.show === true;
+        }
+        return true;
+      }),
     },
     {
-      id: "employee-management",
-      label: "Employee Management",
-      icon: Users,
-      path: "/employee-management",
-      permission: "employee management",
-      staticRoles: ["ADMIN"],
-    },
-    {
-      id: "reports",
-      label: "Reports",
-      icon: BarChart3,
-      path: "/reports",
-      permission: "reports",
-      staticRoles: ["ADMIN"],
-    },
-    {
-      id: "logs",
-      label: "Logs",
-      icon: FileCode,
-      path: "/logs",
-      permission: "logs",
-      staticRoles: STATIC_BUSINESS_ROLES,
-    },
-
-    // --- SYSTEM ---
-    {
-      id: "settings",
-      label: "Settings",
-      icon: Settings,
-      path: "/settings",
-      permission: "settings",
-      staticRoles: STATIC_BUSINESS_ROLES,
+      title: "System",
+      items: [
+        {
+          id: "settings",
+          label: "Settings",
+          icon: Settings,
+          path: "/settings",
+          permission: "settings",
+          show: permissions.showSettings,
+          staticRoles: STATIC_BUSINESS_ROLES,
+        },
+      ].filter((item) => {
+        if (item.show !== undefined) {
+          return item.show === true;
+        }
+        return true;
+      }),
     },
   ];
 
@@ -153,57 +203,36 @@ const Sidebar = () => {
   const role = userData.role?.name || userData.role || "USER";
   const roleType = userData.role?.type || "business";
 
-  // FIXED: Extract employee permissions correctly from userPermissions array
-  const userPermissions = (userData.userPermissions || [])
-    .map((perm) => {
-      if (typeof perm === "string") {
-        return perm.toLowerCase().trim();
-      } else if (perm && typeof perm === "object") {
-        return perm?.permission?.toLowerCase()?.trim() || "";
-      }
-      return "";
+  // Filter menu sections based on user role and permissions - IMPROVED LOGIC
+  const filteredMenuSections = baseMenuItems
+    .map((section) => {
+      const filteredItems = section.items.filter((item) => {
+        // For static business roles
+        if (STATIC_BUSINESS_ROLES.includes(role)) {
+          // Pehle show property check karo, phir staticRoles
+          if (item.show !== undefined && item.show === false) {
+            return false;
+          }
+          return item.staticRoles?.includes(role) ?? true;
+        }
+        // For dynamic employee roles - NEW: At least one permission check
+        else if (roleType === "employee") {
+          // Agar show property hai to ussi se check karo
+          if (item.show !== undefined) {
+            return item.show === true;
+          }
+          // Nahi to direct permission check karo
+          return permissions.hasPermission(item.permission);
+        }
+        return false;
+      });
+
+      return {
+        ...section,
+        items: filteredItems,
+      };
     })
-    .filter((perm) => perm !== "");
-
-  // Filter menu items based on user role and permissions
-  const filteredMenuItems = baseMenuItems.filter((item) => {
-    // Hide "Add Fund" menu if user doesn't have any payment service permissions
-    if (item.id === "add-fund" && !showAddFund) {
-      return false;
-    }
-
-    // For static business roles
-    if (STATIC_BUSINESS_ROLES.includes(role)) {
-      return item.staticRoles.includes(role);
-    }
-    // For dynamic employee roles
-    else if (roleType === "employee") {
-      const hasPermission = userPermissions.includes(
-        item.permission.toLowerCase()
-      );
-      return hasPermission;
-    }
-    return false;
-  });
-
-  // Rest of your sidebar component remains the same...
-  const mainItems = filteredMenuItems.filter((item) =>
-    ["dashboard", "add-fund", "members", "commission", "transactions"].includes(
-      item.id
-    )
-  );
-
-  const serviceItems = filteredMenuItems.filter((item) =>
-    ["payout"].includes(item.id)
-  );
-
-  const adminItems = filteredMenuItems.filter((item) =>
-    ["request-kyc", "employee-management", "reports", "logs"].includes(item.id)
-  );
-
-  const systemItems = filteredMenuItems.filter((item) =>
-    ["settings"].includes(item.id)
-  );
+    .filter((section) => section.items.length > 0);
 
   const MenuItem = ({ item }) => {
     const Icon = item.icon;
@@ -353,25 +382,16 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <div className="flex-1 px-4 pb-4 overflow-y-auto">
-        <MenuSection title="Main" items={mainItems} />
-
-        {/* Services Section */}
-        {serviceItems.length > 0 && (
-          <MenuSection title="Services" items={serviceItems} />
-        )}
-
-        {/* Admin Section */}
-        {adminItems.length > 0 && (
-          <MenuSection title="Administration" items={adminItems} />
-        )}
-
-        {/* System Section */}
-        {systemItems.length > 0 && (
-          <MenuSection title="System" items={systemItems} />
-        )}
+        {filteredMenuSections.map((section) => (
+          <MenuSection
+            key={section.title}
+            title={section.title}
+            items={section.items}
+          />
+        ))}
 
         {/* Empty State for Employees with no permissions */}
-        {roleType === "employee" && filteredMenuItems.length === 0 && (
+        {roleType === "employee" && filteredMenuSections.length === 0 && (
           <div className="text-center py-8">
             <Settings className="h-12 w-12 text-gray-300 mx-auto mb-2" />
             <p className="text-sm text-gray-500">No permissions assigned</p>

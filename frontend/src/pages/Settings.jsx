@@ -4,7 +4,7 @@ import {
   Settings as SettingsIcon,
   UserCog,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 
 import MainSettings from "./MainSetting";
@@ -13,102 +13,165 @@ import ManageServices from "./ManageServices";
 import RoleManager from "../components/RoleManager";
 import PageHeader from "../components/ui/PageHeader";
 import ApiIntegration from "./ApiIntigration";
+import { usePermissions } from "../components/hooks/usePermissions";
+import { BUSINESS_ROLES, PERMISSIONS } from "../utils/constants";
 
 const Settings = () => {
   const { currentUser = {} } = useSelector((state) => state.auth);
-  const currentUserRole = currentUser?.role || "";
 
-  // Define all tabs
+  const permissions = usePermissions("/settings");
+
+  // Get user role and type
+  const userRole = currentUser?.role?.name || currentUser?.role;
+  const userType = currentUser?.role?.type || "business";
+  const isEmployee = userType === "employee";
+  const isBusinessUser = !isEmployee;
+
+  // Define all available tabs with role-based visibility - UPDATED LOGIC
   const allTabs = [
     {
       id: "general",
       label: "General Settings",
       icon: SettingsIcon,
-      adminOnly: true,
-      employee: true,
+      permission: PERMISSIONS.GENERAL_SETTINGS,
+      component: <MainSettings />,
+      // Show to Admin and employees with permission
+      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToEmployee: true,
     },
     {
       id: "accounts",
       label: "Company Accounts",
       icon: CreditCard,
-      adminOnly: false,
-      employee: false,
+      permission: PERMISSIONS.COMPANY_ACCOUNTS,
+      component: <CompanyAccounts />,
+      // Show to Admin and employees with permission
+      showToRoles: [
+        BUSINESS_ROLES.ADMIN,
+        BUSINESS_ROLES.STATE_HEAD,
+        BUSINESS_ROLES.MASTER_DISTRIBUTOR,
+        BUSINESS_ROLES.DISTRIBUTOR,
+        BUSINESS_ROLES.RETAILER ,
+      ],
+      showToEmployee: true,
     },
     {
       id: "services",
       label: "Services",
       icon: UserCog,
-      adminOnly: true,
-      employee: true,
+      permission: PERMISSIONS.MANAGE_SERVICES,
+      component: <ManageServices />,
+      // Show only to Admin and employees with permission
+      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToEmployee: true,
     },
     {
-      id: "role",
+      id: "roles",
       label: "Roles Management",
       icon: UserCog,
-      adminOnly: true,
-      employee: true,
+      permission: PERMISSIONS.ROLE_MANAGEMENT,
+      component: <RoleManager />,
+      // Show only to Admin and employees with permission
+      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToEmployee: true,
     },
     {
-      id: "api-intigration",
-      label: "API Intigration",
+      id: "api-integration",
+      label: "API Integration",
       icon: Cpu,
-      adminOnly: true,
-      employee: true,
+      permission: PERMISSIONS.API_INTEGRATION,
+      component: <ApiIntegration />,
+      // Show only to Admin and employees with permission
+      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToEmployee: true,
     },
   ];
 
-  const tabs =
-    currentUserRole.name === "ADMIN" || currentUserRole.type == "employee"
-      ? allTabs
-      : allTabs.filter((tab) => !tab.adminOnly);
-
-  const defaultTab =
-    currentUserRole.name === "ADMIN" || currentUserRole.type == "employee"
-      ? "general"
-      : tabs[0]?.id || "accounts";
-  const [activeTab, setActiveTab] = useState(defaultTab);
-
-  const renderActiveTab = () => {
-    switch (activeTab) {
-      case "general":
-        return currentUserRole.name === "ADMIN" ||
-          currentUserRole.type == "employee" ? (
-          <MainSettings />
-        ) : (
-          <NoAccess />
-        );
-      case "accounts":
-        return <CompanyAccounts />;
-      case "services":
-        return currentUserRole.name === "ADMIN" ||
-          currentUserRole.type == "employee" ? (
-          <ManageServices />
-        ) : (
-          <NoAccess />
-        );
-      case "role":
-        return currentUserRole.name === "ADMIN" ||
-          currentUserRole.type == "employee" ? (
-          <RoleManager />
-        ) : (
-          <NoAccess />
-        );
-      case "api-intigration":
-        return currentUserRole.name === "ADMIN" ||
-          currentUserRole.type == "employee" ? (
-          <ApiIntegration />
-        ) : (
-          <NoAccess />
-        );
-      default:
-        return currentUserRole.name === "ADMIN" ||
-          currentUserRole.type == "employee" ? (
-          <MainSettings />
-        ) : (
-          <NoAccess />
-        );
+  // Filter tabs based on user role and permissions - UPDATED LOGIC
+  const visibleTabs = allTabs.filter((tab) => {
+    // Employee users - check specific permissions
+    if (isEmployee) {
+      return permissions.hasPermission(tab.permission);
     }
+
+    // Business users - check role-based rules
+    if (isBusinessUser) {
+      // 1. Agar specific roles ke liye show karna hai
+      if (tab.showToRoles && tab.showToRoles.includes(userRole)) {
+        return true;
+      }
+
+      // 2. Agar employee ke liye show karna hai (business users ke liye nahi)
+      if (tab.showToEmployee) {
+        return false;
+      }
+
+      // 3. Default: Agar koi specific rule nahi hai toh hide karo
+      return false;
+    }
+
+    return false;
+  });
+
+  // Set active tab - Use first visible tab
+  const [activeTab, setActiveTab] = useState(() => {
+    return visibleTabs[0]?.id || "general";
+  });
+
+  // Update active tab if current active tab is not in visible tabs
+  useEffect(() => {
+    if (
+      !visibleTabs.find((tab) => tab.id === activeTab) &&
+      visibleTabs.length > 0
+    ) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [visibleTabs, activeTab]);
+
+  // Render active tab component
+  const renderActiveTab = () => {
+    const activeTabConfig = allTabs.find((tab) => tab.id === activeTab);
+
+    if (!activeTabConfig) {
+      return <NoAccess />;
+    }
+
+    // Check if user has permission for this tab
+    if (isEmployee) {
+      if (!permissions.hasPermission(activeTabConfig.permission)) {
+        return <NoAccess />;
+      }
+    }
+
+    // For business users, check if they should have access to this tab
+    if (isBusinessUser) {
+      const shouldHaveAccess =
+        activeTabConfig.showToRoles &&
+        activeTabConfig.showToRoles.includes(userRole);
+
+      if (!shouldHaveAccess) {
+        return <NoAccess />;
+      }
+    }
+
+    return activeTabConfig.component;
   };
+
+  // Show no access message if no tabs are available
+  if (visibleTabs.length === 0) {
+    return (
+      <div>
+        <PageHeader
+          breadcrumb={["Dashboard", "Settings"]}
+          title="Settings"
+          description="Manage your application settings and configurations"
+        />
+        <div className="mt-8">
+          <NoAccess message="You don't have permission to access any settings." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -118,8 +181,9 @@ const Settings = () => {
         description="Manage your application settings and configurations"
       />
 
+      {/* Tabs Navigation */}
       <div className="flex space-x-1 my-8 bg-gray-100 p-1 rounded-lg w-fit">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -135,14 +199,23 @@ const Settings = () => {
         ))}
       </div>
 
+      {/* Tab Content */}
       <div className="mt-4">{renderActiveTab()}</div>
     </div>
   );
 };
 
-const NoAccess = () => (
-  <div className="text-gray-500 p-6 bg-gray-50 rounded-md border border-gray-200">
-    You don’t have permission to view this section.
+const NoAccess = ({
+  message = "You don't have permission to view this section.",
+}) => (
+  <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+    <div className="max-w-md mx-auto">
+      <SettingsIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        Access Denied
+      </h3>
+      <p className="text-gray-500">{message}</p>
+    </div>
   </div>
 );
 
