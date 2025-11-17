@@ -211,18 +211,3 @@ function createFallbackPermissions() {
     hasBankTransfer: false,
   };
 }
-
-export function detectPermissionChange(
-  oldPermissions = [],
-  newPermissions = []
-) {
-  if (!oldPermissions.length && newPermissions.length) {
-    return "initial_permissions_granted";
-  }
-
-  // FIX: Create copies before sorting
-  const oldSorted = JSON.stringify([...oldPermissions].sort());
-  const newSorted = JSON.stringify([...newPermissions].sort());
-
-  return oldSorted !== newSorted ? "permissions_updated" : "no_change";
-}
