@@ -91,6 +91,11 @@ export const navbarTitleConfig = {
     tagLine: "Manage application settings",
     icon: Settings,
   },
+  "/employee-management": {
+    title: "Employee Management",
+    tagLine: "Manage Employee",
+    icon: Users,
+  },
   "/profile/:id": {
     title: "Profile",
     tagLine: "View and manage your profile",
