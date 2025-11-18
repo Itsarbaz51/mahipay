@@ -48,21 +48,21 @@ addressRoutes.get("/state-list", StateController.index);
 addressRoutes.post(
   "/state-store",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   StateController.store
 );
 
 addressRoutes.put(
   "/state-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   StateController.update
 );
 
 addressRoutes.delete(
   "/state-delete/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   StateController.destroy
 );
 
@@ -75,21 +75,21 @@ addressRoutes.get("/city-list", CityController.index);
 addressRoutes.post(
   "/city-store",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   CityController.store
 );
 
 addressRoutes.put(
   "/city-update/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   CityController.update
 );
 
 addressRoutes.delete(
   "/city-delete/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   CityController.destroy
 );
 

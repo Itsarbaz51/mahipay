@@ -11,7 +11,7 @@ const systemSettingRoutes = Router();
 systemSettingRoutes.get(
   "/show",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   SystemSettingController.show
 );
 
@@ -19,7 +19,7 @@ systemSettingRoutes.get(
 systemSettingRoutes.get(
   "/list",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
   SystemSettingController.index
 );
 
@@ -27,7 +27,7 @@ systemSettingRoutes.get(
 systemSettingRoutes.delete(
   "/delete/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
   SystemSettingController.delete
 );
 
@@ -35,7 +35,7 @@ systemSettingRoutes.delete(
 systemSettingRoutes.post(
   "/upsert",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   upload.fields([
     { name: "companyLogo", maxCount: 1 },
     { name: "favIcon", maxCount: 1 },

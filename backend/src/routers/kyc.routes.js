@@ -12,7 +12,7 @@ kycRoutes.post(
   "/list-kyc",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -49,7 +49,7 @@ kycRoutes.post(
 kycRoutes.put(
   "/user-verify",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   validateRequest(KycValidationSchemas.VerificationKycSchema),
   UserKycController.verification
 );

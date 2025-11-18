@@ -11,7 +11,7 @@ roleRoutes.get(
   "/type/:type",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -24,7 +24,7 @@ roleRoutes.get(
 roleRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   RoleController.getAllRoles
 );
 
@@ -32,7 +32,7 @@ roleRoutes.get(
 roleRoutes.post(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   validateRequest(RoleValidationSchemas.createRole),
   RoleController.createRole
 );
@@ -41,7 +41,7 @@ roleRoutes.post(
 roleRoutes.put(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   validateRequest(RoleValidationSchemas.updateRole),
   RoleController.updateRole
 );
@@ -50,7 +50,7 @@ roleRoutes.put(
 roleRoutes.delete(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
   RoleController.deleteRole
 );
 

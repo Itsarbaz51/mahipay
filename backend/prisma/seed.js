@@ -48,38 +48,44 @@ async function main() {
 
   const roles = [
     {
+      name: "SUPER ADMIN",
+      level: 0, // Now starting from 0
+      type: "business",
+      description: "Super Administrator - Full System Access",
+    },
+    {
       name: "ADMIN",
-      level: 0,
+      level: 1, // Incremented by 1
       type: "business",
       description: "System Administrator",
     },
     {
       name: "STATE HEAD",
-      level: 1,
+      level: 2, // Incremented by 1
       type: "business",
       description: "State Head",
     },
     {
       name: "MASTER DISTRIBUTOR",
-      level: 2,
+      level: 3, // Incremented by 1
       type: "business",
       description: "Master Distributor",
     },
     {
       name: "DISTRIBUTOR",
-      level: 3,
+      level: 4, // Incremented by 1
       type: "business",
       description: "Distributor",
     },
     {
       name: "RETAILER",
-      level: 4,
+      level: 5, // Incremented by 1
       type: "business",
       description: "Retailer",
     },
     {
       name: "HR",
-      level: 5,
+      level: 6, // Incremented by 1
       type: "employee",
       description: "Human Resources",
     },
@@ -100,12 +106,47 @@ async function main() {
         level: role.level,
         type: role.type,
         description: role.description,
-        createdBy: null, // will be updated later for ADMIN
+        createdBy: null, // will be updated later for SUPER_ADMIN
       },
     });
     createdRoles[role.level] = created;
     console.log(`✅ Role created: ${created.name} (${created.type})`);
   }
+
+  console.log("\n👑 Creating Super Admin user...");
+
+  const superAdminPassword = CryptoService.encrypt("SuperAdmin@123");
+  const superAdminPin = CryptoService.encrypt("1234");
+
+  const superAdmin = await prisma.user.upsert({
+    where: { email: "superadmin@gmail.com" },
+    update: {},
+    create: {
+      username: "superadmin",
+      firstName: "Super",
+      lastName: "Admin",
+      profileImage: "",
+      email: "superadmin@gmail.com",
+      phoneNumber: "9999999990",
+      password: superAdminPassword,
+      transactionPin: superAdminPin,
+      roleId: createdRoles[0].id, // SUPER_ADMIN role (level 0)
+      hierarchyLevel: 0, // Root level
+      hierarchyPath: "0", // Root path
+      status: "ACTIVE",
+      isKycVerified: true,
+    },
+  });
+
+  console.log(`✅ Super Admin created: ${superAdmin.username}`);
+
+  // Update the SUPER_ADMIN role with createdBy reference (self-reference)
+  await prisma.role.update({
+    where: { id: createdRoles[0].id },
+    data: {
+      createdBy: superAdmin.id,
+    },
+  });
 
   console.log("\n👑 Creating Admin user...");
 
@@ -124,9 +165,10 @@ async function main() {
       phoneNumber: "9999999991",
       password: adminPassword,
       transactionPin: adminPin,
-      roleId: createdRoles[0].id,
-      hierarchyLevel: 0,
-      hierarchyPath: "0",
+      roleId: createdRoles[1].id, // ADMIN role (level 1)
+      hierarchyLevel: 1,
+      hierarchyPath: "0/1", // Under Super Admin
+      parentId: superAdmin.id, // Super Admin is parent
       status: "ACTIVE",
       isKycVerified: true,
     },
@@ -134,11 +176,11 @@ async function main() {
 
   console.log(`✅ Admin created: ${admin.username}`);
 
-  // Update the ADMIN role with createdBy reference
+  // Update the ADMIN role with createdBy reference (Super Admin)
   await prisma.role.update({
-    where: { id: createdRoles[0].id },
+    where: { id: createdRoles[1].id },
     data: {
-      createdBy: admin.id,
+      createdBy: superAdmin.id,
     },
   });
 
@@ -159,9 +201,9 @@ async function main() {
       phoneNumber: "9999999992",
       password: shPassword,
       transactionPin: shPin,
-      roleId: createdRoles[1].id,
-      hierarchyLevel: 1,
-      hierarchyPath: "0/1",
+      roleId: createdRoles[2].id, // STATE HEAD role (level 2)
+      hierarchyLevel: 2,
+      hierarchyPath: "0/1/2", // Updated hierarchy path
       parentId: admin.id,
       status: "ACTIVE",
       isKycVerified: true,
@@ -188,9 +230,9 @@ async function main() {
       phoneNumber: "9999999993",
       password: hrPassword,
       transactionPin: hrPin, // Optional for employees
-      roleId: createdRoles[5].id, // HR role
-      hierarchyLevel: 1,
-      hierarchyPath: "0/1",
+      roleId: createdRoles[6].id, // HR role (level 6)
+      hierarchyLevel: 2,
+      hierarchyPath: "0/1/2", // Same hierarchy level as State Head
       parentId: admin.id,
       status: "ACTIVE",
       isKycVerified: true,
@@ -201,8 +243,8 @@ async function main() {
 
   console.log("\n💰 Creating wallets for business users only...");
 
-  // Only create wallets for business users (Admin and State Head)
-  const businessUsers = [admin, stateHead];
+  // Create wallets for Super Admin and other business users
+  const businessUsers = [superAdmin, admin, stateHead];
   for (const user of businessUsers) {
     await prisma.wallet.upsert({
       where: {
@@ -255,6 +297,12 @@ async function main() {
   }
 
   console.log("\n🎉 Seeding completed successfully!");
+  console.log("\n📋 Summary of created users:");
+  console.log(`   👑 Super Admin: superadmin@gmail.com / SuperAdmin@123`);
+  console.log(`   👑 Admin: admin@gmail.com / Admin@123`);
+  console.log(`   👤 State Head: statehead@gmail.com / User@123`);
+  console.log(`   👨‍💼 HR Employee: hr@gmail.com / Hr@123`);
+  console.log(`   🔐 All users have transaction PIN: 1234`);
 }
 
 main()

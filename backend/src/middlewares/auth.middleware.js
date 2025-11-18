@@ -10,6 +10,7 @@ export const ROLE_TYPES = {
 
 // Predefined business roles (jo system mein fixed hain)
 const PREDEFINED_BUSINESS_ROLES = [
+  "SUPER ADMIN",
   "ADMIN",
   "STATE HEAD",
   "MASTER DISTRIBUTOR",

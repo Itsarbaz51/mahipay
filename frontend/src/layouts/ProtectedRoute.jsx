@@ -27,8 +27,9 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/unauthorized" replace state={{ from: location }} />;
   }
 
-  // KYC verification - Business users ke liye
+  // KYC verification - Business users ke liye (SUPER ADMIN ko exclude karo)
   const isBusinessUser = [
+    "SUPER ADMIN", // ADDED
     "ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
@@ -36,8 +37,12 @@ const ProtectedRoute = ({ children }) => {
     "RETAILER",
   ].includes(currentUser.role?.name || currentUser.role);
 
+  // SUPER ADMIN ko KYC verification se exempt karo
+  const isSuperAdmin = currentUser.role?.name === "SUPER ADMIN";
+
   if (
     isBusinessUser &&
+    !isSuperAdmin &&
     !currentUser?.isKycVerified &&
     currentPath !== "/kyc-submit"
   ) {
@@ -50,8 +55,6 @@ const ProtectedRoute = ({ children }) => {
 
   // Permission check - Business aur Employee dono ke liye
   if (!permissions.canAccessRoute(currentPath)) {
-    console.log("sdfffffffff");
-
     if (
       permissions.isEmployee &&
       permissions.normalizedPermissions.length === 0

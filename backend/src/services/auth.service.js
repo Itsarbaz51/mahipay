@@ -119,6 +119,7 @@ class AuthServices {
       user.userPermissions = permissions;
     } else if (
       [
+        "SUPER ADMIN",
         "ADMIN",
         "STATE HEAD",
         "MASTER DISTRIBUTOR",
@@ -314,6 +315,7 @@ class AuthServices {
           user.userPermissions = permissions;
         } else if (
           [
+            "SUPER ADMIN",
             "ADMIN",
             "STATE HEAD",
             "MASTER DISTRIBUTOR",
@@ -366,7 +368,8 @@ class AuthServices {
       // Serialize and secure sensitive data
       const serialized = Helper.serializeUser(transformedUser);
       const isCurrentUserAdmin =
-        currentUser && currentUser.role?.name === "ADMIN";
+        (currentUser && currentUser.role?.name === "ADMIN") ||
+        currentUser.role?.name === "SUPER ADMIN";
 
       let safeUser;
       if (isCurrentUserAdmin) {

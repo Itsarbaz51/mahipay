@@ -66,7 +66,7 @@ bankRoutes.delete(
 bankRoutes.put(
   "/bank-verify",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   validateRequest(BankValidationSchemas.VerificationBankSchema),
   AddBankController.verify
 );

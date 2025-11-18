@@ -19,6 +19,7 @@ import { usePermissions } from "./hooks/usePermissions";
 
 // Static business roles
 const STATIC_BUSINESS_ROLES = [
+  "SUPER ADMIN",
   "ADMIN",
   "STATE HEAD",
   "MASTER DISTRIBUTOR",
@@ -73,6 +74,7 @@ const Sidebar = () => {
           path: "/members",
           permission: "members",
           staticRoles: [
+            "SUPER ADMIN",
             "ADMIN",
             "STATE HEAD",
             "MASTER DISTRIBUTOR",
@@ -133,6 +135,7 @@ const Sidebar = () => {
           // NEW: Hide if employee doesn't have permission
           show: permissions.hasKycRequest,
           staticRoles: [
+            "SUPER ADMIN",
             "ADMIN",
             "STATE HEAD",
             "MASTER DISTRIBUTOR",
@@ -147,7 +150,7 @@ const Sidebar = () => {
           permission: "employee management",
           // NEW: Hide if employee doesn't have permission
           show: permissions.hasEmployeeManagement,
-          staticRoles: ["ADMIN"],
+          staticRoles: ["ADMIN", "SUPER ADMIN"],
         },
         {
           id: "reports",
@@ -157,7 +160,7 @@ const Sidebar = () => {
           permission: "reports",
           // NEW: Hide if employee doesn't have permission
           show: permissions.hasReports,
-          staticRoles: ["ADMIN"],
+          staticRoles: ["ADMIN", "SUPER ADMIN"],
         },
         {
           id: "logs",

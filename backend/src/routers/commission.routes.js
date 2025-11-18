@@ -13,7 +13,7 @@ const commissionRoutes = Router();
 commissionRoutes.get(
   "/setting",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
 
   CommissionSettingController.getByRoleOrUser
 );
@@ -30,7 +30,7 @@ commissionRoutes.get(
 commissionRoutes.post(
   "/setting",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
 
   validateRequest(
     CommissionValidationSchemas.createOrUpdateCommissionSettingSchema
@@ -42,7 +42,7 @@ commissionRoutes.post(
 commissionRoutes.post(
   "/earn",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
 
   validateRequest(CommissionValidationSchemas.createCommissionEarningSchema),
   CommissionEarningController.create
@@ -51,7 +51,7 @@ commissionRoutes.post(
 commissionRoutes.get(
   "/earnings",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN"]),
+  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
 
   CommissionEarningController.getAll
 );

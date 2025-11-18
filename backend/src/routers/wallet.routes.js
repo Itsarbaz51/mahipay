@@ -11,7 +11,7 @@ const walletRoutes = Router();
 walletRoutes.post(
   "/credit",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.walletCreditSchema),
   WalletController.creditWallet
@@ -21,7 +21,7 @@ walletRoutes.post(
 walletRoutes.post(
   "/debit",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
   idempotencyMiddleware({ required: true }),
   validateRequest(WallletValidationSchemas.walletDebitSchema),
   WalletController.debitWallet
@@ -53,6 +53,7 @@ walletRoutes.get(
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
     "ADMIN",
+    "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -70,6 +71,7 @@ walletRoutes.get(
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
     "ADMIN",
+    "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -86,6 +88,7 @@ walletRoutes.get(
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
     "ADMIN",
+    "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -103,6 +106,7 @@ walletRoutes.get(
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
     "ADMIN",
+    "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",

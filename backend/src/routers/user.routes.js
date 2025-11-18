@@ -20,7 +20,7 @@ userRoutes.get(
   "/role/:roleId",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -34,7 +34,7 @@ userRoutes.get(
   "/children/:userId",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -48,7 +48,7 @@ userRoutes.get(
   "/count/parent/:parentId",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -62,7 +62,7 @@ userRoutes.get(
   "/count/children/:userId",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -76,7 +76,7 @@ userRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -91,7 +91,7 @@ userRoutes.post(
   upload.single("profileImage"),
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -106,7 +106,7 @@ userRoutes.put(
   "/:userId/profile",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -121,7 +121,7 @@ userRoutes.put(
   "/:userId/profile-image",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -137,7 +137,7 @@ userRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN",
+    "ADMIN", "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
@@ -150,7 +150,7 @@ userRoutes.get(
 userRoutes.patch(
   "/:userId/deactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   validateRequest(UserValidationSchemas.deactivateUser),
   UserController.deactivateUser
 );
@@ -159,7 +159,7 @@ userRoutes.patch(
 userRoutes.patch(
   "/:userId/reactivate",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   validateRequest(UserValidationSchemas.reactivateUser),
   UserController.reactivateUser
 );
@@ -168,7 +168,7 @@ userRoutes.patch(
 userRoutes.delete(
   "/:userId/delete",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   validateRequest(UserValidationSchemas.deleteUser),
   UserController.deleteUser
 );

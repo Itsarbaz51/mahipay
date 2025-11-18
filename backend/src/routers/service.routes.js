@@ -11,7 +11,7 @@ const serviceRoutes = Router();
 serviceRoutes.post(
   "/create",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
   upload.single("icon"),
   validateRequest(ServiceValidationSchemas.createServiceProvider),
   ServiceProviderController.create
@@ -21,35 +21,35 @@ serviceRoutes.post(
 serviceRoutes.post(
   "/lists",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "business", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "business", "employee"]),
   ServiceProviderController.getAll
 );
 
 serviceRoutes.put(
   "/env-config/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   ServiceProviderController.updateEnvConfig
 );
 
 serviceRoutes.put(
   "/status/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   ServiceProviderController.toggleServiceStatus
 );
 
 serviceRoutes.put(
   "/api-intigration-status/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   ServiceProviderController.toggleApiIntigrationStatus
 );
 
 serviceRoutes.post(
   "/api-testing/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
   ServiceProviderController.apiTestConnection
 );
 

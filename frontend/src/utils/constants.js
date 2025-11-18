@@ -47,6 +47,7 @@ export const USER_TYPES = {
 
 // Static Business Roles
 export const BUSINESS_ROLES = {
+  SUPER_ADMIN: "SUPER ADMIN", // ADDED
   ADMIN: "ADMIN",
   STATE_HEAD: "STATE HEAD",
   MASTER_DISTRIBUTOR: "MASTER DISTRIBUTOR",

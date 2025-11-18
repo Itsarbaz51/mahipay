@@ -21,7 +21,7 @@ transactionRoutes.post(
 transactionRoutes.post(
   "/refund",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
   validateRequest(TransactionValidationSchemas.refundTransactionSchema),
   TransactionController.refundTransaction
 );
@@ -30,7 +30,7 @@ transactionRoutes.post(
 transactionRoutes.get(
   "/",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "business", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "business", "employee"]),
   TransactionController.getTransactions
 );
 
@@ -38,7 +38,7 @@ transactionRoutes.get(
 transactionRoutes.get(
   "/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "business", "employee"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "business", "employee"]),
   TransactionController.getTransactionById
 );
 
@@ -46,7 +46,7 @@ transactionRoutes.get(
 transactionRoutes.patch(
   "/status",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN"]),
+  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
   validateRequest(TransactionValidationSchemas.updateTransactionStatusSchema),
   TransactionController.updateTransactionStatus
 );
