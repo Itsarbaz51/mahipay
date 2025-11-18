@@ -77,6 +77,12 @@ async function main() {
       type: "business",
       description: "Retailer",
     },
+    {
+      name: "HR",
+      level: 5,
+      type: "employee",
+      description: "Human Resources",
+    },
   ];
 
   const createdRoles = {};
@@ -164,10 +170,40 @@ async function main() {
 
   console.log(`✅ State Head created: ${stateHead.username}`);
 
-  console.log("\n💰 Creating wallets...");
+  console.log("\n👨‍💼 Creating HR Employee...");
 
-  const users = [admin, stateHead];
-  for (const user of users) {
+  const hrPassword = CryptoService.encrypt("Hr@123");
+  // Employees don't need transaction pin since they don't have wallets
+  const hrPin = CryptoService.encrypt("0000"); // Optional minimal pin
+
+  const hrEmployee = await prisma.user.upsert({
+    where: { email: "hr@gmail.com" },
+    update: {},
+    create: {
+      username: "hr_employee",
+      firstName: "HR",
+      lastName: "Manager",
+      profileImage: "",
+      email: "hr@gmail.com",
+      phoneNumber: "9999999993",
+      password: hrPassword,
+      transactionPin: hrPin, // Optional for employees
+      roleId: createdRoles[5].id, // HR role
+      hierarchyLevel: 1,
+      hierarchyPath: "0/1",
+      parentId: admin.id,
+      status: "ACTIVE",
+      isKycVerified: true,
+    },
+  });
+
+  console.log(`✅ HR Employee created: ${hrEmployee.username}`);
+
+  console.log("\n💰 Creating wallets for business users only...");
+
+  // Only create wallets for business users (Admin and State Head)
+  const businessUsers = [admin, stateHead];
+  for (const user of businessUsers) {
     await prisma.wallet.upsert({
       where: {
         userId_walletType: { userId: user.id, walletType: "PRIMARY" },
@@ -185,6 +221,8 @@ async function main() {
     });
     console.log(`💳 Wallet created for ${user.username}`);
   }
+
+  console.log("⏭️  Skipping wallet creation for HR employee (employee role)");
 
   console.log("\n🏢 Creating service providers...");
 
