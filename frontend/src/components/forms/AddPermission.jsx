@@ -211,9 +211,7 @@ const AddPermission = ({
 
     return formData.serviceIds.map((serviceId) => {
       const service = services.find((s) => s.id === serviceId);
-      return service
-        ? service.name || service.type || service.code
-        : `Unknown (${serviceId})`;
+      return (service && service?.name) || service?.code;
     });
   }, [formData.serviceIds, services]);
 
@@ -315,6 +313,9 @@ const AddPermission = ({
                   <div className="flex flex-wrap gap-2">
                     {selectedServiceNames.map((serviceName, index) => {
                       const serviceId = formData.serviceIds[index];
+
+                      if (!serviceName) return null;
+
                       return (
                         <span
                           key={serviceId}
