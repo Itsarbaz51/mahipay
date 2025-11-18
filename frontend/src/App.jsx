@@ -5,6 +5,7 @@ import { Provider, useSelector, useDispatch } from "react-redux";
 import store from "./redux/store.js";
 import { ToastContainer } from "react-toastify";
 import { verifyAuth } from "./redux/slices/authSlice";
+import { InputSelect } from "./components/ui/Input_select.jsx";
 
 const AppContent = () => {
   const dispatch = useDispatch();
@@ -38,6 +39,7 @@ const App = () => (
       pauseOnHover
     />
     <AppContent />
+    <InputSelect />
   </Provider>
 );
 
