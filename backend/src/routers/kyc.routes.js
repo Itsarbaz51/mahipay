@@ -26,7 +26,7 @@ kycRoutes.post(
 kycRoutes.get(
   "/user-kyc-show/:id",
   AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "employee"]),
+  AuthMiddleware.authorize(["business", "employee"]),
   UserKycController.show
 );
 

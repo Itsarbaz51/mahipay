@@ -289,7 +289,7 @@ class EmployeeServices {
         created: permissionsToCreate,
         finalPermissions: normalizedPermissions,
         totalPermissions: normalizedPermissions.length,
-        roleName: req?.user?.roleres,
+        roleName: req?.user?.role,
         updatedBy: adminId,
       },
     });
