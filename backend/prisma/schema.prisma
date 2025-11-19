@@ -41,6 +41,19 @@ model EmployeePermission {
   @@map("employee_permissions")
 }
 
+model ipWhitelist {
+  id         String   @id @default(uuid())
+  domainName String   @unique @map("domain_name")
+  serverIp   String   @map("server_ip")
+  localIp    String?  @unique @map("local_ip")
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("ip_whitelists")
+}
+
 model User {
   id                            String               @id @default(uuid())
   username                      String               @db.Text
@@ -86,6 +99,7 @@ model User {
   children                      User[]               @relation("UserHierarchy")
   role                          Role                 @relation(fields: [roleId], references: [id])
   wallets                       Wallet[]
+  ipWhitelists                  ipWhitelist[]
 
   @@index([parentId])
   @@index([hierarchyLevel])
