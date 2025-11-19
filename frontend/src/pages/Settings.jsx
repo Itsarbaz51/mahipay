@@ -12,7 +12,6 @@ import CompanyAccounts from "./CompanyAccounts";
 import ManageServices from "./ManageServices";
 import RoleManager from "../components/RoleManager";
 import PageHeader from "../components/ui/PageHeader";
-import ApiIntegration from "./ApiIntigration";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { BUSINESS_ROLES, PERMISSIONS } from "../utils/constants";
 
@@ -51,7 +50,7 @@ const Settings = () => {
         BUSINESS_ROLES.STATE_HEAD,
         BUSINESS_ROLES.MASTER_DISTRIBUTOR,
         BUSINESS_ROLES.DISTRIBUTOR,
-        BUSINESS_ROLES.RETAILER ,
+        BUSINESS_ROLES.RETAILER,
       ],
       showToEmployee: true,
     },
@@ -71,16 +70,6 @@ const Settings = () => {
       icon: UserCog,
       permission: PERMISSIONS.ROLE_MANAGEMENT,
       component: <RoleManager />,
-      // Show only to Admin and employees with permission
-      showToRoles: [BUSINESS_ROLES.ADMIN],
-      showToEmployee: true,
-    },
-    {
-      id: "api-integration",
-      label: "API Integration",
-      icon: Cpu,
-      permission: PERMISSIONS.API_INTEGRATION,
-      component: <ApiIntegration />,
       // Show only to Admin and employees with permission
       showToRoles: [BUSINESS_ROLES.ADMIN],
       showToEmployee: true,

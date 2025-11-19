@@ -180,8 +180,7 @@ export class BankDetailService {
       where: { userId: targetUserId },
     });
 
-    if (!records || records.length === 0)
-      throw ApiError.notFound("No bank details found");
+    if (!records || records.length === 0) return null;
 
     const safely = await Helper.serializeUser(records);
     return safely;
