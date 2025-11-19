@@ -15,7 +15,7 @@ app.set("trust proxy", 1);
 app.use(
   cors({
     origin: (origin, callback) => {
-      const allowed = [process.env.CLIENT_URL];
+      const allowed = [process.env.CLIENT_URL, "http://localhost:5174"];
       if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {

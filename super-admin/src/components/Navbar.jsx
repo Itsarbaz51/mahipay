@@ -70,11 +70,12 @@ const Navbar = () => {
     <nav className="border-b border-gray-300 flex items-center justify-between px-6 md:px-8 py-4 backdrop-blur-2xl sticky top-0 z-50 bg-white/90">
       {/* LOGO */}
       <Link to="/" className="flex items-center space-x-2">
-        <img
+        {/* <img
           src="/WhatsApp Image 2025-10-10 at 11.48.12 AM.jpeg"
           alt="Impulse"
           className="h-fit w-24 object-contain"
-        />
+        /> */}
+        <h1 className="text-2xl font-bold uppercase">super admin</h1>
       </Link>
 
       {/* DESKTOP MENU */}
@@ -136,7 +137,6 @@ const Navbar = () => {
         >
           Login
         </Link>
-        
       </div>
 
       {/* MOBILE MENU TOGGLE */}
