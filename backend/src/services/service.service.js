@@ -708,6 +708,22 @@ export class ServiceProviderService {
           },
         });
 
+        // ✅ NEW: Sub-services ke user permissions bhi disable karo
+        const subServiceIds = existing.subService.map((sub) => sub.id);
+        const allServiceIdsToDisable = [id, ...subServiceIds];
+
+        const disabledPermissionsCount = await Prisma.userPermission.updateMany(
+          {
+            where: {
+              serviceId: { in: allServiceIdsToDisable },
+              canView: true,
+            },
+            data: {
+              canView: false,
+            },
+          }
+        );
+
         // Updated service return karo
         const updatedService = await Prisma.serviceProvider.findUnique({
           where: { id },
@@ -736,6 +752,8 @@ export class ServiceProviderService {
             roleName: req.user.role,
             newStatus: newStatus,
             subServicesAffected: existing.subService.length,
+            permissionsDisabled: disabledPermissionsCount.count,
+            servicesDisabled: allServiceIdsToDisable,
             toggledBy: currentUserId,
           },
         });
@@ -791,6 +809,21 @@ export class ServiceProviderService {
         throw ApiError.internal("Failed to change active/inactive status");
       }
 
+      // ✅ NEW: Agar service disable ho rahi hai to user permissions update karo
+      let disabledPermissionsCount = 0;
+      if (!newStatus) {
+        const result = await Prisma.userPermission.updateMany({
+          where: {
+            serviceId: id,
+            canView: true,
+          },
+          data: {
+            canView: false,
+          },
+        });
+        disabledPermissionsCount = result.count;
+      }
+
       // Audit log for successful service status toggle
       await AuditLogService.createAuditLog({
         userId: currentUserId,
@@ -804,6 +837,7 @@ export class ServiceProviderService {
           previousStatus: existing.isActive,
           roleName: req.user.role,
           newStatus: newStatus,
+          permissionsDisabled: disabledPermissionsCount,
           toggledBy: currentUserId,
         },
       });
