@@ -275,7 +275,7 @@ const UserProfileKYC = () => {
                 <th className="px-6 py-4">Type</th>
                 <th className="px-6 py-4">Location</th>
                 <th className="px-6 py-4">Status</th>
-                {(currentUser.role.name === "ADMIN" ||
+                {(currentUser.role.name === "SUPER ADMIN" ||
                   currentUser.role.type === "employee") && (
                   <th className="px-6 py-4">Actions</th>
                 )}
@@ -366,7 +366,7 @@ const UserProfileKYC = () => {
                           <span className="ml-1">{kyc.status}</span>
                         </span>
                       </td>
-                      {(currentUser.role.name === "ADMIN" ||
+                      {(currentUser.role.name === "SUPER ADMIN" ||
                         currentUser.role.type === "employee") && (
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
