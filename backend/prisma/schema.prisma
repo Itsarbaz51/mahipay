@@ -9,7 +9,7 @@ datasource db {
 
 model Role {
   id                 String              @id @default(uuid())
-  name               String              @unique
+  name               String
   type               String              @default("business")
   level              Int                 @unique
   description        String?             @db.LongText

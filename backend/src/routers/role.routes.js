@@ -11,21 +11,14 @@ roleRoutes.get(
   "/type/:type",
   AuthMiddleware.isAuthenticated,
   AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
+    "ADMIN",
+    "SUPER ADMIN",
     "STATE HEAD",
     "MASTER DISTRIBUTOR",
     "DISTRIBUTOR",
     "employee",
   ]),
   RoleController.getAllRolesByType
-);
-
-//  GET BUSINESS ROLES FOR USER REGISTRATION
-roleRoutes.get(
-  "/",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  RoleController.getAllRoles
 );
 
 //  CREATE EMPLOYEE ROLE (Only ADMIN can create employee roles)

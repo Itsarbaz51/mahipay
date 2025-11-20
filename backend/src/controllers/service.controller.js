@@ -51,7 +51,11 @@ class ServiceProviderController {
 
     let serviceProviders;
 
-    if (user.role === "ADMIN" || user.roleType === "employee") {
+    if (
+      user.role === "ADMIN" ||
+      user.role === "SUPER ADMIN" ||
+      user.roleType === "employee"
+    ) {
       // ADMIN can see all services based on type
       switch (type) {
         case "active":
@@ -63,11 +67,7 @@ class ServiceProviderController {
         default:
           serviceProviders = await ServiceProviderService.getAll();
       }
-    } else {
-      // Regular users can only see assigned services
-      serviceProviders = await ServiceProviderService.getUserServices(user.id);
     }
-
     return res
       .status(200)
       .json(

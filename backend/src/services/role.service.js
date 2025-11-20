@@ -4,17 +4,19 @@ import AuditLogService from "./auditLog.service.js";
 import Helper from "../utils/helper.js";
 
 class RoleServices {
-  static getAllRoles = async (options = {}) => {
-    const { currentUserRoleLevel, excludeAdmin = false } = options;
+  static getAllRolesTypeBusiness = async (options = {}) => {
+    const { currentUserRoleLevel, currentUser } = options;
 
-    const where = {};
-
-    if (excludeAdmin) {
-      where.name = { not: "ADMIN" };
-    }
+    const where = {
+      type: "business",
+    };
 
     if (typeof currentUserRoleLevel === "number") {
       where.level = { gt: currentUserRoleLevel };
+
+      if (currentUserRoleLevel === 0) {
+        where.level = 1;
+      }
     }
 
     // Query using Prisma
@@ -35,102 +37,97 @@ class RoleServices {
     return roles;
   };
 
-  static async getAllRolesByType(options) {
-    const { currentUserRoleLevel, type, currentUser } = options;
-
-    if (!type) {
-      throw new Error("Type parameter is required");
-    }
-
-    if (!["employee", "business"].includes(type)) {
-      throw new Error(
-        "Invalid type parameter. Must be 'employee' or 'business'"
-      );
-    }
+  static getAllRolesTypeEmployee = async (options = {}) => {
+    const { currentUserRoleLevel, currentUser } = options;
 
     const where = {
-      type: type,
+      type: "employee",
     };
 
-    where.NOT = {
-      name: "ADMIN",
-    };
-
-    // Role level logic based on current user's role
-    if (currentUser?.role?.name === "ADMIN") {
-      delete where.level;
-    } else if (currentUser?.role?.type === "employee") {
-      delete where.level;
-    } else if (typeof currentUserRoleLevel === "number") {
-      where.level = { gt: currentUserRoleLevel };
+    if (typeof currentUserRoleLevel === "number") {
+      // If user is employee type, show only roles created by them
+      if (currentUser?.roleType === "employee") {
+        where.createdBy = currentUser.id;
+      } else {
+        // For business users, show roles with higher levels
+        where.level = { gt: currentUserRoleLevel };
+      }
     }
 
-    try {
-      const roles = await Prisma.role.findMany({
-        where,
-        orderBy: { level: "asc" },
-        include: {
-          createdByUser: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
+    // Query using Prisma
+    const roles = await Prisma.role.findMany({
+      where,
+      orderBy: { level: "asc" },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        level: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: true, // Include createdBy to verify
+      },
+    });
+
+    return roles;
+  };
+
+  static async getRolebyId(id) {
+    const role = await Prisma.role.findUnique({
+      where: { id },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
-          _count: {
-            select: {
-              users: true,
-              rolePermissions: true,
+        },
+        rolePermissions: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                isActive: true,
+              },
             },
           },
         },
-      });
-
-      const roleDTOs = roles.map((role) => ({
-        id: role.id,
-        name: role.name,
-        type: role.type,
-        level: role.level,
-        description: role.description,
-        createdBy: role.createdByUser
-          ? `${role.createdByUser.firstName} ${role.createdByUser.lastName}`
-          : "System",
-        createdByUser: role.createdByUser
-          ? {
-              id: role.createdByUser.id,
-              firstName: role.createdByUser.firstName,
-              lastName: role.createdByUser.lastName,
-              email: role.createdByUser.email,
-            }
-          : null,
-        createdAt: role.createdAt,
-        updatedAt: role.updatedAt,
-        userCount: role._count.users,
-        permissionCount: role._count.rolePermissions,
-      }));
-
-      return {
-        roles: roleDTOs,
-        meta: {
-          total: roleDTOs.length,
-          type: type,
-          filteredByLevel:
-            typeof currentUserRoleLevel === "number" &&
-            currentUser?.role?.name !== "ADMIN" &&
-            currentUser?.role?.type !== "employee",
-          currentUserRoleName: currentUser?.role?.name,
-          currentUserRoleType: currentUser?.role?.type,
-          currentUserRoleLevel: currentUserRoleLevel,
-          excludedAdminRole: true,
+        _count: {
+          select: {
+            users: true,
+          },
         },
-      };
-    } catch (error) {
-      console.error("Error in getAllRolesByType:", error);
-      throw ApiError.internal(
-        `Failed to fetch ${type} roles: ${error.message}`
-      );
+      },
+    });
+
+    if (!role) {
+      return null;
     }
+
+    return {
+      id: role.id,
+      name: role.name,
+      type: role.type,
+      level: role.level,
+      description: role.description,
+      createdBy: role.createdBy || "",
+      createdAt: role.createdAt,
+      updatedAt: role.updatedAt,
+      userCount: role._count.users,
+      permissions: role.rolePermissions.map((rp) => ({
+        id: rp.id,
+        service: rp.service,
+        canView: rp.canView,
+        canEdit: rp.canEdit,
+        canSetCommission: rp.canSetCommission,
+        canProcess: rp.canProcess,
+      })),
+    };
   }
 
   static async createRole(payload, req = null, res = null) {

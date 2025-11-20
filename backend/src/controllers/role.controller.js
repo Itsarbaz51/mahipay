@@ -4,25 +4,6 @@ import RoleServices from "../services/role.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 class RoleController {
-  static getAllRoles = asyncHandler(async (req, res) => {
-    const userRoleLevel = req.user?.roleLevel;
-
-    const options = {
-      ...(typeof userRoleLevel === "number" && {
-        currentUserRoleLevel: userRoleLevel,
-      }),
-      excludeAdmin: true, // Exclude ADMIN role
-    };
-
-    const roles = await RoleServices.getAllRoles(options);
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(roles, "All non-admin roles fetched successfully")
-      );
-  });
-
   static getAllRolesByType = asyncHandler(async (req, res) => {
     const currentUser = req.user;
     const { type } = req.params;
@@ -32,26 +13,22 @@ class RoleController {
         .status(400)
         .json(
           ApiError.badRequest(
-            "Invalid type parameter. Must be 'employee' or 'business'",
-            400
+            "Invalid type parameter. Must be 'employee' or 'business'"
           )
         );
     }
 
     const options = {
       currentUserRoleLevel: currentUser?.roleLevel,
-      type: type,
-      currentUser: {
-        id: currentUser?.id,
-        role: {
-          type: currentUser?.roleType,
-          name: currentUser?.role,
-          level: currentUser?.roleLevel,
-        },
-      },
+      currentUser,
     };
 
-    const roles = await RoleServices.getAllRolesByType(options);
+    let roles;
+    if (type === "business") {
+      roles = await RoleServices.getAllRolesTypeBusiness(options);
+    } else if (type === "employee") {
+      roles = await RoleServices.getAllRolesTypeEmployee(options);
+    }
 
     const message =
       type === "employee"
@@ -59,6 +36,30 @@ class RoleController {
         : "Business roles fetched successfully";
 
     return res.status(200).json(ApiResponse.success(roles, message, 200));
+  });
+
+  static getRolebyId = asyncHandler(async (req, res) => {
+    const userRoleLevel = req.user?.roleLevel;
+    const roleId = req.params.id;
+
+    if (!roleId) {
+      throw ApiError.badRequest("Role ID is required");
+    }
+
+    const role = await RoleServices.getRolebyId(roleId);
+
+    if (!role) {
+      throw ApiError.notFound("Role not found");
+    }
+
+    // Check if user has permission to view this role
+    if (userRoleLevel && role.level <= userRoleLevel) {
+      throw ApiError.forbidden("Insufficient permissions to view this role");
+    }
+
+    return res
+      .status(200)
+      .json(ApiResponse.success(role, "Role fetched successfully", 200));
   });
 
   static createRole = asyncHandler(async (req, res) => {

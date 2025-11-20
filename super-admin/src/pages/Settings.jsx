@@ -36,7 +36,7 @@ const Settings = () => {
       permission: PERMISSIONS.GENERAL_SETTINGS,
       component: <MainSettings />,
       // Show to Admin and employees with permission
-      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToRoles: [BUSINESS_ROLES.ADMIN, BUSINESS_ROLES.SUPER_ADMIN],
       showToEmployee: true,
     },
     {
@@ -47,11 +47,13 @@ const Settings = () => {
       component: <CompanyAccounts />,
       // Show to Admin and employees with permission
       showToRoles: [
+        ,
+        BUSINESS_ROLES.SUPER_ADMIN,
         BUSINESS_ROLES.ADMIN,
         BUSINESS_ROLES.STATE_HEAD,
         BUSINESS_ROLES.MASTER_DISTRIBUTOR,
         BUSINESS_ROLES.DISTRIBUTOR,
-        BUSINESS_ROLES.RETAILER ,
+        BUSINESS_ROLES.RETAILER,
       ],
       showToEmployee: true,
     },
@@ -62,7 +64,7 @@ const Settings = () => {
       permission: PERMISSIONS.MANAGE_SERVICES,
       component: <ManageServices />,
       // Show only to Admin and employees with permission
-      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToRoles: [BUSINESS_ROLES.ADMIN, BUSINESS_ROLES.SUPER_ADMIN],
       showToEmployee: true,
     },
     {
@@ -72,7 +74,7 @@ const Settings = () => {
       permission: PERMISSIONS.ROLE_MANAGEMENT,
       component: <RoleManager />,
       // Show only to Admin and employees with permission
-      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToRoles: [BUSINESS_ROLES.ADMIN, BUSINESS_ROLES.SUPER_ADMIN],
       showToEmployee: true,
     },
     {
@@ -82,7 +84,7 @@ const Settings = () => {
       permission: PERMISSIONS.API_INTEGRATION,
       component: <ApiIntegration />,
       // Show only to Admin and employees with permission
-      showToRoles: [BUSINESS_ROLES.ADMIN],
+      showToRoles: [BUSINESS_ROLES.ADMIN, BUSINESS_ROLES.SUPER_ADMIN],
       showToEmployee: true,
     },
   ];
