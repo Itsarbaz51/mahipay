@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: subhan
+      MYSQL_DATABASE: superadmin
     ports:
       - "3306:3306"
     volumes:

@@ -14,7 +14,6 @@ import RoleManager from "../components/RoleManager";
 import PageHeader from "../components/ui/PageHeader";
 import { usePermissions } from "../components/hooks/usePermissions";
 import { BUSINESS_ROLES, PERMISSIONS } from "../utils/constants";
-import ApiIntegration from "./ApiIntegration";
 
 const Settings = () => {
   const { currentUser = {} } = useSelector((state) => state.auth);
@@ -71,16 +70,6 @@ const Settings = () => {
       icon: UserCog,
       permission: PERMISSIONS.ROLE_MANAGEMENT,
       component: <RoleManager />,
-      // Show only to Admin and employees with permission
-      showToRoles: [BUSINESS_ROLES.ADMIN],
-      showToEmployee: true,
-    },
-    {
-      id: "api-integration",
-      label: "API Integration",
-      icon: Cpu,
-      permission: PERMISSIONS.API_INTEGRATION,
-      component: <ApiIntegration />,
       // Show only to Admin and employees with permission
       showToRoles: [BUSINESS_ROLES.ADMIN],
       showToEmployee: true,

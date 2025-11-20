@@ -79,35 +79,6 @@ class ServiceProviderController {
       );
   });
 
-  static updateEnvConfig = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { envConfig, subServices } = req.body;
-
-    if (!id) {
-      throw ApiError.badRequest("Service Provider ID is required");
-    }
-
-    const updatedServiceProvider = await ServiceProviderService.updateEnvConfig(
-      id,
-      {
-        envConfig,
-        subServices,
-      },
-      req,
-      res
-    );
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          updatedServiceProvider,
-          "Environment configuration updated successfully",
-          200
-        )
-      );
-  });
-
   static toggleServiceStatus = asyncHandler(async (req, res) => {
     const { id } = req.params;
 

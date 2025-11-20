@@ -96,54 +96,10 @@ export const allServices = (type) => async (dispatch) => {
   }
 };
 
-export const envConfig =
-  ({ id, payload }) =>
-  async (dispatch) => {
-    try {
-      dispatch(serviceRequest());
-      const { data } = await axios.put(`/services/env-config/${id}`, payload);
-      dispatch(setServiceProviders(data));
-      dispatch(allServices());
-      return data;
-    } catch (error) {
-      const errMsg = error?.response?.data?.message || error?.message;
-      dispatch(serviceFail(errMsg));
-      throw error;
-    }
-  };
-
 export const toggleStatusService = (id) => async (dispatch) => {
   try {
     dispatch(serviceRequest());
     const { data } = await axios.put(`/services/status/${id}`);
-    dispatch(setServiceProviders(data));
-    dispatch(allServices());
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(serviceFail(errMsg));
-    throw error;
-  }
-};
-
-export const toggleStatusApiIntigration = (id) => async (dispatch) => {
-  try {
-    dispatch(serviceRequest());
-    const { data } = await axios.put(`/services/api-intigration-status/${id}`);
-    dispatch(setServiceProviders(data));
-    dispatch(allServices());
-    return data;
-  } catch (error) {
-    const errMsg = error?.response?.data?.message || error?.message;
-    dispatch(serviceFail(errMsg));
-    throw error;
-  }
-};
-
-export const ApiTesting = (id, payload) => async (dispatch) => {
-  try {
-    dispatch(serviceRequest());
-    const { data } = await axios.post(`/services/api-testing/${id}`, payload);
     dispatch(setServiceProviders(data));
     dispatch(allServices());
     return data;
