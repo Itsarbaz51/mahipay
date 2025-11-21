@@ -1,16 +1,19 @@
 import dotenv from "dotenv";
-dotenv.config({ path: "./.env" }); // Always load env first
-import Prisma from "./db/db.js";
+dotenv.config({ path: "./.env" }); // load env first
+
+import sequelize from "./db/db.js";
 import app from "./app.js";
-import { envConfig } from "./config/env.config.js";
 
 (async function main() {
   try {
-    console.log("Connecting to database...");
-    await Prisma.$connect();
+    await sequelize.authenticate();
     console.log("✅ Database connected");
 
-    const PORT = envConfig.PORT || 8000;
+    // 🔥 Auto Sync All Models
+    await sequelize.sync({ alter: true });
+    console.log("🔄 Models synchronized with database");
+
+    const PORT = process.env.PORT || 8000;
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
