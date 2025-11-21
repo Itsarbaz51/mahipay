@@ -1,4 +1,4 @@
-import FundRequestService from "../../services/fundRequest/fundRequest.service.js";
+import FundRequestService from "../../services/apis/fundRequest/fundRequest.service.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import asyncHandler from "../../utils/AsyncHandler.js";
 

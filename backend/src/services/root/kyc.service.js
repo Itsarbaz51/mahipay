@@ -1,8 +1,8 @@
-import Prisma from "../db/db.js";
-import { ApiError } from "../utils/ApiError.js";
-import Helper from "../utils/helper.js";
-import { CryptoService } from "../utils/cryptoService.js";
-import AuditLogService from "./auditLog.service.js";
+import Prisma from "../../db/db.js";
+import { ApiError } from "../../utils/ApiError.js";
+import Helper from "../../utils/helper.js";
+import { CryptoService } from "../../utils/cryptoService.js";
+import AuditLogService from "../auditLog.service.js";
 
 class RootKycServices {
   static async getAllByAdmin(
