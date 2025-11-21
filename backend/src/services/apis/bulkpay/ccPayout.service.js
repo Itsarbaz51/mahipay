@@ -1,20 +1,17 @@
 import { BulkpeAPIClient } from "./BulkpeAPIClient.js";
-import Prisma from "../../db/db.js";
+import Prisma from "../../../db/db.js";
 
-import { ApiError } from "../../utils/ApiError.js";
-import CommissionDistributionService from "../commission.distribution.service.js";
-import { CryptoService } from "../../utils/cryptoService.js";
+import { ApiError } from "../../../utils/ApiError.js";
+import CommissionDistributionService from "../../commission.distribution.service.js";
+import { CryptoService } from "../../../utils/cryptoService.js";
 
 export class CCPayoutService {
   constructor() {
     this.bulkpeClient = new BulkpeAPIClient();
-    this.serviceType = "CC_PAYOUT"; 
+    this.serviceType = "CC_PAYOUT";
   }
 
-
-   async generateSequentialReferenceId(
-    prefix = "ref"
-  ){
+  async generateSequentialReferenceId(prefix = "ref") {
     const latestEntity = await Prisma.apiEntity.findFirst({
       where: {
         reference: {
@@ -122,12 +119,7 @@ export class CCPayoutService {
     });
   }
 
-  async uploadCardImage(
-    userId,
-    senderId,
-    cardImageType,
-    file
-  ) {
+  async uploadCardImage(userId, senderId, cardImageType, file) {
     return await Prisma.$transaction(async (tx) => {
       const senderEntity = await tx.apiEntity.findFirst({
         where: {
@@ -147,7 +139,7 @@ export class CCPayoutService {
         file
       );
 
-      const currentMetadata = (senderEntity.metadata);
+      const currentMetadata = senderEntity.metadata;
 
       const updatedMetadata = {
         ...currentMetadata,
@@ -650,7 +642,7 @@ export class CCPayoutService {
         const metadata = tx.metadata;
 
         const latestWebhook = tx.apiWebhooks[0];
-        const webhookStatus = latestWebhook?.payload ;
+        const webhookStatus = latestWebhook?.payload;
 
         return {
           collectionId: tx.externalRefId,
@@ -717,7 +709,7 @@ export class CCPayoutService {
           completedAt: new Date(),
           updatedAt: new Date(),
           metadata: this.safeJsonParse({
-            ...(transaction.metadata),
+            ...transaction.metadata,
             utr: utr,
             webhookStatus: status,
             webhookMessage: message,
@@ -737,7 +729,7 @@ export class CCPayoutService {
             status === "SUCCESS" ? EntityStatus.ACTIVE : EntityStatus.INACTIVE,
           updatedAt: new Date(),
           metadata: this.safeJsonParse({
-            ...(transaction.metadata),
+            ...transaction.metadata,
             status: status,
             message: message,
             utr: utr,
@@ -1075,7 +1067,7 @@ export class CCPayoutService {
   }
 
   static mapWebhookStatus(webhookStatus) {
-    const statusMap= {
+    const statusMap = {
       SUCCESS: TxStatus.SUCCESS,
       FAILED: TxStatus.FAILED,
       PENDING: TxStatus.PENDING,

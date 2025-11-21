@@ -1,9 +1,9 @@
 import axios from "axios";
 import FormData from "form-data";
-import { ApiError } from "../../utils/ApiError.js";
+import { ApiError } from "../../../utils/ApiError.js";
 
 export class BulkpeAPIClient {
-   constructor() {
+  constructor() {
     this.baseURL = "https://api.bulkpe.in/client/cc";
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -40,9 +40,7 @@ export class BulkpeAPIClient {
     );
   }
 
-  async createSender(
-    payload
-  ) {
+  async createSender(payload) {
     const response = await this.client.post("/createSender", payload);
 
     if (!response.data.status) {
@@ -54,11 +52,7 @@ export class BulkpeAPIClient {
     return response.data.data;
   }
 
-  async uploadCardImage(
-    senderId,
-    cardImageType,
-    file
-  ) {
+  async uploadCardImage(senderId, cardImageType, file) {
     const formData = new FormData();
     formData.append("senderId", senderId);
     formData.append("cardImageType", cardImageType);
@@ -94,9 +88,7 @@ export class BulkpeAPIClient {
     return response.data;
   }
 
-  async createBeneficiary(
-    payload
-  ) {
+  async createBeneficiary(payload) {
     const response = await this.client.post("/createBeneficiary", payload);
 
     if (!response.data.status) {
@@ -120,9 +112,7 @@ export class BulkpeAPIClient {
     return response.data;
   }
 
-  async createCollection(
-    payload
-  ) {
+  async createCollection(payload) {
     const response = await this.client.post(
       "/createCardCollectionUrl",
       payload

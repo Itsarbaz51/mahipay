@@ -1,14 +1,14 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import Prisma from "../../db/db.js";
-import { ApiError } from "../../utils/ApiError.js";
+import Prisma from "../../../db/db.js";
+import { ApiError } from "../../../utils/ApiError.js";
 
 import pkg from "@prisma/client";
 
-import { ServiceProviderService } from "../service.service.js";
-import S3Service from "../../utils/S3Service.js";
-import { TransactionService } from "../transaction.service.js";
-import { LedgerService } from "../ledger.service.js";
+import { ServiceProviderService } from "../../service.service.js";
+import S3Service from "../../../utils/S3Service.js";
+import { TransactionService } from "../../transaction.service.js";
+import { LedgerService } from "../../ledger.service.js";
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,

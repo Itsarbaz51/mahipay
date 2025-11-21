@@ -2,6 +2,7 @@ import asyncHandler from "../utils/AsyncHandler.js";
 import KycServices from "../services/kyc.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
+import RootKycServices from "../services/root/kyc.service.js";
 
 class UserKycController {
   static index = asyncHandler(async (req, res) => {
@@ -15,7 +16,7 @@ class UserKycController {
     let allKyc;
 
     if (req.user.role === "SUPER ADMIN") {
-      allKyc = await KycServices.getAllBySuperAdmin(
+      allKyc = await RootKycServices.getAllBySuperAdmin(
         {
           userId,
           status,
