@@ -11,21 +11,36 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         unique: true,
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [3, 50],
+        },
       },
       firstName: {
         type: DataTypes.STRING,
         field: "first_name",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [1, 100],
+        },
       },
       lastName: {
         type: DataTypes.STRING,
         field: "last_name",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [1, 100],
+        },
       },
       profileImage: {
         type: DataTypes.TEXT,
         field: "profile_image",
         allowNull: true,
+        validate: {
+          isUrl: true,
+        },
       },
       email: {
         type: DataTypes.STRING,
@@ -40,10 +55,16 @@ export default (sequelize, DataTypes) => {
         unique: true,
         field: "phone_number",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
       },
       password: {
         type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          len: [6, 255],
+        },
       },
       departmentId: {
         type: DataTypes.UUID,
@@ -53,6 +74,9 @@ export default (sequelize, DataTypes) => {
       status: {
         type: DataTypes.ENUM("ACTIVE", "INACTIVE", "SUSPENDED", "DELETED"),
         defaultValue: "ACTIVE",
+        validate: {
+          isIn: [["ACTIVE", "INACTIVE", "SUSPENDED", "DELETED"]],
+        },
       },
       refreshToken: {
         type: DataTypes.TEXT,
@@ -74,6 +98,22 @@ export default (sequelize, DataTypes) => {
         field: "last_login_at",
         allowNull: true,
       },
+      hierarchyLevel: {
+        type: DataTypes.INTEGER,
+        field: "hierarchy_level",
+        allowNull: false, // Removed unique constraint
+        validate: {
+          min: 0,
+        },
+      },
+      hierarchyPath: {
+        type: DataTypes.TEXT, // Changed to TEXT
+        field: "hierarchy_path",
+        allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
+      },
       createdAt: {
         type: DataTypes.DATE,
         field: "created_at",
@@ -93,6 +133,9 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.ENUM("ROOT", "ADMIN"),
         field: "created_by_type",
         allowNull: false,
+        validate: {
+          isIn: [["ROOT", "ADMIN"]],
+        },
       },
       createdById: {
         type: DataTypes.UUID,
@@ -114,12 +157,28 @@ export default (sequelize, DataTypes) => {
       tableName: "employees",
       timestamps: true,
       underscored: true,
+      paranoid: true, // Added soft delete support
       indexes: [
         {
           fields: ["department_id"],
         },
         {
           fields: ["created_by_id", "created_by_type"],
+        },
+        {
+          unique: true,
+          fields: ["username"],
+        },
+        {
+          unique: true,
+          fields: ["email"],
+        },
+        {
+          unique: true,
+          fields: ["phone_number"],
+        },
+        {
+          fields: ["status"],
         },
       ],
     }
@@ -129,17 +188,54 @@ export default (sequelize, DataTypes) => {
     Employee.belongsTo(models.Department, {
       foreignKey: "department_id",
       as: "department",
+      onDelete: "RESTRICT",
     });
     Employee.hasMany(models.EmployeePermission, {
       foreignKey: "employee_id",
       as: "employeePermissions",
+      onDelete: "CASCADE",
     });
-    Employee.belongsTo(models.Root, { foreignKey: "root_id", as: "root" });
-    Employee.belongsTo(models.User, { foreignKey: "user_id", as: "user" });
+    Employee.belongsTo(models.Root, {
+      foreignKey: "root_id",
+      as: "root",
+      onDelete: "CASCADE",
+    });
+    Employee.belongsTo(models.User, {
+      foreignKey: "user_id",
+      as: "user",
+      onDelete: "CASCADE",
+    });
+    // Polymorphic association for creator
+    Employee.belongsTo(models.Root, {
+      foreignKey: "created_by_id",
+      as: "createdByRoot",
+      constraints: false,
+      scope: {
+        created_by_type: "ROOT",
+      },
+    });
     Employee.belongsTo(models.User, {
       foreignKey: "created_by_id",
       as: "createdByUser",
+      constraints: false,
+      scope: {
+        created_by_type: "ADMIN",
+      },
     });
+  };
+
+  // Instance methods
+  Employee.prototype.getFullName = function () {
+    return `${this.firstName} ${this.lastName}`;
+  };
+
+  Employee.prototype.isActive = function () {
+    return this.status === "ACTIVE";
+  };
+
+  // Class methods
+  Employee.findByEmail = function (email) {
+    return this.findOne({ where: { email } });
   };
 
   return Employee;

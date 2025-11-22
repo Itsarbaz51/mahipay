@@ -7,25 +7,52 @@ export default (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
+      customerId: {
+        type: DataTypes.STRING(8),
+        field: "customer_id",
+        allowNull: false,
+        unique: true,
+        defaultValue: function () {
+          return String(Math.floor(10000000 + Math.random() * 90000000));
+        },
+        validate: {
+          len: [8, 8], // Ensure exactly 8 characters
+        },
+      },
       username: {
         type: DataTypes.STRING,
         unique: true,
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [3, 50],
+        },
       },
       firstName: {
         type: DataTypes.STRING,
         field: "first_name",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [1, 100],
+        },
       },
       lastName: {
         type: DataTypes.STRING,
         field: "last_name",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [1, 100],
+        },
       },
       profileImage: {
         type: DataTypes.TEXT,
         field: "profile_image",
         allowNull: true,
+        validate: {
+          isUrl: true, // Optional: validate URL format
+        },
       },
       email: {
         type: DataTypes.STRING,
@@ -40,15 +67,24 @@ export default (sequelize, DataTypes) => {
         unique: true,
         field: "phone_number",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
       },
       password: {
         type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          len: [6, 255], // Minimum password length
+        },
       },
       transactionPin: {
-        type: DataTypes.TEXT,
+        type: DataTypes.STRING, // Changed from TEXT to STRING for pins
         field: "transaction_pin",
         allowNull: true,
+        validate: {
+          len: [4, 6], // Typical pin lengths
+        },
       },
       parentId: {
         type: DataTypes.UUID,
@@ -56,25 +92,27 @@ export default (sequelize, DataTypes) => {
         allowNull: true,
       },
       hierarchyLevel: {
-        type: DataTypes.ENUM(
-          "ADMIN",
-          "STATE",
-          "HEAD",
-          "MASTER_DISTRIBUTOR",
-          "DISTRIBUTOR",
-          "RETAILER"
-        ),
+        type: DataTypes.INTEGER,
         field: "hierarchy_level",
-        allowNull: false,
+        allowNull: false, // Removed unique constraint - multiple users can have same level
+        validate: {
+          min: 0,
+        },
       },
       hierarchyPath: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT, // Changed to TEXT for potentially long paths
         field: "hierarchy_path",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
       },
       status: {
         type: DataTypes.ENUM("ACTIVE", "INACTIVE", "SUSPENDED", "DELETED"),
         defaultValue: "ACTIVE",
+        validate: {
+          isIn: [["ACTIVE", "INACTIVE", "SUSPENDED", "DELETED"]],
+        },
       },
       isKycVerified: {
         type: DataTypes.BOOLEAN,
@@ -116,6 +154,11 @@ export default (sequelize, DataTypes) => {
         field: "email_verification_token_expires",
         allowNull: true,
       },
+      lastLoginAt: {
+        type: DataTypes.DATE,
+        field: "last_login_at",
+        allowNull: true,
+      },
       createdAt: {
         type: DataTypes.DATE,
         field: "created_at",
@@ -141,10 +184,14 @@ export default (sequelize, DataTypes) => {
       tableName: "users",
       timestamps: true,
       underscored: true,
-      paranoid: true, // Enables soft deletes
+      paranoid: true,
       indexes: [
         {
           fields: ["parent_id"],
+        },
+        {
+          unique: true,
+          fields: ["customer_id"],
         },
         {
           fields: ["hierarchy_level"],
@@ -153,10 +200,25 @@ export default (sequelize, DataTypes) => {
           fields: ["hierarchy_path"],
         },
         {
+          unique: true,
           fields: ["phone_number"],
         },
         {
           fields: ["role_id"],
+        },
+        {
+          unique: true,
+          fields: ["username"],
+        },
+        {
+          unique: true,
+          fields: ["email"],
+        },
+        {
+          fields: ["status"],
+        },
+        {
+          fields: ["created_at"],
         },
       ],
     }
@@ -164,22 +226,44 @@ export default (sequelize, DataTypes) => {
 
   User.associate = function (models) {
     // Hierarchical self-reference
-    User.belongsTo(User, { foreignKey: "parent_id", as: "parent" });
-    User.hasMany(User, { foreignKey: "parent_id", as: "children" });
+    User.belongsTo(User, {
+      foreignKey: "parent_id",
+      as: "parent",
+      onDelete: "RESTRICT",
+    });
+    User.hasMany(User, {
+      foreignKey: "parent_id",
+      as: "children",
+      onDelete: "CASCADE",
+    });
 
     // Business relations
-    User.belongsTo(models.Role, { foreignKey: "role_id", as: "role" });
-    User.hasMany(models.Wallet, { foreignKey: "user_id", as: "wallets" });
+    User.belongsTo(models.Role, {
+      foreignKey: "role_id",
+      as: "role",
+      onDelete: "RESTRICT",
+    });
+    User.hasMany(models.Wallet, {
+      foreignKey: "user_id",
+      as: "wallets",
+      onDelete: "CASCADE",
+    });
     User.hasMany(models.BankDetail, {
       foreignKey: "user_id",
       as: "bankAccounts",
+      onDelete: "CASCADE",
     });
 
     // KYC Relations
-    User.hasOne(models.UserKyc, { foreignKey: "user_id", as: "userKyc" });
+    User.hasOne(models.UserKyc, {
+      foreignKey: "user_id",
+      as: "userKyc",
+      onDelete: "CASCADE",
+    });
     User.hasOne(models.BusinessKyc, {
       foreignKey: "user_id",
       as: "businessKyc",
+      onDelete: "CASCADE",
     });
 
     // KYC Verification Relations
@@ -193,36 +277,44 @@ export default (sequelize, DataTypes) => {
     User.hasMany(models.Transaction, {
       foreignKey: "user_id",
       as: "transactions",
+      onDelete: "RESTRICT",
     });
     User.hasMany(models.CommissionEarning, {
       foreignKey: "user_id",
       as: "commissionEarnings",
+      onDelete: "RESTRICT",
     });
     User.hasMany(models.CommissionEarning, {
       foreignKey: "from_user_id",
       as: "commissionsGiven",
+      onDelete: "RESTRICT",
     });
     User.hasMany(models.RootCommissionEarning, {
       foreignKey: "from_user_id",
       as: "rootCommissionsGiven",
+      onDelete: "RESTRICT",
     });
 
     // Permission relations
     User.hasMany(models.UserPermission, {
       foreignKey: "user_id",
       as: "userPermissions",
+      onDelete: "CASCADE",
     });
     User.hasMany(models.PiiConsent, {
       foreignKey: "user_id",
       as: "piiConsents",
+      onDelete: "CASCADE",
     });
     User.hasMany(models.ApiEntity, {
       foreignKey: "user_id",
       as: "apiEntities",
+      onDelete: "CASCADE",
     });
     User.hasMany(models.IpWhitelist, {
       foreignKey: "user_id",
       as: "ipWhitelists",
+      onDelete: "CASCADE",
     });
 
     // Management relations
@@ -244,13 +336,18 @@ export default (sequelize, DataTypes) => {
     User.hasMany(models.CommissionSetting, {
       foreignKey: "target_user_id",
       as: "commissionSettings",
+      onDelete: "CASCADE",
     });
     User.hasMany(models.Department, {
       foreignKey: "created_by_id",
       as: "departments",
       constraints: false,
     });
-    User.hasMany(models.Employee, { foreignKey: "user_id", as: "employees" });
+    User.hasMany(models.Employee, {
+      foreignKey: "user_id",
+      as: "employees",
+      onDelete: "SET NULL",
+    });
 
     // Permissions created by Admin User
     User.hasMany(models.RolePermission, {
@@ -273,6 +370,28 @@ export default (sequelize, DataTypes) => {
       as: "createdEmployeePermissions",
       constraints: false,
     });
+  };
+
+  // Instance methods
+  User.prototype.getFullName = function () {
+    return `${this.firstName} ${this.lastName}`;
+  };
+
+  User.prototype.isActive = function () {
+    return this.status === "ACTIVE";
+  };
+
+  // Class methods
+  User.findByEmail = function (email) {
+    return this.findOne({ where: { email } });
+  };
+
+  User.findByCustomerId = function (customerId) {
+    return this.findOne({ where: { customerId } });
+  };
+
+  User.findByPhone = function (phoneNumber) {
+    return this.findOne({ where: { phoneNumber } });
   };
 
   return User;

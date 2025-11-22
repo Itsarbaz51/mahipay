@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config({ path: "./.env" });
 
 import sequelize from "./db/db.js";
-import "./models/index.js";
 import app from "./app.js";
 
 import "./models/index.js";

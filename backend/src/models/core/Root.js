@@ -11,21 +11,36 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         unique: true,
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [3, 50],
+        },
       },
       firstName: {
         type: DataTypes.STRING,
         field: "first_name",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [1, 100],
+        },
       },
       lastName: {
         type: DataTypes.STRING,
         field: "last_name",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+          len: [1, 100],
+        },
       },
       profileImage: {
         type: DataTypes.TEXT,
         field: "profile_image",
         allowNull: true,
+        validate: {
+          isUrl: true,
+        },
       },
       email: {
         type: DataTypes.STRING,
@@ -40,14 +55,23 @@ export default (sequelize, DataTypes) => {
         unique: true,
         field: "phone_number",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
       },
       password: {
         type: DataTypes.STRING,
         allowNull: false,
+        validate: {
+          len: [6, 255],
+        },
       },
       status: {
         type: DataTypes.ENUM("ACTIVE", "INACTIVE", "SUSPENDED", "DELETED"),
         defaultValue: "ACTIVE",
+        validate: {
+          isIn: [["ACTIVE", "INACTIVE", "SUSPENDED", "DELETED"]],
+        },
       },
       refreshToken: {
         type: DataTypes.TEXT,
@@ -69,6 +93,26 @@ export default (sequelize, DataTypes) => {
         field: "last_login_at",
         allowNull: true,
       },
+      hierarchyLevel: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        field: "hierarchy_level",
+        allowNull: false,
+        unique: true,
+        validate: {
+          min: 0,
+        },
+      },
+      hierarchyPath: {
+        type: DataTypes.TEXT, // Changed to TEXT
+        defaultValue: "0",
+        field: "hierarchy_path",
+        allowNull: false,
+        unique: true,
+        validate: {
+          notEmpty: true,
+        },
+      },
       createdAt: {
         type: DataTypes.DATE,
         field: "created_at",
@@ -84,23 +128,59 @@ export default (sequelize, DataTypes) => {
       tableName: "roots",
       timestamps: true,
       underscored: true,
+      paranoid: true, // Added soft delete support
+      indexes: [
+        {
+          unique: true,
+          fields: ["username"],
+        },
+        {
+          unique: true,
+          fields: ["email"],
+        },
+        {
+          unique: true,
+          fields: ["phone_number"],
+        },
+        {
+          unique: true,
+          fields: ["hierarchy_level"],
+        },
+        {
+          unique: true,
+          fields: ["hierarchy_path"],
+        },
+        {
+          fields: ["status"],
+        },
+      ],
     }
   );
 
   Root.associate = function (models) {
     // Root Business Capabilities
-    Root.hasMany(models.RootWallet, { foreignKey: "root_id", as: "wallets" });
+    Root.hasMany(models.RootWallet, {
+      foreignKey: "root_id",
+      as: "wallets",
+      onDelete: "CASCADE",
+    });
     Root.hasMany(models.RootBankDetail, {
       foreignKey: "root_id",
       as: "bankAccounts",
+      onDelete: "CASCADE",
     });
     Root.hasMany(models.RootCommissionEarning, {
       foreignKey: "root_id",
       as: "commissionEarnings",
+      onDelete: "RESTRICT",
     });
 
     // Management Capabilities
-    Root.hasMany(models.Employee, { foreignKey: "root_id", as: "employees" });
+    Root.hasMany(models.Employee, {
+      foreignKey: "root_id",
+      as: "employees",
+      onDelete: "CASCADE",
+    });
     Root.hasMany(models.Department, {
       foreignKey: "created_by_id",
       as: "departments",
@@ -109,6 +189,7 @@ export default (sequelize, DataTypes) => {
     Root.hasMany(models.SystemSetting, {
       foreignKey: "root_id",
       as: "systemSettings",
+      onDelete: "CASCADE",
     });
     Root.hasMany(models.Role, {
       foreignKey: "created_by_id",
@@ -123,6 +204,7 @@ export default (sequelize, DataTypes) => {
     Root.hasMany(models.IpWhitelist, {
       foreignKey: "root_id",
       as: "ipWhitelists",
+      onDelete: "CASCADE",
     });
 
     // KYC Verification Relations
@@ -134,16 +216,19 @@ export default (sequelize, DataTypes) => {
     Root.hasMany(models.BusinessKyc, {
       foreignKey: "verified_by_root_id",
       as: "verifiedBusinessKycs",
+      onDelete: "RESTRICT",
     });
     Root.hasMany(models.BusinessKyc, {
       foreignKey: "root_id",
       as: "ownedBusinessKycs",
+      onDelete: "CASCADE",
     });
 
     // Service Management
     Root.hasMany(models.ServiceProvider, {
       foreignKey: "created_by_root_id",
       as: "serviceProviders",
+      onDelete: "CASCADE",
     });
 
     // Permissions created by Root
@@ -167,6 +252,20 @@ export default (sequelize, DataTypes) => {
       as: "createdEmployeePermissions",
       constraints: false,
     });
+  };
+
+  // Instance methods
+  Root.prototype.getFullName = function () {
+    return `${this.firstName} ${this.lastName}`;
+  };
+
+  Root.prototype.isActive = function () {
+    return this.status === "ACTIVE";
+  };
+
+  // Class methods
+  Root.findByEmail = function (email) {
+    return this.findOne({ where: { email } });
   };
 
   return Root;
