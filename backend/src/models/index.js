@@ -1,27 +1,8 @@
-import { Sequelize } from "sequelize";
+import { DataTypes } from "sequelize";
+import sequelize from "../db/db.js";
 import dotenv from "dotenv";
 
 dotenv.config();
-
-// Environment configuration
-const config = {
-  database: process.env.DB_NAME,
-  username: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  dialect: "mysql",
-  logging: process.env.NODE_ENV === "development" ? console.log : false,
-  pool: {
-    max: 10,
-    min: 0,
-    acquire: 30000,
-    idle: 10000,
-  },
-  timezone: "+05:30", // IST
-};
-
-const sequelize = new Sequelize(config);
 
 // Import all models
 import Root from "./core/Root.js";
@@ -67,47 +48,47 @@ import AuditLog from "./audit/AuditLog.js";
 
 // Initialize models
 const models = {
-  Root: Root(sequelize, Sequelize.DataTypes),
-  Employee: Employee(sequelize, Sequelize.DataTypes),
-  User: User(sequelize, Sequelize.DataTypes),
+  Root: Root(sequelize, DataTypes),
+  Employee: Employee(sequelize, DataTypes),
+  User: User(sequelize, DataTypes),
 
-  RootWallet: RootWallet(sequelize, Sequelize.DataTypes),
-  RootCommissionEarning: RootCommissionEarning(sequelize, Sequelize.DataTypes),
-  RootBankDetail: RootBankDetail(sequelize, Sequelize.DataTypes),
-  RootLedgerEntry: RootLedgerEntry(sequelize, Sequelize.DataTypes),
+  RootWallet: RootWallet(sequelize, DataTypes),
+  RootCommissionEarning: RootCommissionEarning(sequelize, DataTypes),
+  RootBankDetail: RootBankDetail(sequelize, DataTypes),
+  RootLedgerEntry: RootLedgerEntry(sequelize, DataTypes),
 
-  Wallet: Wallet(sequelize, Sequelize.DataTypes),
-  Transaction: Transaction(sequelize, Sequelize.DataTypes),
-  CommissionEarning: CommissionEarning(sequelize, Sequelize.DataTypes),
-  BankDetail: BankDetail(sequelize, Sequelize.DataTypes),
-  LedgerEntry: LedgerEntry(sequelize, Sequelize.DataTypes),
+  Wallet: Wallet(sequelize, DataTypes),
+  Transaction: Transaction(sequelize, DataTypes),
+  CommissionEarning: CommissionEarning(sequelize, DataTypes),
+  BankDetail: BankDetail(sequelize, DataTypes),
+  LedgerEntry: LedgerEntry(sequelize, DataTypes),
 
-  CommissionSetting: CommissionSetting(sequelize, Sequelize.DataTypes),
-  Role: Role(sequelize, Sequelize.DataTypes),
-  Department: Department(sequelize, Sequelize.DataTypes),
-  ServiceProvider: ServiceProvider(sequelize, Sequelize.DataTypes),
+  CommissionSetting: CommissionSetting(sequelize, DataTypes),
+  Role: Role(sequelize, DataTypes),
+  Department: Department(sequelize, DataTypes),
+  ServiceProvider: ServiceProvider(sequelize, DataTypes),
 
-  RolePermission: RolePermission(sequelize, Sequelize.DataTypes),
-  UserPermission: UserPermission(sequelize, Sequelize.DataTypes),
-  DepartmentPermission: DepartmentPermission(sequelize, Sequelize.DataTypes),
-  EmployeePermission: EmployeePermission(sequelize, Sequelize.DataTypes),
+  RolePermission: RolePermission(sequelize, DataTypes),
+  UserPermission: UserPermission(sequelize, DataTypes),
+  DepartmentPermission: DepartmentPermission(sequelize, DataTypes),
+  EmployeePermission: EmployeePermission(sequelize, DataTypes),
 
-  UserKyc: UserKyc(sequelize, Sequelize.DataTypes),
-  BusinessKyc: BusinessKyc(sequelize, Sequelize.DataTypes),
-  State: State(sequelize, Sequelize.DataTypes),
-  City: City(sequelize, Sequelize.DataTypes),
-  Address: Address(sequelize, Sequelize.DataTypes),
+  UserKyc: UserKyc(sequelize, DataTypes),
+  BusinessKyc: BusinessKyc(sequelize, DataTypes),
+  State: State(sequelize, DataTypes),
+  City: City(sequelize, DataTypes),
+  Address: Address(sequelize, DataTypes),
 
-  ApiEntity: ApiEntity(sequelize, Sequelize.DataTypes),
-  ApiWebhook: ApiWebhook(sequelize, Sequelize.DataTypes),
+  ApiEntity: ApiEntity(sequelize, DataTypes),
+  ApiWebhook: ApiWebhook(sequelize, DataTypes),
 
-  IpWhitelist: IpWhitelist(sequelize, Sequelize.DataTypes),
-  SystemSetting: SystemSetting(sequelize, Sequelize.DataTypes),
-  PiiConsent: PiiConsent(sequelize, Sequelize.DataTypes),
-  Refund: Refund(sequelize, Sequelize.DataTypes),
-  IdempotencyKey: IdempotencyKey(sequelize, Sequelize.DataTypes),
+  IpWhitelist: IpWhitelist(sequelize, DataTypes),
+  SystemSetting: SystemSetting(sequelize, DataTypes),
+  PiiConsent: PiiConsent(sequelize, DataTypes),
+  Refund: Refund(sequelize, DataTypes),
+  IdempotencyKey: IdempotencyKey(sequelize, DataTypes),
 
-  AuditLog: AuditLog(sequelize, Sequelize.DataTypes),
+  AuditLog: AuditLog(sequelize, DataTypes),
 };
 
 // Apply associations
@@ -118,6 +99,4 @@ Object.keys(models).forEach((modelName) => {
 });
 
 models.sequelize = sequelize;
-models.Sequelize = Sequelize;
-
 export default models;
