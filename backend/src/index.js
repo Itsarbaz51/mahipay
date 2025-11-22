@@ -1,16 +1,18 @@
 import dotenv from "dotenv";
-dotenv.config({ path: "./.env" }); // load env first
+dotenv.config({ path: "./.env" });
 
 import sequelize from "./db/db.js";
 import "./models/index.js";
 import app from "./app.js";
+
+import "./models/index.js";
 
 (async function main() {
   try {
     await sequelize.authenticate();
     console.log("✅ Database connected");
 
-    // 🔥 Auto Sync All Models
+    // Sync all models
     await sequelize.sync({ alter: true });
     console.log("🔄 Models synchronized with database");
 
