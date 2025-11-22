@@ -48,7 +48,7 @@ async function main() {
 
   const roles = [
     {
-      name: "SUPER ADMIN",
+      name: "ROOT",
       level: 0, // Now starting from 0
       type: "business",
       description: "Super Administrator - Full System Access",
@@ -82,12 +82,6 @@ async function main() {
       level: 5, // Incremented by 1
       type: "business",
       description: "Retailer",
-    },
-    {
-      name: "HR",
-      level: 6, // Incremented by 1
-      type: "employee",
-      description: "Human Resources",
     },
   ];
 
