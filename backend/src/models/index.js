@@ -63,6 +63,8 @@ import PiiConsent from "./security/PiiConsent.js";
 import Refund from "./security/Refund.js";
 import IdempotencyKey from "./security/IdempotencyKey.js";
 
+import AuditLog from "./audit/AuditLog.js";
+
 // Initialize models
 const models = {
   Root: Root(sequelize, Sequelize.DataTypes),
@@ -104,6 +106,8 @@ const models = {
   PiiConsent: PiiConsent(sequelize, Sequelize.DataTypes),
   Refund: Refund(sequelize, Sequelize.DataTypes),
   IdempotencyKey: IdempotencyKey(sequelize, Sequelize.DataTypes),
+
+  AuditLog: AuditLog(sequelize, Sequelize.DataTypes),
 };
 
 // Apply associations
