@@ -1,146 +1,149 @@
 import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError.js";
 import asyncHandler from "../utils/AsyncHandler.js";
-import Prisma from "../db/db.js";
+import models from "../models/index.js";
 
-export const ROLE_TYPES = {
-  BUSINESS: "business",
-  EMPLOYEE: "employee",
+export const BUSINESS_ROLES = {
+  ROOT: "ROOT",
+  ADMIN: "ADMIN",
+  STATE_HEAD: "STATE HEAD",
+  MASTER_DISTRIBUTOR: "MASTER DISTRIBUTOR",
+  DISTRIBUTOR: "DISTRIBUTOR",
+  RETAILER: "RETAILER",
 };
 
-// Predefined business roles (jo system mein fixed hain)
-const PREDEFINED_BUSINESS_ROLES = [
-  "SUPER ADMIN",
-  "ADMIN",
-  "STATE HEAD",
-  "MASTER DISTRIBUTOR",
-  "DISTRIBUTOR",
-  "RETAILER",
-];
-
 class AuthMiddleware {
-  static isAuthenticated = asyncHandler(async (req, res, next) => {
+  static authenticate = asyncHandler(async (req, res, next) => {
     const token =
       req.cookies?.accessToken ||
-      req.headers["authorization"]?.replace("Bearer ", "");
+      req.header("Authorization")?.replace("Bearer ", "");
+    if (!token) throw ApiError.unauthorized("Access token required");
 
-    if (!token) {
-      throw ApiError.unauthorized("Unauthorized: No token provided");
-    }
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const user = await this.findUserWithContext(decoded.id);
 
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    } catch (error) {
-      throw ApiError.unauthorized("Unauthorized: Invalid/Expired token");
-    }
+    if (!user || user.status !== "ACTIVE")
+      throw ApiError.unauthorized("Invalid or inactive account");
 
-    const userExists = await Prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: {
-        role: {
-          select: {
-            name: true,
-            type: true,
-            level: true,
-          },
-        },
-      },
-    });
-
-    if (!userExists) {
-      throw ApiError.unauthorized("Unauthorized: Invalid token user");
-    }
-
-    req.user = {
-      id: userExists.id,
-      email: userExists.email,
-      role: userExists.role.name,
-      roleType: userExists.role.type,
-      roleLevel: userExists.role.level,
-      roleDetails: userExists.role,
-    };
-
-    return next();
+    req.user = user;
+    next();
   });
 
-  // Unified authorization middleware
-  static authorize = (allowedAccess = []) => {
-    // Validate input array
-    if (!Array.isArray(allowedAccess)) {
-      throw new Error("Authorization rules must be an array");
-    }
+  static async findUserWithContext(userId) {
+    // Check Root
+    let user = await models.Root.findByPk(userId);
+    if (user) return { ...user.toJSON(), userType: "root", permissions: [] };
 
-    // Check for duplicates and validate entries
-    const seen = new Set();
-    const validRoleTypes = Object.values(ROLE_TYPES);
-
-    for (const item of allowedAccess) {
-      if (seen.has(item)) {
-        throw new Error(
-          `Duplicate entry found in authorization rules: ${item}`
-        );
-      }
-      seen.add(item);
-
-      // Validate if item is either a predefined business role or a valid role type
-      if (
-        !PREDEFINED_BUSINESS_ROLES.includes(item) &&
-        !validRoleTypes.includes(item)
-      ) {
-        throw new Error(
-          `Invalid authorization entry: ${item}. Must be either a predefined business role or valid role type.`
-        );
-      }
-    }
-
-    return asyncHandler(async (req, res, next) => {
-      const userRole = req.user?.role;
-      const userRoleType = req.user?.roleType;
-
-      if (!userRole || !userRoleType) {
-        throw ApiError.forbidden(
-          "Access denied: User role information missing"
-        );
-      }
-
-      // Check if user has access based on either role name or role type
-      const hasAccess = allowedAccess.some((accessItem) => {
-        // If accessItem is a role type, check against user's role type
-        if (Object.values(ROLE_TYPES).includes(accessItem)) {
-          return userRoleType === accessItem;
-        }
-        // If accessItem is a role name, check against user's role name
-        else {
-          return userRole === accessItem;
-        }
-      });
-
-      if (!hasAccess) {
-        const formattedAccess = allowedAccess.map((item) =>
-          Object.values(ROLE_TYPES).includes(item)
-            ? `${item} (role type)`
-            : item
-        );
-
-        throw ApiError.forbidden(
-          `Access denied. Required: ${formattedAccess.join(", ")}. Your role: ${userRole} (${userRoleType})`
-        );
-      }
-
-      return next();
+    // Check Employee with permissions
+    user = await models.Employee.findByPk(userId, {
+      include: [
+        { association: "department", attributes: ["name"] },
+        {
+          association: "employeePermissions",
+          where: { isActive: true },
+          required: false,
+        },
+        {
+          association: "createdByRoot",
+          attributes: ["id", "hierarchyLevel", "hierarchyPath"],
+        },
+        {
+          association: "createdByUser",
+          attributes: ["id", "hierarchyLevel", "hierarchyPath", "roleId"],
+        },
+      ],
     });
-  };
+    if (user) {
+      const permissions =
+        user.employeePermissions?.map((ep) => ep.permission) || [];
+      const creator = user.createdByRoot
+        ? { ...user.createdByRoot.toJSON(), userType: "root" }
+        : user.createdByUser
+          ? { ...user.createdByUser.toJSON(), userType: "business" }
+          : null;
 
-  // Backward compatibility ke liye existing methods
-  static authorizeBusinessRoles = (allowedRoles = []) =>
-    this.authorize(allowedRoles);
+      return {
+        ...user.toJSON(),
+        userType: "employee",
+        permissions,
+        creator,
+        departmentName: user.department?.name,
+      };
+    }
 
-  static authorizeEmployeeRoles = (allowedRoles = []) =>
-    this.authorize([...allowedRoles, ROLE_TYPES.EMPLOYEE]);
+    // Check Business User
+    user = await models.User.findByPk(userId, {
+      include: [
+        { association: "role" },
+        { association: "userPermissions", required: false },
+      ],
+    });
+    if (user) {
+      const permissions =
+        user.userPermissions?.map((up) => up.permission) || [];
+      return {
+        ...user.toJSON(),
+        userType: "business",
+        permissions,
+        role: user.role?.name,
+      };
+    }
 
-  static authorizeRoleTypes = (allowedRoleTypes = []) =>
-    this.authorize(allowedRoleTypes);
+    return null;
+  }
+
+  static authorize = (options = {}) =>
+    asyncHandler(async (req, res, next) => {
+      const user = req.user;
+      if (!user) throw ApiError.unauthorized("Authentication required");
+      if (user.userType === "root") return next();
+
+      // Role/User Type Check
+      if (options.roles?.length && !options.roles.includes(user.role)) {
+        throw ApiError.forbidden(`Required roles: ${options.roles.join(", ")}`);
+      }
+      if (
+        options.userTypes?.length &&
+        !options.userTypes.includes(user.userType)
+      ) {
+        throw ApiError.forbidden(
+          `Required user types: ${options.userTypes.join(", ")}`
+        );
+      }
+
+      // Department Check
+      if (
+        options.departments?.length &&
+        user.userType === "employee" &&
+        !options.departments.includes(user.departmentName)
+      ) {
+        throw ApiError.forbidden(
+          `Required departments: ${options.departments.join(", ")}`
+        );
+      }
+
+      // Permission Check
+      if (options.permissions?.length) {
+        const hasAllPermissions = options.permissions.every(
+          (permission) =>
+            user.userType === "root" || user.permissions.includes(permission)
+        );
+        if (!hasAllPermissions)
+          throw ApiError.forbidden("Insufficient permissions");
+      }
+
+      next();
+    });
+
+  // Convenience Methods
+  static requireRoot = this.authorize({ userTypes: ["root"] });
+  static requireBusiness = this.authorize({ userTypes: ["business"] });
+  static requireEmployee = this.authorize({ userTypes: ["employee"] });
+  static requireAdmin = this.authorize({ roles: [BUSINESS_ROLES.ADMIN] });
+  static requirePermissions = (...permissions) =>
+    this.authorize({ permissions });
+  static requireDepartment = (departments) =>
+    this.authorize({ userTypes: ["employee"], departments });
 }
 
 export default AuthMiddleware;
