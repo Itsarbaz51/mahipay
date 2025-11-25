@@ -15,41 +15,26 @@ export default (sequelize, DataTypes) => {
       serviceId: {
         type: DataTypes.UUID,
         field: "service_id",
+        allowNull: true, // global permissions ke liye
+      },
+      permission: {
+        type: DataTypes.STRING,
         allowNull: false,
       },
-      canView: {
-        type: DataTypes.BOOLEAN,
-        field: "can_view",
-        defaultValue: false,
+      assignedAt: {
+        type: DataTypes.DATE,
+        field: "assigned_at",
+        defaultValue: DataTypes.NOW,
       },
-      canEdit: {
-        type: DataTypes.BOOLEAN,
-        field: "can_edit",
-        defaultValue: false,
-      },
-      canSetCommission: {
-        type: DataTypes.BOOLEAN,
-        field: "can_set_commission",
-        defaultValue: false,
-      },
-      canProcess: {
-        type: DataTypes.BOOLEAN,
-        field: "can_process",
-        defaultValue: false,
-      },
-      limits: {
-        type: DataTypes.JSON,
+      revokedAt: {
+        type: DataTypes.DATE,
+        field: "revoked_at",
         allowNull: true,
       },
-      createdAt: {
-        type: DataTypes.DATE,
-        field: "created_at",
-        defaultValue: DataTypes.NOW,
-      },
-      updatedAt: {
-        type: DataTypes.DATE,
-        field: "updated_at",
-        defaultValue: DataTypes.NOW,
+      isActive: {
+        type: DataTypes.BOOLEAN,
+        field: "is_active",
+        defaultValue: true,
       },
       createdByType: {
         type: DataTypes.ENUM("ROOT", "ADMIN"),
@@ -69,33 +54,51 @@ export default (sequelize, DataTypes) => {
       indexes: [
         {
           unique: true,
-          fields: ["role_id", "service_id"],
+          fields: ["role_id", "permission", "service_id"],
+          where: {
+            is_active: true,
+            revoked_at: null,
+          },
         },
         {
           fields: ["created_by_id", "created_by_type"],
+        },
+        {
+          fields: ["role_id"],
+        },
+        {
+          fields: ["is_active"],
         },
       ],
     }
   );
 
   RolePermission.associate = function (models) {
-    RolePermission.belongsTo(models.Role, {
-      foreignKey: "role_id",
-      as: "role",
-    });
     RolePermission.belongsTo(models.ServiceProvider, {
       foreignKey: "service_id",
       as: "service",
     });
+    RolePermission.belongsTo(models.Role, {
+      foreignKey: "role_id",
+      as: "role",
+    });
+
     RolePermission.belongsTo(models.Root, {
       foreignKey: "created_by_id",
       as: "createdByRoot",
       constraints: false,
+      scope: {
+        created_by_type: "ROOT",
+      },
     });
+
     RolePermission.belongsTo(models.User, {
       foreignKey: "created_by_id",
       as: "createdByUser",
       constraints: false,
+      scope: {
+        created_by_type: "ADMIN",
+      },
     });
   };
 

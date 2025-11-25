@@ -16,15 +16,20 @@ export default (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      createdAt: {
+      assignedAt: {
         type: DataTypes.DATE,
-        field: "created_at",
+        field: "assigned_at",
         defaultValue: DataTypes.NOW,
       },
-      updatedAt: {
+      revokedAt: {
         type: DataTypes.DATE,
-        field: "updated_at",
-        defaultValue: DataTypes.NOW,
+        field: "revoked_at",
+        allowNull: true,
+      },
+      isActive: {
+        type: DataTypes.BOOLEAN,
+        field: "is_active",
+        defaultValue: true,
       },
       createdByType: {
         type: DataTypes.ENUM("ROOT", "ADMIN"),
@@ -45,9 +50,19 @@ export default (sequelize, DataTypes) => {
         {
           unique: true,
           fields: ["department_id", "permission"],
+          where: {
+            is_active: true,
+            revoked_at: null,
+          },
         },
         {
           fields: ["created_by_id", "created_by_type"],
+        },
+        {
+          fields: ["department_id"],
+        },
+        {
+          fields: ["is_active"],
         },
       ],
     }
@@ -62,11 +77,17 @@ export default (sequelize, DataTypes) => {
       foreignKey: "created_by_id",
       as: "createdByRoot",
       constraints: false,
+      scope: {
+        created_by_type: "ROOT",
+      },
     });
     DepartmentPermission.belongsTo(models.User, {
       foreignKey: "created_by_id",
       as: "createdByUser",
       constraints: false,
+      scope: {
+        created_by_type: "ADMIN",
+      },
     });
   };
 
