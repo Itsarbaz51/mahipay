@@ -74,7 +74,7 @@ class AuthMiddleware {
         {
           association: "role",
           attributes: ["id", "name", "hierarchyLevel", "description"],
-          required: true,
+          required: false,
         },
       ],
       attributes: {
@@ -102,6 +102,7 @@ class AuthMiddleware {
         {
           association: "department",
           attributes: ["id", "name", "description"],
+          required: false,
         },
         {
           association: "createdByRoot",
@@ -169,6 +170,7 @@ class AuthMiddleware {
         {
           association: "role",
           attributes: ["id", "name", "hierarchyLevel", "description"],
+          required: false,
         },
         {
           association: "parent",

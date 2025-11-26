@@ -251,7 +251,15 @@ class AuthController {
   });
 
   static confirmPasswordReset = asyncHandler(async (req, res) => {
-    const { token, userType, newPassword } = req.body;
+    // Get token + userType from URL query
+    const token = req.query.token;
+    const userType = req.query.type; // or req.query.userType
+
+    console.log(token);
+    console.log(userType);
+
+    // Get password from request body
+    const { newPassword } = req.body;
 
     if (!token || !userType || !newPassword) {
       throw ApiError.badRequest(
@@ -284,35 +292,6 @@ class AuthController {
           newPassword,
           req
         );
-        break;
-
-      default:
-        throw ApiError.badRequest("Invalid user type");
-    }
-
-    return res.status(200).json(ApiResponse.success(null, result.message, 200));
-  });
-
-  static verifyEmail = asyncHandler(async (req, res) => {
-    const { token, userType } = req.query;
-
-    if (!token || !userType) {
-      throw ApiError.badRequest("Token and user type are required");
-    }
-
-    let result;
-
-    switch (userType.toUpperCase()) {
-      case "ROOT":
-        result = await RootAuthService.verifyEmail(String(token), req);
-        break;
-
-      case "BUSINESS":
-        result = await BusinessAuthService.verifyEmail(String(token), req);
-        break;
-
-      case "EMPLOYEE":
-        result = await EmployeeAuthService.verifyEmail(String(token), req);
         break;
 
       default:
@@ -378,51 +357,12 @@ class AuthController {
     );
   });
 
-  // NEW METHOD: Create and send email verification
-  static sendEmailVerification = asyncHandler(async (req, res) => {
-    const userId = req.user?.id;
-    const userType = req.user?.userType;
-
-    if (!userId || !userType) {
-      throw ApiError.unauthorized("User not authenticated");
-    }
-
-    switch (userType.toUpperCase()) {
-      case "ROOT":
-        const rootUser = await RootAuthService.getProfile(userId);
-        await RootAuthService.createAndSendEmailVerification(rootUser, req);
-        break;
-
-      case "BUSINESS":
-        const businessUser = await BusinessAuthService.getProfile(userId);
-        await BusinessAuthService.createAndSendEmailVerification(
-          businessUser,
-          req
-        );
-        break;
-
-      case "EMPLOYEE":
-        const employeeUser = await EmployeeAuthService.getProfile(userId);
-        await EmployeeAuthService.createAndSendEmailVerification(
-          employeeUser,
-          req
-        );
-        break;
-
-      default:
-        throw ApiError.badRequest("Invalid user type");
-    }
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(null, "Verification email sent successfully", 200)
-      );
-  });
-
   // DASHBOARD METHODS
   static getDashboard = asyncHandler(async (req, res) => {
     const userType = req.user?.userType;
+
+    console.log(req.user);
+    
 
     if (!userType) {
       throw ApiError.unauthorized("User not authenticated");

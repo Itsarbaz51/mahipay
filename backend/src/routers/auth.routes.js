@@ -9,21 +9,21 @@ import PermissionMiddleware from "../middlewares/permission.middleware.js";
 const authRoutes = Router();
 
 // Public routes
+// ✅
 authRoutes.post(
   "/login",
   validateRequest(AuthValidationSchemas.login),
   AuthController.login
-);
+); // ✅
 authRoutes.post(
   "/password-reset",
   validateRequest(AuthValidationSchemas.forgotPassword),
   AuthController.requestPasswordReset
 );
 authRoutes.post("/password-reset/confirm", AuthController.confirmPasswordReset);
-authRoutes.get("/verify-email", AuthController.verifyEmail);
 
 // Protected routes
-authRoutes.post("/logout", AuthMiddleware.authenticate, AuthController.logout);
+authRoutes.post("/logout", AuthMiddleware.authenticate, AuthController.logout); // ✅
 authRoutes.post(
   "/refresh-token",
   AuthMiddleware.authenticate,
@@ -33,7 +33,7 @@ authRoutes.get(
   "/me",
   AuthMiddleware.authenticate,
   AuthController.getCurrentUser
-);
+); // ✅
 authRoutes.put(
   "/:userId/credentials",
   AuthMiddleware.authenticate,
@@ -58,11 +58,6 @@ authRoutes.put(
     PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[2]
   ),
   AuthController.updateProfile
-);
-authRoutes.post(
-  "/send-verification",
-  AuthMiddleware.authenticate,
-  AuthController.sendEmailVerification
 );
 
 export default authRoutes;

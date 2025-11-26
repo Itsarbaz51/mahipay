@@ -94,7 +94,14 @@ class BusinessAuthService extends BaseAuthService {
         { where: { id: user.id } }
       );
 
-      await this.createAuthAuditLog(user, "LOGIN_SUCCESS", req);
+      await this.createAuthAuditLog(
+        {
+          ...user.toJSON(),
+          userType: "BUSINESS",
+        },
+        "LOGIN_SUCCESS",
+        req
+      );
 
       return {
         user: this.sanitizeUserData(user),
@@ -190,7 +197,14 @@ class BusinessAuthService extends BaseAuthService {
       { where: { id: user.id } }
     );
 
-    await this.createAuthAuditLog(user, "REFRESH_TOKEN_SUCCESS", req);
+    await this.createAuthAuditLog(
+      {
+        ...user.toJSON(),
+        userType: "BUSINESS",
+      },
+      "REFRESH_TOKEN_SUCCESS",
+      req
+    );
 
     return {
       accessToken: newAccessToken,
@@ -227,7 +241,7 @@ class BusinessAuthService extends BaseAuthService {
       };
     }
 
-    const { token, tokenHash, expires } = this.generatePasswordResetToken();
+    const { token, tokenHash, expires } = CryptoService.generateSecureToken();
 
     await models.User.update(
       {
@@ -239,9 +253,17 @@ class BusinessAuthService extends BaseAuthService {
 
     await this.sendPasswordResetEmail(user, token, "admin");
 
-    await this.createAuthAuditLog(user, "PASSWORD_RESET_REQUESTED", req, {
-      email,
-    });
+    await this.createAuthAuditLog(
+      {
+        ...user.toJSON(),
+        userType: "BUSINESS",
+      },
+      "PASSWORD_RESET_REQUESTED",
+      req,
+      {
+        email,
+      }
+    );
 
     return {
       message:
@@ -251,7 +273,7 @@ class BusinessAuthService extends BaseAuthService {
 
   static async confirmPasswordReset(encryptedToken, newPassword, req = null) {
     try {
-      const token = CryptoService.decrypt(encryptedToken);
+      const token = CryptoService.verifySecureToken(encryptedToken);
       const tokenHash = CryptoService.hashData(token);
 
       const user = await this.validatePasswordResetToken(
@@ -285,7 +307,14 @@ class BusinessAuthService extends BaseAuthService {
 
       await this.updateUserPassword(user.id, newPassword, models.User);
 
-      await this.createAuthAuditLog(user, "PASSWORD_RESET_CONFIRMED", req);
+      await this.createAuthAuditLog(
+        {
+          ...user.toJSON(),
+          userType: "BUSINESS",
+        },
+        "PASSWORD_RESET_CONFIRMED",
+        req
+      );
 
       return {
         message:

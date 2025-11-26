@@ -45,7 +45,6 @@ export class CryptoService {
     try {
       if (!encryptedText) return encryptedText;
 
-      
       const parts = encryptedText.split(":");
       if (parts.length !== 3) {
         throw new Error("Invalid encrypted text format");
@@ -112,6 +111,67 @@ export class CryptoService {
   }
 
   static generateSecureToken(length = 32) {
-    return crypto.randomBytes(length).toString("hex");
+    const token = crypto.randomBytes(length).toString("hex");
+
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(
+      ALGORITHM,
+      Buffer.from(secretKey, "hex"),
+      iv
+    );
+
+    let encrypted = cipher.update(token, "utf8", "hex");
+    encrypted += cipher.final("hex");
+
+    const authTag = cipher.getAuthTag().toString("hex");
+
+    // format = iv:encrypted:authTag
+    const encryptedToken = `${iv.toString("hex")}:${encrypted}:${authTag}`;
+
+    const tokenHash = CryptoService.hashData(token); // FIX: generate hash
+
+    const expires = new Date(Date.now() + 2 * 60 * 1000);
+
+    return { token, tokenHash, encryptedToken, expires };
+  }
+
+  static verifySecureToken(encryptedText) {
+    try {
+      if (!encryptedText) return encryptedText;
+
+      // FIX 1: URL-decode
+      encryptedText = decodeURIComponent(encryptedText);
+
+      encryptedText = encryptedText.split("?")[0].split("&")[0];
+
+      const parts = encryptedText.split(":");
+      if (parts.length !== 3) {
+        throw new Error("Invalid encrypted token format");
+      }
+
+      const [ivHex, encrypted, authTagHex] = parts;
+      const iv = Buffer.from(ivHex, "hex");
+      const authTag = Buffer.from(authTagHex, "hex");
+
+      if (!secretKey || Buffer.from(secretKey, "hex").length !== 32) {
+        throw new Error("Invalid key length. Must be 32 bytes.");
+      }
+
+      const decipher = crypto.createDecipheriv(
+        ALGORITHM,
+        Buffer.from(secretKey, "hex"),
+        iv
+      );
+
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(encrypted, "hex", "utf8");
+      decrypted += decipher.final("utf8");
+
+      return decrypted;
+    } catch (err) {
+      console.error("Decryption failed:", err);
+      throw new Error("Decryption failed");
+    }
   }
 }

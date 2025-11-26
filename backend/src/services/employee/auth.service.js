@@ -94,7 +94,14 @@ class EmployeeAuthService extends BaseAuthService {
         { where: { id: user.id } }
       );
 
-      await this.createAuthAuditLog(user, "LOGIN_SUCCESS", req);
+      await this.createAuthAuditLog(
+        {
+          ...user.toJSON(),
+          userType: "EMPLOYEE",
+        },
+        "LOGIN_SUCCESS",
+        req
+      );
 
       return {
         user: this.sanitizeUserData(user),
@@ -192,7 +199,14 @@ class EmployeeAuthService extends BaseAuthService {
       { where: { id: user.id } }
     );
 
-    await this.createAuthAuditLog(user, "REFRESH_TOKEN_SUCCESS", req);
+    await this.createAuthAuditLog(
+      {
+        ...user.toJSON(),
+        userType: "EMPLOYEE",
+      },
+      "REFRESH_TOKEN_SUCCESS",
+      req
+    );
 
     return {
       accessToken: newAccessToken,
@@ -229,7 +243,7 @@ class EmployeeAuthService extends BaseAuthService {
       };
     }
 
-    const { token, tokenHash, expires } = this.generatePasswordResetToken();
+    const { token, tokenHash, expires } = CryptoService.generateSecureToken();
 
     await models.Employee.update(
       {
@@ -241,10 +255,18 @@ class EmployeeAuthService extends BaseAuthService {
 
     await this.sendPasswordResetEmail(user, token, "employee");
 
-    await this.createAuthAuditLog(user, "PASSWORD_RESET_REQUESTED", req, {
-      email,
-      department: user.department?.name,
-    });
+    await this.createAuthAuditLog(
+      {
+        ...user.toJSON(),
+        userType: "EMPLOYEE",
+      },
+      "PASSWORD_RESET_REQUESTED",
+      req,
+      {
+        email,
+        department: user.department?.name,
+      }
+    );
 
     return {
       message:
@@ -254,7 +276,7 @@ class EmployeeAuthService extends BaseAuthService {
 
   static async confirmPasswordReset(encryptedToken, newPassword, req = null) {
     try {
-      const token = CryptoService.decrypt(encryptedToken);
+      const token = CryptoService.verifySecureToken(encryptedToken);
       const tokenHash = CryptoService.hashData(token);
 
       const user = await this.validatePasswordResetToken(
@@ -273,7 +295,14 @@ class EmployeeAuthService extends BaseAuthService {
 
       await this.updateUserPassword(user.id, newPassword, models.Employee);
 
-      await this.createAuthAuditLog(user, "PASSWORD_RESET_CONFIRMED", req);
+      await this.createAuthAuditLog(
+        {
+          ...user.toJSON(),
+          userType: "EMPLOYEE",
+        },
+        "PASSWORD_RESET_CONFIRMED",
+        req
+      );
 
       return {
         message:
