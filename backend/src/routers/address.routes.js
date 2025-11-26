@@ -1,96 +1,67 @@
+// routes/address.routes.js
 import { Router } from "express";
+import { AddressController } from "../controllers/address.controller.js";
+import { validateRequest } from "../middlewares/validateRequest.js";
 import {
-  AddressController,
-  CityController,
-  StateController,
-} from "../controllers/address.controller.js";
+  getAddressByIdSchema,
+  createAddressSchema,
+  updateAddressSchema,
+  deleteAddressSchema,
+} from "../validations/addressValidation.schemas.js";
 import AuthMiddleware from "../middlewares/auth.middleware.js";
+import PermissionMiddleware from "../middlewares/permission.middleware.js";
+import PermissionRegistry from "../utils/permissionRegistry.js";
 
 const addressRoutes = Router();
 
-// ===================== ADDRESS ROUTES =====================
+// Apply authentication to all address routes
+addressRoutes.use(AuthMiddleware.authenticate);
 
-// Address operations (Business users only)
+// Get address by ID
 addressRoutes.get(
-  "/address-show/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.show
+  "/:id",
+  validateRequest(getAddressByIdSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.ADDRESS_MGMT[0]], // "address:view"
+    userTypes: ["root", "admin", "employee"],
+  }),
+  AddressController.getAddressById
 );
 
+// Create address (Only Admin)
 addressRoutes.post(
-  "/address-store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.store
+  "/",
+  validateRequest(createAddressSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.ADDRESS_MGMT[1]], // "address:create"
+    userTypes: ["admin"],
+  }),
+  PermissionMiddleware.canActOnBehalf("address:create"),
+  AddressController.createAddress
 );
 
+// Update address (Only Admin)
 addressRoutes.put(
-  "/address-update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.update
+  "/:id",
+  validateRequest(updateAddressSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.ADDRESS_MGMT[2]], // "address:update"
+    userTypes: ["admin"],
+  }),
+  PermissionMiddleware.canActOnBehalf("address:update"),
+  AddressController.updateAddress
 );
 
+// Delete address (Only Admin)
 addressRoutes.delete(
-  "/address-delete/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.destroy
-);
-
-// ===================== STATE ROUTES =====================
-
-// State list (Public)
-addressRoutes.get("/state-list", StateController.index);
-
-// State management (ADMIN only)
-addressRoutes.post(
-  "/state-store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  StateController.store
-);
-
-addressRoutes.put(
-  "/state-update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  StateController.update
-);
-
-addressRoutes.delete(
-  "/state-delete/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  StateController.destroy
-);
-
-// ===================== CITY ROUTES =====================
-
-// City list (Public)
-addressRoutes.get("/city-list", CityController.index);
-
-// City management (ADMIN only)
-addressRoutes.post(
-  "/city-store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  CityController.store
-);
-
-addressRoutes.put(
-  "/city-update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  CityController.update
-);
-
-addressRoutes.delete(
-  "/city-delete/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  CityController.destroy
+  "/:id",
+  validateRequest(deleteAddressSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.ADDRESS_MGMT[3]], // "address:delete"
+    userTypes: ["admin"],
+  }),
+  PermissionMiddleware.canActOnBehalf("address:delete"),
+  AddressController.deleteAddress
 );
 
 export default addressRoutes;

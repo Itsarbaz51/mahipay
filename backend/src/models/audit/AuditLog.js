@@ -25,7 +25,7 @@ export default (sequelize, DataTypes) => {
       entityId: {
         type: DataTypes.STRING,
         field: "entity_id",
-        allowNull: false,
+        allowNull: true,
       },
 
       // User who performed the action
@@ -37,7 +37,7 @@ export default (sequelize, DataTypes) => {
       performedById: {
         type: DataTypes.UUID,
         field: "performed_by_id",
-        allowNull: false,
+        allowNull: true,
       },
 
       // Target user (if applicable)

@@ -1,56 +1,50 @@
 import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
+import { ServiceProviderController } from "../controllers/serviceProvider.controller.js";
 import { validateRequest } from "../middlewares/validateRequest.js";
-import ServiceProviderController from "../controllers/service.controller.js";
-import { ServiceValidationSchemas } from "../validations/serviceValidation.schemas.js";
-import upload from "../middlewares/multer.middleware.js";
+import {
+  assignServicesSchema,
+  updateServiceStatusSchema,
+  deleteServicesSchema,
+  getServicesSchema,
+} from "../validations/serviceValidation.schemas.js";
+import AuthMiddleware from "../middlewares/auth.middleware.js";
+import checkServiceMiddleware from "../middlewares/checkServiceMiddleware.js";
 
 const serviceRoutes = Router();
 
-// Create service provider (ADMIN only)
+// Apply authentication to all service routes
+serviceRoutes.use(AuthMiddleware.authenticate);
+
+// ========== SERVICE ASSIGNMENT ROUTES ==========
 serviceRoutes.post(
-  "/create",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
-  upload.single("icon"),
-  validateRequest(ServiceValidationSchemas.createServiceProvider),
-  ServiceProviderController.create
+  "/assign",
+  validateRequest(assignServicesSchema),
+  checkServiceMiddleware("assign"),
+  ServiceProviderController.assignServices
 );
 
-// Get all service providers (ADMIN sees all, business users see assigned)
-serviceRoutes.post(
-  "/lists",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "business", "employee"]),
-  ServiceProviderController.getAll
+// ========== SERVICE STATUS ROUTES ==========
+serviceRoutes.patch(
+  "/status/:id?",
+  validateRequest(updateServiceStatusSchema),
+  checkServiceMiddleware("modify"),
+  ServiceProviderController.updateServiceStatus
 );
 
-serviceRoutes.put(
-  "/env-config/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  ServiceProviderController.updateEnvConfig
+// ========== SERVICE DELETION ROUTES ==========
+serviceRoutes.delete(
+  "/:id?",
+  validateRequest(deleteServicesSchema),
+  checkServiceMiddleware("delete"),
+  ServiceProviderController.deleteServices
 );
 
-serviceRoutes.put(
-  "/status/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  ServiceProviderController.toggleServiceStatus
-);
-
-serviceRoutes.put(
-  "/api-intigration-status/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  ServiceProviderController.toggleApiIntigrationStatus
-);
-
-serviceRoutes.post(
-  "/api-testing/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  ServiceProviderController.apiTestConnection
+// ========== SERVICE QUERY ROUTES ==========
+serviceRoutes.get(
+  "/",
+  validateRequest(getServicesSchema),
+  checkServiceMiddleware("view"),
+  ServiceProviderController.getServices
 );
 
 export default serviceRoutes;

@@ -1,71 +1,94 @@
+// routes/kyc.routes.js
 import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
-import { UserKycController } from "../controllers/kyc.controller.js";
+import { KycController } from "../controllers/kyc.controller.js";
 import { validateRequest } from "../middlewares/validateRequest.js";
-import KycValidationSchemas from "../validations/kycValidation.schemas.js";
-import upload from "../middlewares/multer.middleware.js";
+import {
+  getAllKycSchema,
+  getKycByIdSchema,
+  createKycSchema,
+  updateKycSchema,
+  verifyKycSchema,
+  kycFilesSchema,
+} from "../validations/kycValidation.schemas.js";
+import AuthMiddleware from "../middlewares/auth.middleware.js";
+import PermissionMiddleware from "../middlewares/permission.middleware.js";
+import PermissionRegistry from "../utils/permissionRegistry.js";
+import { upload } from "../middlewares/multer.middleware.js";
 
 const kycRoutes = Router();
 
-// List KYC applications (Business users - hierarchy access)
-kycRoutes.post(
-  "/list-kyc",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  validateRequest(KycValidationSchemas.ListkycSchema),
-  UserKycController.index
-);
+// Apply authentication to all KYC routes
+kycRoutes.use(AuthMiddleware.authenticate);
 
-// Get KYC by ID (Users can see their own, business users can see their hierarchy)
+// Get all KYC applications
 kycRoutes.get(
-  "/user-kyc-show/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["business", "employee"]),
-  UserKycController.show
+  "/",
+  validateRequest(getAllKycSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.KYC_MGMT[0]], // "kyc:view"
+    userTypes: ["root", "admin", "employee"],
+  }),
+  KycController.getAllKyc
 );
 
-// Submit KYC (Business users only)
+// Get KYC by ID
+kycRoutes.get(
+  "/:id",
+  validateRequest(getKycByIdSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.KYC_MGMT[0]], // "kyc:view"
+    userTypes: ["root", "admin", "employee"],
+  }),
+  KycController.getKycById
+);
+
+// Create KYC
 kycRoutes.post(
-  "/user-kyc-store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["business", "employee"]),
+  "/",
   upload.fields([
     { name: "panFile", maxCount: 1 },
     { name: "aadhaarFile", maxCount: 1 },
     { name: "addressProofFile", maxCount: 1 },
     { name: "photo", maxCount: 1 },
   ]),
-  validateRequest(KycValidationSchemas.UserKyc),
-  UserKycController.store
+  validateRequest(createKycSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.KYC_MGMT[1]], // "kyc:create"
+    userTypes: ["root", "admin", "employee"],
+  }),
+  PermissionMiddleware.canActOnBehalf("kyc:create"),
+  KycController.createKyc
 );
 
-// Verify KYC (ADMIN only)
+// Update KYC
 kycRoutes.put(
-  "/user-verify",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  validateRequest(KycValidationSchemas.VerificationKycSchema),
-  UserKycController.verification
-);
-
-// Update KYC (Business users can update their own)
-kycRoutes.put(
-  "/user-kyc-update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["business", "employee"]),
+  "/:id",
   upload.fields([
     { name: "panFile", maxCount: 1 },
     { name: "aadhaarFile", maxCount: 1 },
     { name: "addressProofFile", maxCount: 1 },
     { name: "photo", maxCount: 1 },
   ]),
-  UserKycController.update
+  validateRequest(updateKycSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.KYC_MGMT[2]], // "kyc:update"
+    userTypes: ["root", "admin", "employee"],
+  }),
+  PermissionMiddleware.canActOnBehalf("kyc:update"),
+  KycController.updateKyc
+);
+
+// Verify KYC (Only for Root and Admin roles)
+kycRoutes.post(
+  "/verify",
+  validateRequest(verifyKycSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.KYC_MGMT[3]], // "kyc:verify"
+    userTypes: ["root", "admin"],
+  }),
+  // For employees, they can only verify through their admin's hierarchy
+  PermissionMiddleware.canActOnBehalf("kyc:verify"),
+  KycController.verifyKyc
 );
 
 export default kycRoutes;

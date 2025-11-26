@@ -1,111 +1,247 @@
+import models from "../models/index.js";
+
 class PermissionRegistry {
-  // Core Modules
-  static USER_MANAGEMENT = [
-    "user:create",
-    "user:view",
-    "user:update",
-    "user:delete",
-    "user:manage",
-  ];
-  static EMPLOYEE_MANAGEMENT = [
-    "employee:create",
-    "employee:view",
-    "employee:update",
-    "employee:delete",
-    "employee:manage",
-  ];
-  static WALLET_MANAGEMENT = [
-    "wallet:view",
-    "wallet:manage",
-    "wallet:transfer",
-    "wallet:balance:view",
-  ];
-  static TRANSACTION_MANAGEMENT = [
-    "transaction:create",
-    "transaction:view",
-    "transaction:update",
-    "transaction:process",
-  ];
-  static KYC_MANAGEMENT = [
-    "kyc:view",
-    "kyc:manage",
-    "kyc:verify",
-    "kyc:reject",
-  ];
-
-  // Business Operations
-  static BUSINESS_OPS = [
-    "business:dashboard:view",
-    "business:report:view",
-    "business:analytics:view",
-  ];
-
-  // System Management
-  static SYSTEM_MGMT = [
-    "system:settings:view",
-    "system:settings:manage",
-    "role:manage",
-    "department:manage",
-  ];
-
-  // Get all permissions as flat array
-  static getAllPermissions() {
-    return [
-      ...this.USER_MANAGEMENT,
-      ...this.EMPLOYEE_MANAGEMENT,
-      ...this.WALLET_MANAGEMENT,
-      ...this.TRANSACTION_MANAGEMENT,
-      ...this.KYC_MANAGEMENT,
-      ...this.BUSINESS_OPS,
-      ...this.SYSTEM_MGMT,
-    ];
-  }
-
-  // Permission groups for easy assignment
-  static GROUPS = {
-    ROOT_ADMIN: this.getAllPermissions(),
-    BUSINESS_ADMIN: [
-      ...this.USER_MANAGEMENT,
-      ...this.WALLET_MANAGEMENT,
-      ...this.TRANSACTION_MANAGEMENT,
-      ...this.BUSINESS_OPS,
-      ...this.KYC_MANAGEMENT,
-    ],
-    DEPARTMENT_MANAGER: [
+  // Permission definitions
+  static PERMISSIONS = {
+    USER_MANAGEMENT: [
+      "user:create",
       "user:view",
+      "user:update",
+      "user:delete",
+      "user:manage",
+      "user:update:credentials",
+      "user:update:profile:image",
+    ],
+    EMPLOYEE_MANAGEMENT: [
+      "employee:create",
       "employee:view",
+      "employee:update",
+      "employee:delete",
       "employee:manage",
+    ],
+    WALLET_MANAGEMENT: [
+      "wallet:view",
+      "wallet:manage",
+      "wallet:transfer",
+      "wallet:balance:view",
+    ],
+    TRANSACTION_MANAGEMENT: [
+      "transaction:create",
       "transaction:view",
+      "transaction:update",
+      "transaction:process",
+    ],
+    KYC_MANAGEMENT: ["kyc:view", "kyc:manage", "kyc:verify", "kyc:reject"],
+    DEPARTMENT_MANAGEMENT: [
+      "department:create",
+      "department:view",
+      "department:update",
+      "department:delete",
       "department:manage",
     ],
-    EMPLOYEE_BASIC: [
-      "user:view",
-      "transaction:view",
-      "wallet:view",
-      "kyc:view",
+    ROLE_MANAGEMENT: [
+      "role:create",
+      "role:view",
+      "role:update",
+      "role:delete",
+      "role:manage",
+    ],
+    SERVICE_MANAGEMENT: [
+      "service:create",
+      "service:view",
+      "service:update",
+      "service:delete",
+      "service:manage",
+    ],
+    COMMISSION_MANAGEMENT: [
+      "commission:view",
+      "commission:manage",
+      "commission:setting:update",
+    ],
+    SYSTEM_MANAGEMENT: [
+      "system:settings:view",
+      "system:settings:manage",
+      "audit:view",
     ],
   };
 
+  // Get all permissions as flat array
+  static getAllPermissions() {
+    return Object.values(this.PERMISSIONS).flat();
+  }
+
+  // Validate permission format
   static isValid(permission) {
     return this.getAllPermissions().includes(permission);
   }
 
-  static getCategory(permission) {
-    const categories = {
-      USER_MANAGEMENT: this.USER_MANAGEMENT,
-      EMPLOYEE_MANAGEMENT: this.EMPLOYEE_MANAGEMENT,
-      WALLET_MANAGEMENT: this.WALLET_MANAGEMENT,
-      TRANSACTION_MANAGEMENT: this.TRANSACTION_MANAGEMENT,
-      KYC_MANAGEMENT: this.KYC_MANAGEMENT,
-      BUSINESS_OPS: this.BUSINESS_OPS,
-      SYSTEM_MGMT: this.SYSTEM_MGMT,
-    };
+  // Get effective permissions for BUSINESS USER (RolePermissions + UserPermissions)
+  static async getUserEffectivePermissions(userId, models) {
+    try {
+      const [userPermissions, userWithRole] = await Promise.all([
+        models.UserPermission.findAll({
+          where: {
+            user_id: userId,
+            is_active: true,
+            revoked_at: null,
+          },
+          attributes: ["permission", "service_id"],
+          raw: true,
+        }),
+        models.User.findByPk(userId, {
+          include: [
+            {
+              association: "role",
+              include: [
+                {
+                  association: "rolePermissions",
+                  where: { is_active: true, revoked_at: null },
+                  required: false,
+                  attributes: ["permission", "service_id"],
+                },
+              ],
+            },
+          ],
+        }),
+      ]);
 
-    return (
-      Object.keys(categories).find((cat) =>
-        categories[cat].includes(permission)
-      ) || "OTHER"
-    );
+      const rolePermissions = userWithRole?.role?.rolePermissions || [];
+      return this.mergePermissions(
+        rolePermissions,
+        userPermissions,
+        "role",
+        "user"
+      );
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      return [];
+    }
+  }
+
+  // Get effective permissions for EMPLOYEE (DepartmentPermissions + EmployeePermissions)
+  static async getEmployeeEffectivePermissions(employeeId, models) {
+    try {
+      const [employeePermissions, employeeWithDept] = await Promise.all([
+        models.EmployeePermission.findAll({
+          where: {
+            employee_id: employeeId,
+            is_active: true,
+            revoked_at: null,
+          },
+          attributes: ["permission", "service_id"],
+          raw: true,
+        }),
+        models.Employee.findByPk(employeeId, {
+          include: [
+            {
+              association: "department",
+              include: [
+                {
+                  association: "departmentPermissions",
+                  where: { is_active: true, revoked_at: null },
+                  required: false,
+                  attributes: ["permission", "service_id"],
+                },
+              ],
+            },
+          ],
+        }),
+      ]);
+
+      const deptPermissions =
+        employeeWithDept?.department?.departmentPermissions || [];
+      return this.mergePermissions(
+        deptPermissions,
+        employeePermissions,
+        "department",
+        "employee"
+      );
+    } catch (error) {
+      console.error("Error fetching employee permissions:", error);
+      return [];
+    }
+  }
+
+  // Merge base permissions with override permissions
+  static mergePermissions(
+    basePermissions,
+    overridePermissions,
+    baseSource,
+    overrideSource
+  ) {
+    const permissionMap = new Map();
+
+    // Add base permissions first
+    basePermissions.forEach((perm) => {
+      const key = `${perm.permission}-${perm.service_id || "global"}`;
+      permissionMap.set(key, {
+        permission: perm.permission,
+        serviceId: perm.service_id,
+        source: baseSource,
+      });
+    });
+
+    // Override with specific permissions
+    overridePermissions.forEach((perm) => {
+      const key = `${perm.permission}-${perm.service_id || "global"}`;
+      permissionMap.set(key, {
+        permission: perm.permission,
+        serviceId: perm.service_id,
+        source: overrideSource,
+      });
+    });
+
+    return Array.from(permissionMap.values());
+  }
+
+  // Check if user has specific permission
+  static async hasPermission(user, permission, serviceId = null) {
+    if (!user || !permission) return false;
+
+    // ROOT has all permissions
+    if (user.userType === "ROOT") return true;
+
+    if (!this.isValid(permission)) return false;
+
+    let effectivePerms = [];
+    try {
+      if (user.userType === "BUSINESS") {
+        effectivePerms = await this.getUserEffectivePermissions(
+          user.id,
+          models
+        );
+      } else if (user.userType === "EMPLOYEE") {
+        effectivePerms = await this.getEmployeeEffectivePermissions(
+          user.id,
+          models
+        );
+      } else {
+        return false;
+      }
+
+      return effectivePerms.some(
+        (perm) =>
+          perm.permission === permission &&
+          (serviceId === null ||
+            perm.serviceId === null ||
+            perm.serviceId === serviceId)
+      );
+    } catch (error) {
+      console.error("Error checking permission:", error);
+      return false;
+    }
+  }
+
+  // Check if user has all of the given permissions
+  static async hasAllPermissions(user, permissions, serviceId = null) {
+    if (user.userType === "ROOT") return true;
+
+    for (const permission of permissions) {
+      if (!(await this.hasPermission(user, permission, serviceId))) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 

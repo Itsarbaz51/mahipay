@@ -7,6 +7,11 @@ export default (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
+      roleId: {
+        type: DataTypes.UUID,
+        field: "role_id",
+        allowNull: true,
+      },
       username: {
         type: DataTypes.STRING,
         unique: true,
@@ -251,6 +256,12 @@ export default (sequelize, DataTypes) => {
       foreignKey: "created_by_id",
       as: "createdEmployeePermissions",
       constraints: false,
+    });
+
+    Root.belongsTo(models.Role, {
+      foreignKey: "role_id",
+      as: "role",
+      onDelete: "RESTRICT",
     });
   };
 

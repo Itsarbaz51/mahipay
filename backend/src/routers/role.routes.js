@@ -1,49 +1,51 @@
 import { Router } from "express";
 import RoleController from "../controllers/role.controller.js";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
 import { validateRequest } from "../middlewares/validateRequest.js";
-import RoleValidationSchemas from "../validations/roleValidation.schemas.js";
+import {
+  deleteRoleSchema,
+  getAllRolesByTypeSchema,
+  upsertRoleSchema,
+} from "../validations/roleValidation.schemas.js";
+import AuthMiddleware from "../middlewares/auth.middleware.js";
+import PermissionMiddleware from "../middlewares/permission.middleware.js";
+import PermissionRegistry from "../utils/permissionRegistry.js";
 
 const roleRoutes = Router();
 
-//  GET ROLES BY TYPE (employee or business)
+// Apply authentication to all role routes
+roleRoutes.use(AuthMiddleware.authenticate);
+
 roleRoutes.get(
-  "/type/:type",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN",
-    "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  RoleController.getAllRolesByType
+  "/roles",
+  validateRequest(getAllRolesByTypeSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.SYSTEM_MGMT[3]], // "role:manage"
+    userTypes: ["root", "business", "employee"],
+  }),
+  RoleController.getAllRoles
 );
 
-//  CREATE EMPLOYEE ROLE (Only ADMIN can create employee roles)
 roleRoutes.post(
   "/",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(RoleValidationSchemas.createRole),
-  RoleController.createRole
+  validateRequest(upsertRoleSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.SYSTEM_MGMT[3]], // "role:manage"
+    userTypes: ["root", "business"],
+  }),
+  // For employees, verify they can act on behalf of their creator
+  PermissionMiddleware.canActOnBehalf("role:manage"),
+  RoleController.upsertRole
 );
 
-//  UPDATE EMPLOYEE ROLE (Only ADMIN can update employee roles)
-roleRoutes.put(
-  "/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(RoleValidationSchemas.updateRole),
-  RoleController.updateRole
-);
-
-//  DELETE EMPLOYEE ROLE (Only ADMIN can delete employee roles)
 roleRoutes.delete(
   "/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
+  validateRequest(deleteRoleSchema),
+  AuthMiddleware.authorize({
+    permissions: [PermissionRegistry.SYSTEM_MGMT[3]], // "role:manage"
+    userTypes: ["root", "business"],
+  }),
+  // For employees, verify they can act on behalf of their creator
+  PermissionMiddleware.canActOnBehalf("role:manage"),
   RoleController.deleteRole
 );
 
