@@ -210,17 +210,11 @@ export default (sequelize, DataTypes) => {
       foreignKey: "created_by_id",
       as: "createdByRoot",
       constraints: false,
-      scope: {
-        created_by_type: "ROOT",
-      },
     });
     Employee.belongsTo(models.User, {
       foreignKey: "created_by_id",
       as: "createdByUser",
       constraints: false,
-      scope: {
-        created_by_type: "ADMIN",
-      },
     });
   };
 

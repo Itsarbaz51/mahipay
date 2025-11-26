@@ -1,4 +1,4 @@
-import { DataTypes } from "sequelize";
+import { DataTypes, Sequelize } from "sequelize";
 import sequelize from "../db/db.js";
 import dotenv from "dotenv";
 
@@ -99,4 +99,5 @@ Object.keys(models).forEach((modelName) => {
 });
 
 models.sequelize = sequelize;
+models.Sequelize = Sequelize;
 export default models;

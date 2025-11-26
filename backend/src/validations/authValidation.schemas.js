@@ -1,8 +1,11 @@
 import { z } from "zod";
 
+const RoleEnums = z.enum(["BUSINESS", "ROOT", "EMPLOYEE"]);
+
 class AuthValidationSchemas {
   static get login() {
     return z.object({
+      userType: RoleEnums,
       emailOrUsername: z
         .string()
         .min(1, "Email or username is required")
