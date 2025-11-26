@@ -70,6 +70,13 @@ class AuthMiddleware {
   // Helper method for ROOT user
   static async _findRootUser(userId) {
     const user = await models.Root.findByPk(userId, {
+      include: [
+        {
+          association: "role",
+          attributes: ["id", "name", "hierarchyLevel", "description"],
+          required: true,
+        },
+      ],
       attributes: {
         exclude: ["password", "refreshToken", "passwordResetToken"],
       },
