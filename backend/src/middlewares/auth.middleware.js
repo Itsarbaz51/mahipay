@@ -80,6 +80,9 @@ class AuthMiddleware {
     return {
       ...user.toJSON(),
       userType: "ROOT",
+      role: user.role?.name,
+      roleLevel: user.role?.hierarchyLevel,
+      roleId: user.role?.id,
       permissions: PermissionRegistry.getAllPermissions(),
       creator: null,
     };
@@ -145,8 +148,8 @@ class AuthMiddleware {
     return {
       ...user.toJSON(),
       userType: "EMPLOYEE",
-      employeeRole: user.department?.name,
-      employeeRoleId: user.department?.id,
+      role: user.department?.name,
+      roleId: user.department?.id,
       permissions: effectivePerms,
       creator,
     };
