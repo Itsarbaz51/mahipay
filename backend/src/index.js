@@ -12,7 +12,7 @@ import "./models/index.js";
     console.log("✅ Database connected");
 
     // Sync all models for deployement add (force: false)
-    await sequelize.sync({ force: false });
+    await sequelize.sync({ alter: true });
     console.log("🔄 Models synchronized with database");
 
     const PORT = process.env.PORT || 8000;

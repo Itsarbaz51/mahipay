@@ -23,6 +23,7 @@ import CommissionSetting from "./shared/CommissionSetting.js";
 import Role from "./shared/Role.js";
 import Department from "./shared/Department.js";
 import ServiceProvider from "./shared/ServiceProvider.js";
+import ApiIntegration from "./shared/ApiIntigration.js";
 
 import RolePermission from "./permissions/RolePermission.js";
 import UserPermission from "./permissions/UserPermission.js";
@@ -67,6 +68,7 @@ const models = {
   Role: Role(sequelize, DataTypes),
   Department: Department(sequelize, DataTypes),
   ServiceProvider: ServiceProvider(sequelize, DataTypes),
+  ApiIntegration: ApiIntegration(sequelize, DataTypes),
 
   RolePermission: RolePermission(sequelize, DataTypes),
   UserPermission: UserPermission(sequelize, DataTypes),

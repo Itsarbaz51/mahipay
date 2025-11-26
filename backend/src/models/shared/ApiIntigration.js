@@ -3,9 +3,9 @@ export default (sequelize, DataTypes) => {
     "ApiIntegration",
     {
       id: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
-        autoIncrement: true,
       },
       platformName: {
         type: DataTypes.STRING,
@@ -44,13 +44,8 @@ export default (sequelize, DataTypes) => {
       },
       // Only ROOT can create API integrations
       createdByRootId: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.UUID,
         field: "created_by_root_id",
-        allowNull: false,
-      },
-      rootId: {
-        type: DataTypes.BIGINT,
-        field: "root_id",
         allowNull: false,
       },
       createdAt: {
@@ -70,26 +65,14 @@ export default (sequelize, DataTypes) => {
       underscored: true,
       indexes: [
         {
-          fields: ["root_id"],
-        },
-        {
-          fields: ["created_by_root_id"],
-        },
-        {
           unique: true,
-          fields: ["platform_name", "service_name", "root_id"],
+          fields: ["platform_name", "service_name", "created_by_root_id"],
         },
       ],
     }
   );
-  ApiIntegration.associate = function (models) {
-    // Root association - owner
-    ApiIntegration.belongsTo(models.Root, {
-      foreignKey: "root_id",
-      as: "root",
-      onDelete: "CASCADE",
-    });
 
+  ApiIntegration.associate = function (models) {
     // Root who created this integration
     ApiIntegration.belongsTo(models.Root, {
       foreignKey: "created_by_root_id",

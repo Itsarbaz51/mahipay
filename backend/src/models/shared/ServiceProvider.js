@@ -3,17 +3,17 @@ export default (sequelize, DataTypes) => {
     "ServiceProvider",
     {
       id: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
-        autoIncrement: true,
       },
       userId: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.UUID,
         field: "user_id",
         allowNull: false,
       },
       integrationId: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.UUID,
         field: "integration_id",
         allowNull: false,
       },
@@ -42,12 +42,12 @@ export default (sequelize, DataTypes) => {
         },
       },
       assignedById: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.UUID,
         field: "assigned_by_id",
         allowNull: false,
       },
       rootId: {
-        type: DataTypes.BIGINT,
+        type: DataTypes.UUID,
         field: "root_id",
         allowNull: false,
       },
@@ -169,7 +169,7 @@ export default (sequelize, DataTypes) => {
       onDelete: "CASCADE",
     });
 
-    // FIXED: Polymorphic assigner association - use proper condition
+    // FIXED: Polymorphic assigner association - use string references
     ServiceProvider.belongsTo(models.Root, {
       foreignKey: "assigned_by_id",
       as: "assignedByRoot",
@@ -188,7 +188,7 @@ export default (sequelize, DataTypes) => {
       },
     });
   };
-  
+
   // Instance methods
   ServiceProvider.prototype.isActive = function () {
     return this.status === "ACTIVE";
