@@ -1,96 +1,139 @@
-import { Router } from "express";
-import {
-  AddressController,
-  CityController,
-  StateController,
-} from "../controllers/address.controller.js";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
+// import { Router } from "express";
+// import {
+//   AddressController,
+//   CityController,
+//   StateController,
+// } from "../controllers/address.controller.js";
+// import AuthMiddleware from "../middlewares/auth.middleware.js";
+// import PermissionMiddleware from "../middlewares/permission.middleware.js";
+// import PermissionRegistry from "../utils/permissionRegistry.js";
 
-const addressRoutes = Router();
+// const addressRoutes = Router();
 
-// ===================== ADDRESS ROUTES =====================
+// // ===================== ADDRESS ROUTES =====================
 
-// Address operations (Business users only)
-addressRoutes.get(
-  "/address-show/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.show
-);
+// // Address operations (Users can manage their own addresses)
+// addressRoutes.get(
+//   "/address-show/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     userTypes: ["business", "employee"],
+//   }),
+//   PermissionMiddleware.requireResourceOwnership("address", "id"),
+//   AddressController.show
+// );
 
-addressRoutes.post(
-  "/address-store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.store
-);
+// addressRoutes.post(
+//   "/address-store",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     userTypes: ["business", "employee"],
+//   }),
+//   AddressController.store
+// );
 
-addressRoutes.put(
-  "/address-update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.update
-);
+// addressRoutes.put(
+//   "/address-update/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     userTypes: ["business", "employee"],
+//   }),
+//   PermissionMiddleware.requireResourceOwnership("address", "id"),
+//   AddressController.update
+// );
 
-addressRoutes.delete(
-  "/address-delete/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  AddressController.destroy
-);
+// addressRoutes.delete(
+//   "/address-delete/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     userTypes: ["business", "employee"],
+//   }),
+//   PermissionMiddleware.requireResourceOwnership("address", "id"),
+//   AddressController.destroy
+// );
 
-// ===================== STATE ROUTES =====================
+// // ===================== STATE ROUTES =====================
 
-// State list (Public)
-addressRoutes.get("/state-list", StateController.index);
+// // State list (Public)
+// addressRoutes.get("/state-list", StateController.index);
 
-// State management (ADMIN only)
-addressRoutes.post(
-  "/state-store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  StateController.store
-);
+// // State management (ADMIN with permissions only)
+// addressRoutes.post(
+//   "/state-store",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.STATE_MANAGEMENT.STATE_CREATE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.STATE_MANAGEMENT.STATE_CREATE
+//   ),
+//   StateController.store
+// );
 
-addressRoutes.put(
-  "/state-update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  StateController.update
-);
+// addressRoutes.put(
+//   "/state-update/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.STATE_MANAGEMENT.STATE_UPDATE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.STATE_MANAGEMENT.STATE_UPDATE
+//   ),
+//   StateController.update
+// );
 
-addressRoutes.delete(
-  "/state-delete/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  StateController.destroy
-);
+// addressRoutes.delete(
+//   "/state-delete/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.STATE_MANAGEMENT.STATE_DELETE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.STATE_MANAGEMENT.STATE_DELETE
+//   ),
+//   StateController.destroy
+// );
 
-// ===================== CITY ROUTES =====================
+// // ===================== CITY ROUTES =====================
 
-// City list (Public)
-addressRoutes.get("/city-list", CityController.index);
+// // City list (Public)
+// addressRoutes.get("/city-list", CityController.index);
 
-// City management (ADMIN only)
-addressRoutes.post(
-  "/city-store",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  CityController.store
-);
+// // City management (ADMIN with permissions only)
+// addressRoutes.post(
+//   "/city-store",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.CITY_MANAGEMENT.CITY_CREATE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.CITY_MANAGEMENT.CITY_CREATE
+//   ),
+//   CityController.store
+// );
 
-addressRoutes.put(
-  "/city-update/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  CityController.update
-);
+// addressRoutes.put(
+//   "/city-update/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.CITY_MANAGEMENT.CITY_UPDATE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.CITY_MANAGEMENT.CITY_UPDATE
+//   ),
+//   CityController.update
+// );
 
-addressRoutes.delete(
-  "/city-delete/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  CityController.destroy
-);
+// addressRoutes.delete(
+//   "/city-delete/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.CITY_MANAGEMENT.CITY_DELETE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.CITY_MANAGEMENT.CITY_DELETE
+//   ),
+//   CityController.destroy
+// );
 
-export default addressRoutes;
+// export default addressRoutes;

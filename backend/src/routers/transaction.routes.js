@@ -1,54 +1,84 @@
-import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
-import { TransactionValidationSchemas } from "../validations/transactionValidation.schemas.js";
-import { TransactionController } from "../controllers/transaction.controller.js";
-import idempotencyMiddleware from "../middlewares/idempotency.middleware.js";
+// import { Router } from "express";
+// import AuthMiddleware from "../middlewares/auth.middleware.js";
+// import PermissionMiddleware from "../middlewares/permission.middleware.js";
+// import PermissionRegistry from "../utils/permissionRegistry.js";
+// import { validateRequest } from "../middlewares/validateRequest.js";
+// import { TransactionValidationSchemas } from "../validations/transactionValidation.schemas.js";
+// import { TransactionController } from "../controllers/transaction.controller.js";
+// import idempotencyMiddleware from "../middlewares/idempotency.middleware.js";
 
-const transactionRoutes = Router();
+// const transactionRoutes = Router();
 
-// Create transaction with idempotency (Business users only)
-transactionRoutes.post(
-  "/",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["business", "employee"]),
-  idempotencyMiddleware({ required: true }),
-  validateRequest(TransactionValidationSchemas.createTransactionSchema),
-  TransactionController.createTransaction
-);
+// // Create transaction with idempotency
+// transactionRoutes.post(
+//   "/",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_CREATE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_CREATE
+//   ),
+//   idempotencyMiddleware({ required: true }),
+//   validateRequest(TransactionValidationSchemas.createTransactionSchema),
+//   TransactionController.createTransaction
+// );
 
-// Refund transaction (ADMIN only)
-transactionRoutes.post(
-  "/refund",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
-  validateRequest(TransactionValidationSchemas.refundTransactionSchema),
-  TransactionController.refundTransaction
-);
+// // Refund transaction (ADMIN with permissions)
+// transactionRoutes.post(
+//   "/refund",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.REFUND_MANAGEMENT.REFUND_PROCESS],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.REFUND_MANAGEMENT.REFUND_PROCESS
+//   ),
+//   validateRequest(TransactionValidationSchemas.refundTransactionSchema),
+//   TransactionController.refundTransaction
+// );
 
-// Get transactions (with query params) - Business users see their own, ADMIN sees all
-transactionRoutes.get(
-  "/",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "business", "employee"]),
-  TransactionController.getTransactions
-);
+// // Get transactions
+// transactionRoutes.get(
+//   "/",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_VIEW],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_VIEW
+//   ),
+//   TransactionController.getTransactions
+// );
 
-// Get transaction by ID - Business users see their own, ADMIN sees all
-transactionRoutes.get(
-  "/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "business", "employee"]),
-  TransactionController.getTransactionById
-);
+// // Get transaction by ID
+// transactionRoutes.get(
+//   "/:id",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_VIEW],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_VIEW
+//   ),
+//   PermissionMiddleware.requireResourceOwnership("transaction", "id"),
+//   TransactionController.getTransactionById
+// );
 
-// Update transaction status (ADMIN only)
-transactionRoutes.patch(
-  "/status",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN"]),
-  validateRequest(TransactionValidationSchemas.updateTransactionStatusSchema),
-  TransactionController.updateTransactionStatus
-);
+// // Update transaction status (ADMIN with permissions)
+// transactionRoutes.patch(
+//   "/status",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [
+//       PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_PROCESS,
+//     ],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.TRANSACTION_MANAGEMENT.TRANSACTION_PROCESS
+//   ),
+//   validateRequest(TransactionValidationSchemas.updateTransactionStatusSchema),
+//   TransactionController.updateTransactionStatus
+// );
 
-export default transactionRoutes;
+// export default transactionRoutes;
