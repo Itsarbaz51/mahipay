@@ -183,9 +183,11 @@ class RootAuthService extends BaseAuthService {
     });
 
     if (!user) {
-      // Don't reveal whether user exists for security
       await this.createAuthAuditLog(
-        { id: null, userType: "ROOT" },
+        {
+          id: null,
+          userType: "ROOT",
+        },
         "PASSWORD_RESET_REQUEST_FAILED",
         req,
         { reason: "USER_NOT_FOUND", email }
@@ -209,9 +211,17 @@ class RootAuthService extends BaseAuthService {
 
     await this.sendPasswordResetEmail(user, token, "root");
 
-    await this.createAuthAuditLog(user, "PASSWORD_RESET_REQUESTED", req, {
-      email,
-    });
+    await this.createAuthAuditLog(
+      {
+        ...user.toJSON(),
+        userType: "ROOT",
+      },
+      "PASSWORD_RESET_REQUESTED",
+      req,
+      {
+        email,
+      }
+    );
 
     return {
       message:

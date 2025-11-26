@@ -304,11 +304,11 @@ class EmailTemplates {
       resetUrl,
       expiryMinutes = 2,
       supportEmail = null,
-      userType = "user", // 'employee' or 'business'
+      userType, // 'employee' or 'business' "root"
       customMessage = null,
     } = options;
 
-    const formattedFirstName = this.formatName(firstiName);
+    const formattedFirstName = this.formatName(firstName);
     const expiryTime = `${expiryMinutes} minute${expiryMinutes !== 1 ? "s" : ""}`;
 
     const headerColor =

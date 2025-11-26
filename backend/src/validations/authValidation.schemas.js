@@ -30,6 +30,7 @@ class AuthValidationSchemas {
 
   static get forgotPassword() {
     return z.object({
+      userType: RoleEnums,
       email: z
         .string()
         .email("Invalid email address")

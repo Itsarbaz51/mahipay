@@ -53,6 +53,7 @@ authRoutes.get(
 authRoutes.put(
   "/profile",
   AuthMiddleware.authenticate,
+  AuthMiddleware.requireUser,
   PermissionMiddleware.requirePermission(
     PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[2]
   ),

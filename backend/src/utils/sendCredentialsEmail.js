@@ -56,7 +56,7 @@ export async function sendCredentialsEmail(
 export async function sendPasswordResetEmail(
   user,
   resetUrl,
-  userType = "business",
+  userType,
   customMessage = null
 ) {
   try {

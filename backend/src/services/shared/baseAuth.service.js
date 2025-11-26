@@ -1,6 +1,8 @@
+import EmailTemplates from "../../emaiTemplates/EmailTemplates.js";
 import models from "../../models/index.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { CryptoService } from "../../utils/cryptoService.js";
+import { sendPasswordResetEmail } from "../../utils/sendCredentialsEmail.js";
 import AuditService from "../audit.service.js";
 
 class BaseAuthService {
@@ -119,7 +121,7 @@ class BaseAuthService {
   static generatePasswordResetToken() {
     const token = CryptoService.generateSecureToken(32);
     const tokenHash = CryptoService.hashData(token);
-    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const expires = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
 
     return { token, tokenHash, expires };
   }
@@ -128,11 +130,7 @@ class BaseAuthService {
     const encryptedToken = CryptoService.encrypt(token);
     const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${encodeURIComponent(encryptedToken)}&type=${userType}`;
 
-    // Implementation depends on your email service
-    console.log(`Password reset email sent to ${user.email}: ${resetUrl}`);
-
-    // In a real implementation, you would use your email service here
-    // await EmailService.sendPasswordReset(user.email, resetUrl, userType);
+    await sendPasswordResetEmail(user, resetUrl, userType);
   }
 
   static async validatePasswordResetToken(tokenHash, model) {

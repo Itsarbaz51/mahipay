@@ -45,6 +45,7 @@ export class CryptoService {
     try {
       if (!encryptedText) return encryptedText;
 
+      
       const parts = encryptedText.split(":");
       if (parts.length !== 3) {
         throw new Error("Invalid encrypted text format");
