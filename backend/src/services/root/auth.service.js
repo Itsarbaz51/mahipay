@@ -3,7 +3,6 @@ import { ApiError } from "../../utils/ApiError.js";
 import Helper from "../../utils/helper.js";
 import { CryptoService } from "../../utils/cryptoService.js";
 import BaseAuthService from "../shared/baseAuth.service.js";
-import { includes } from "zod";
 
 class RootAuthService extends BaseAuthService {
   static async login(payload, req = null) {

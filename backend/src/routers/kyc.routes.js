@@ -15,7 +15,7 @@ import PermissionMiddleware from "../middlewares/permission.middleware.js";
 import PermissionRegistry from "../utils/permissionRegistry.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
-const kycRoutes = Router();
+// const kycRoutes = Router();
 
 // Apply authentication to all KYC routes
 kycRoutes.use(AuthMiddleware.authenticate);
@@ -91,4 +91,4 @@ kycRoutes.post(
   KycController.verifyKyc
 );
 
-export default kycRoutes;
+// export default kycRoutes;

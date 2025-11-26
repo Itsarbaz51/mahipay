@@ -10,7 +10,7 @@ import {
 import AuthMiddleware from "../middlewares/auth.middleware.js";
 import checkServiceMiddleware from "../middlewares/checkServiceMiddleware.js";
 
-const serviceRoutes = Router();
+// const serviceRoutes = Router();
 
 // Apply authentication to all service routes
 serviceRoutes.use(AuthMiddleware.authenticate);
@@ -47,4 +47,4 @@ serviceRoutes.get(
   ServiceProviderController.getServices
 );
 
-export default serviceRoutes;
+// export default serviceRoutes;

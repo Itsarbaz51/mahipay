@@ -12,7 +12,7 @@ import AuthMiddleware from "../middlewares/auth.middleware.js";
 import PermissionMiddleware from "../middlewares/permission.middleware.js";
 import PermissionRegistry from "../utils/permissionRegistry.js";
 
-const addressRoutes = Router();
+// const addressRoutes = Router();
 
 // Apply authentication to all address routes
 addressRoutes.use(AuthMiddleware.authenticate);
@@ -64,4 +64,4 @@ addressRoutes.delete(
   AddressController.deleteAddress
 );
 
-export default addressRoutes;
+// export default addressRoutes;

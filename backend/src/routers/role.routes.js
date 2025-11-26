@@ -10,7 +10,7 @@ import AuthMiddleware from "../middlewares/auth.middleware.js";
 import PermissionMiddleware from "../middlewares/permission.middleware.js";
 import PermissionRegistry from "../utils/permissionRegistry.js";
 
-const roleRoutes = Router();
+// const roleRoutes = Router();
 
 // Apply authentication to all role routes
 roleRoutes.use(AuthMiddleware.authenticate);
@@ -49,4 +49,4 @@ roleRoutes.delete(
   RoleController.deleteRole
 );
 
-export default roleRoutes;
+// export default roleRoutes;

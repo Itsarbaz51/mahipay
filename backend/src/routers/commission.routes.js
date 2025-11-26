@@ -1,59 +1,83 @@
-import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
-import CommissionValidationSchemas from "../validations/commissionValidation.schemas.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
-import {
-  CommissionEarningController,
-  CommissionSettingController,
-} from "../controllers/commission.controller.js";
+// import { Router } from "express";
+// import AuthMiddleware from "../middlewares/auth.middleware.js";
+// import PermissionMiddleware from "../middlewares/permission.middleware.js";
+// import PermissionRegistry from "../utils/permissionRegistry.js";
+// import CommissionValidationSchemas from "../validations/commissionValidation.schemas.js";
+// import { validateRequest } from "../middlewares/validateRequest.js";
+// import {
+//   CommissionEarningController,
+//   CommissionSettingController,
+// } from "../controllers/commission.controller.js";
 
-const commissionRoutes = Router();
+// const commissionRoutes = Router();
 
-// Get commission settings by role or user (ADMIN only)
-commissionRoutes.get(
-  "/setting",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
+// // Get commission settings by role or user (ADMIN with permissions)
+// commissionRoutes.get(
+//   "/setting",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [
+//       PermissionRegistry.COMMISSION_SETTINGS.COMMISSION_SETTING_VIEW,
+//     ],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.COMMISSION_SETTINGS.COMMISSION_SETTING_VIEW
+//   ),
+//   CommissionSettingController.getByRoleOrUser
+// );
 
-  CommissionSettingController.getByRoleOrUser
-);
+// // Get commission settings created by current user
+// commissionRoutes.get(
+//   "/setting/created-by-me",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     userTypes: ["business", "employee"],
+//   }),
+//   CommissionSettingController.getAll
+// );
 
-// Get commission settings created by current user (Business users)
-commissionRoutes.get(
-  "/setting/created-by-me",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["business", "employee"]),
-  CommissionSettingController.getAll
-);
+// // Create or update commission setting (ADMIN with permissions)
+// commissionRoutes.post(
+//   "/setting",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [
+//       PermissionRegistry.COMMISSION_SETTINGS.COMMISSION_SETTING_MANAGE,
+//     ],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.COMMISSION_SETTINGS.COMMISSION_SETTING_MANAGE
+//   ),
+//   validateRequest(
+//     CommissionValidationSchemas.createOrUpdateCommissionSettingSchema
+//   ),
+//   CommissionSettingController.createOrUpdate
+// );
 
-// Create or update commission setting (ADMIN only)
-commissionRoutes.post(
-  "/setting",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
+// // Commission Earning Routes (ADMIN with permissions)
+// commissionRoutes.post(
+//   "/earn",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.COMMISSION_EARNING.COMMISSION_CALCULATE],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.COMMISSION_EARNING.COMMISSION_CALCULATE
+//   ),
+//   validateRequest(CommissionValidationSchemas.createCommissionEarningSchema),
+//   CommissionEarningController.create
+// );
 
-  validateRequest(
-    CommissionValidationSchemas.createOrUpdateCommissionSettingSchema
-  ),
-  CommissionSettingController.createOrUpdate
-);
+// commissionRoutes.get(
+//   "/earnings",
+//   AuthMiddleware.authenticate,
+//   AuthMiddleware.authorize({
+//     permissions: [PermissionRegistry.COMMISSION_EARNING.COMMISSION_VIEW],
+//   }),
+//   PermissionMiddleware.canActOnBehalfOfCreator(
+//     PermissionRegistry.COMMISSION_EARNING.COMMISSION_VIEW
+//   ),
+//   CommissionEarningController.getAll
+// );
 
-// Commission Earning Routes (ADMIN only)
-commissionRoutes.post(
-  "/earn",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-
-  validateRequest(CommissionValidationSchemas.createCommissionEarningSchema),
-  CommissionEarningController.create
-);
-
-commissionRoutes.get(
-  "/earnings",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-
-  CommissionEarningController.getAll
-);
-
-export default commissionRoutes;
+// export default commissionRoutes;
