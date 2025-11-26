@@ -19,7 +19,7 @@ class AuthMiddleware {
       const user = await this.findUserWithContext(decoded.id, decoded.userType);
 
       if (!user) {
-        throw ApiError.unauthorized("Invalid token");
+        throw ApiError.unauthorized("User not found");
       }
 
       if (user.status !== "ACTIVE") {
