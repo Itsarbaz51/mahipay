@@ -1,17 +1,17 @@
-import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
-import LoginLogController from "../controllers/loginLog.controller.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
-import LoginLogsValidationSchemas from "../validations/loginLogValidation.schemas.js";
+// import { Router } from "express";
+// import AuthMiddleware from "../middlewares/auth.middleware.js";
+// import LoginLogController from "../controllers/loginLog.controller.js";
+// import { validateRequest } from "../middlewares/validateRequest.js";
+// import LoginLogsValidationSchemas from "../validations/loginLogValidation.schemas.js";
 
-const loginLogRoutes = Router();
+// const loginLogRoutes = Router();
 
-loginLogRoutes.post(
-  "/",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["business", "employee"]),
-  validateRequest(LoginLogsValidationSchemas.ListLoginLogsSchema),
-  LoginLogController.index
-);
+// loginLogRoutes.post(
+//   "/",
+//   AuthMiddleware.isAuthenticated,
+//   AuthMiddleware.authorize(["business", "employee"]),
+//   validateRequest(LoginLogsValidationSchemas.ListLoginLogsSchema),
+//   LoginLogController.index
+// );
 
-export default loginLogRoutes;
+// export default loginLogRoutes;

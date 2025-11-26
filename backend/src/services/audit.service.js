@@ -23,9 +23,9 @@ class AuditService {
       const auditLog = await models.AuditLog.create({
         action,
         entity,
-        entityId: entityId.toString(),
+        entityId: entityId ? entityId.toString() : null,
         performedByType,
-        performedById,
+        performedById: performedById ?? null,
         targetUserType,
         targetUserId,
         oldValues,

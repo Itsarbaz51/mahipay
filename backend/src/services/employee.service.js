@@ -1,38 +1,15 @@
-import Prisma from "../db/db.js";
+import models from "../models/index.js";
 import { ApiError } from "../utils/ApiError.js";
 import { CryptoService } from "../utils/cryptoService.js";
 import Helper from "../utils/helper.js";
 import S3Service from "../utils/S3Service.js";
 import { sendCredentialsEmail } from "../utils/sendCredentialsEmail.js";
-import AuditLogService from "./auditLog.service.js";
+import AuditService from "./audit.service.js";
+import PermissionRegistry from "../utils/PermissionRegistry.js";
 
 class EmployeeServices {
-  // COMMON USER SELECT FIELDS (DRY Principle)
-  static roleSelectFields = {
-    id: true,
-    name: true,
-    level: true,
-    description: true,
-    type: true,
-  };
-
-  static userSelectFields = {
-    id: true,
-    username: true,
-    firstName: true,
-    lastName: true,
-    email: true,
-    phoneNumber: true,
-    profileImage: true,
-    status: true,
-    hierarchyLevel: true,
-    hierarchyPath: true,
-    createdAt: true,
-    updatedAt: true,
-  };
-
   // EMPLOYEE REGISTRATION
-  static async register(payload, req = null, res = null) {
+  static async register(payload, req = null) {
     const {
       username,
       firstName,
@@ -40,17 +17,14 @@ class EmployeeServices {
       profileImage,
       email,
       phoneNumber,
-      roleId,
-      parentId,
+      departmentId,
       permissions = [],
+      parentId,
     } = payload;
 
     try {
-      // Validate role
-      const role = await this.validateEmployeeRole(roleId);
-
-      // Check existing user
-      await this.checkExistingUser({ email, phoneNumber, username });
+      // Check existing employee
+      await this.checkExistingEmployee({ email, phoneNumber, username });
 
       const generatedPassword = Helper.generatePassword();
       const hashedPassword = CryptoService.encrypt(generatedPassword);
@@ -65,828 +39,281 @@ class EmployeeServices {
       const formattedFirstName = this.formatName(firstName);
       const formattedLastName = this.formatName(lastName);
 
-      // Create user
-      const user = await Prisma.user.create({
-        data: {
-          username,
-          firstName: formattedFirstName,
-          lastName: formattedLastName,
-          profileImage: profileImageUrl,
-          email: email.toLowerCase(),
-          phoneNumber,
-          password: hashedPassword,
-          roleId,
-          parentId,
-          hierarchyLevel,
-          hierarchyPath,
-          status: "ACTIVE",
-          deactivationReason: null,
-          isKycVerified: true,
-          emailVerifiedAt: new Date(),
-        },
-        include: {
-          role: { select: this.roleSelectFields },
-          parent: { select: this.userSelectFields },
-        },
+      // Create employee
+      const employee = await models.Employee.create({
+        username,
+        firstName: formattedFirstName,
+        lastName: formattedLastName,
+        profileImage: profileImageUrl,
+        email: email.toLowerCase(),
+        phoneNumber,
+        password: hashedPassword,
+        departmentId,
+        hierarchyLevel,
+        hierarchyPath,
+        status: "ACTIVE",
+        createdByType: "ADMIN",
+        createdById: parentId,
       });
 
       // Assign permissions
       if (permissions.length > 0) {
-        await this.updateEmployeePermissions(
-          user.id,
+        await this.assignEmployeePermissions(
+          employee.id,
           permissions,
-          parentId,
-          "EMPLOYEE_PERMISSIONS_ASSIGNED"
+          parentId
         );
       }
 
       // Send credentials
-      await this.sendEmployeeCredentials(user, generatedPassword, permissions);
+      await this.sendEmployeeCredentials(
+        employee,
+        generatedPassword,
+        permissions
+      );
 
       // Generate access token
       const accessToken = Helper.generateAccessToken({
-        id: user.id,
-        email: user.email,
-        role: user.role.name,
-        roleLevel: user.role.level,
+        id: employee.id,
+        email: employee.email,
+        userType: "employee",
         permissions: permissions,
       });
 
-      // Get current user role for audit log
-      const currentUser = await Prisma.user.findUnique({
-        where: { id: parentId },
-        include: { role: true },
-      });
-
-      // Audit log
-      await AuditLogService.createAuditLog({
-        userId: parentId,
+      await AuditService.createLog({
         action: "EMPLOYEE_CREATED",
-        entityType: "EMPLOYEE",
-        entityId: user.id,
-        ipAddress: req ? Helper.getClientIP(req) : null,
+        entity: "EMPLOYEE",
+        entityId: employee.id,
+        performedById: parentId,
+        performedByType: "USER",
+        description: "Employee created successfully",
         metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          employeeEmail: user.email,
-          employeeRole: user.role.name,
+          employeeEmail: employee.email,
           permissionsCount: permissions.length,
-          roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-          roleType: currentUser?.role?.type,
           createdBy: parentId,
         },
       });
 
-      return { user, accessToken };
+      return { user: employee, accessToken };
     } catch (error) {
       console.error("Employee registration error:", error);
+
       if (error instanceof ApiError) throw error;
+
+      await AuditService.createLog({
+        action: "EMPLOYEE_CREATION_FAILED",
+        entity: "EMPLOYEE",
+        performedById: parentId,
+        performedByType: "USER",
+        description: "Employee creation failed",
+        metadata: {
+          reason: "UNKNOWN_ERROR",
+          error: error.message,
+        },
+      });
+
       throw ApiError.internal("Failed to create employee");
     } finally {
       if (profileImage) Helper.deleteOldImage(profileImage);
     }
   }
 
-  // UNIFIED EMPLOYEE PERMISSIONS MANAGEMENT
-  static async updateEmployeePermissions(
-    employeeId,
-    permissions,
-    adminId,
-    req,
-    res
-  ) {
-    // Validate employee exists
-    const employee = await Prisma.user.findUnique({
-      where: { id: employeeId },
-      select: { id: true, email: true },
-    });
-
+  // UPDATE EMPLOYEE PERMISSIONS
+  static async updateEmployeePermissions(employeeId, permissions, adminId) {
+    const employee = await models.Employee.findByPk(employeeId);
     if (!employee) {
-      await AuditLogService.createAuditLog({
-        userId: adminId,
-        action: "EMPLOYEE_PERMISSIONS_UPDATE_FAILED",
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "EMPLOYEE_NOT_FOUND",
-          roleName: req?.user?.roleres,
-          updatedBy: adminId,
-        },
-      });
       throw ApiError.notFound("Employee not found");
     }
 
     if (!Array.isArray(permissions)) {
-      await AuditLogService.createAuditLog({
-        userId: adminId,
-        action: "EMPLOYEE_PERMISSIONS_UPDATE_FAILED",
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "INVALID_PERMISSIONS_FORMAT",
-          roleName: req?.user?.roleres,
-          updatedBy: adminId,
-        },
-      });
       throw ApiError.badRequest("Permissions must be an array");
     }
 
-    // Trim and normalize permissions
-    const normalizedPermissions = permissions.map((p) => p.trim());
-    const newPermissionSet = new Set(normalizedPermissions);
+    // Validate permissions
+    const invalidPermissions = permissions.filter(
+      (p) => !PermissionRegistry.isValid(p)
+    );
+    if (invalidPermissions.length > 0) {
+      throw ApiError.badRequest(
+        `Invalid permissions: ${invalidPermissions.join(", ")}`
+      );
+    }
 
-    // Get ALL permissions (both active and inactive) for this employee
-    const allPermissions = await Prisma.employeePermission.findMany({
-      where: { userId: employeeId },
+    // Get current permissions
+    const currentPermissions = await models.EmployeePermission.findAll({
+      where: { employeeId, isActive: true },
     });
 
-    const currentActivePermissions = allPermissions.filter((p) => p.isActive);
-    const currentInactivePermissions = allPermissions.filter(
-      (p) => !p.isActive
+    const currentPermissionSet = new Set(
+      currentPermissions.map((p) => p.permission)
     );
+    const newPermissionSet = new Set(permissions);
 
-    // Identify permissions to ACTIVATE (previously inactive, now in new set)
-    const permissionsToActivate = currentInactivePermissions
-      .filter((p) => newPermissionSet.has(p.permission))
-      .map((p) => p.permission);
-
-    // Identify permissions to DEACTIVATE (currently active, not in new set)
-    const permissionsToDeactivate = currentActivePermissions
+    // Identify changes
+    const permissionsToAdd = permissions.filter(
+      (p) => !currentPermissionSet.has(p)
+    );
+    const permissionsToRemove = currentPermissions
       .filter((p) => !newPermissionSet.has(p.permission))
       .map((p) => p.permission);
 
-    // Identify permissions to CREATE (completely new permissions)
-    const existingPermissionSet = new Set(
-      allPermissions.map((p) => p.permission)
-    );
-    const permissionsToCreate = normalizedPermissions.filter(
-      (permission) => !existingPermissionSet.has(permission)
-    );
+    // Use transaction
+    const transaction = await models.sequelize.transaction();
 
-    // Use transaction for atomic operations
-    await Prisma.$transaction(async (tx) => {
-      // Activate previously inactive permissions
-      if (permissionsToActivate.length > 0) {
-        await tx.employeePermission.updateMany({
-          where: {
-            userId: employeeId,
-            permission: { in: permissionsToActivate },
-          },
-          data: {
-            isActive: true,
-            assignedBy: adminId,
-            assignedAt: new Date(),
-            revokedAt: null,
-          },
+    try {
+      // Deactivate removed permissions
+      if (permissionsToRemove.length > 0) {
+        await models.EmployeePermission.update(
+          { isActive: false, revokedAt: new Date() },
+          {
+            where: {
+              employeeId,
+              permission: permissionsToRemove,
+            },
+            transaction,
+          }
+        );
+      }
+
+      // Add new permissions
+      if (permissionsToAdd.length > 0) {
+        const permissionRecords = permissionsToAdd.map((permission) => ({
+          employeeId,
+          permission,
+          createdByType: "ADMIN",
+          createdById: adminId,
+          isActive: true,
+          assignedAt: new Date(),
+        }));
+
+        await models.EmployeePermission.bulkCreate(permissionRecords, {
+          transaction,
         });
       }
 
-      // Deactivate permissions that are no longer in the set
-      if (permissionsToDeactivate.length > 0) {
-        await tx.employeePermission.updateMany({
-          where: {
-            userId: employeeId,
-            permission: { in: permissionsToDeactivate },
-          },
-          data: {
-            isActive: false,
-            revokedAt: new Date(),
-          },
-        });
-      }
+      await transaction.commit();
 
-      // Create completely new permissions
-      if (permissionsToCreate.length > 0) {
-        await tx.employeePermission.createMany({
-          data: permissionsToCreate.map((permission) => ({
-            userId: employeeId,
-            permission: permission,
-            assignedBy: adminId,
-            assignedAt: new Date(),
-            isActive: true,
-          })),
-          skipDuplicates: true,
-        });
-      }
-    });
+      await AuditService.createLog({
+        action: "EMPLOYEE_PERMISSIONS_UPDATED",
+        entity: "EMPLOYEE",
+        entityId: employeeId,
+        performedById: adminId,
+        performedByType: "USER",
+        description: "Employee permissions updated",
+        metadata: {
+          added: permissionsToAdd,
+          removed: permissionsToRemove,
+          finalPermissions: permissions,
+          totalPermissions: permissions.length,
+        },
+      });
 
-    // Create audit log
-    await AuditLogService.createAuditLog({
-      userId: adminId,
-      action: "EMPLOYEE_PERMISSIONS_UPDATED",
-      entityType: "EMPLOYEE",
-      entityId: employeeId,
-      ipAddress: req ? Helper.getClientIP(req) : null,
-      metadata: {
-        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-        employeeEmail: employee.email,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        activated: permissionsToActivate,
-        deactivated: permissionsToDeactivate,
-        created: permissionsToCreate,
-        finalPermissions: normalizedPermissions,
-        totalPermissions: normalizedPermissions.length,
-        roleName: req?.user?.role,
-        updatedBy: adminId,
-      },
-    });
-
-    // Get updated permissions for response
-    const updatedPermissions = await this.getEmployeePermissions(employeeId);
-
-    return {
-      success: true,
-      employeeId,
-      employeeEmail: employee.email,
-      activated: permissionsToActivate,
-      deactivated: permissionsToDeactivate,
-      created: permissionsToCreate,
-      permissions: updatedPermissions,
-      totalPermissions: updatedPermissions.length,
-      message: `Permissions updated successfully. Activated: ${permissionsToActivate.length}, Deactivated: ${permissionsToDeactivate.length}, Created: ${permissionsToCreate.length}`,
-    };
+      return {
+        success: true,
+        employeeId,
+        added: permissionsToAdd,
+        removed: permissionsToRemove,
+        permissions,
+        totalPermissions: permissions.length,
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
   }
 
   // GET EMPLOYEE PERMISSIONS
   static async getEmployeePermissions(employeeId) {
-    try {
-      const permissions = await Prisma.employeePermission.findMany({
-        where: {
-          userId: employeeId,
-          isActive: true,
-        },
-        select: {
-          permission: true,
-          assignedAt: true,
-          assigner: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-        orderBy: { assignedAt: "desc" },
-      });
+    const permissions = await models.EmployeePermission.findAll({
+      where: { employeeId, isActive: true },
+      attributes: ["permission"],
+    });
 
-      return permissions.map((p) => p.permission);
-    } catch (error) {
-      console.error("Error fetching employee permissions:", error);
-      return [];
-    }
+    return permissions.map((p) => p.permission);
   }
 
   // EMPLOYEE PROFILE UPDATE
-  static async updateProfile(userId, updateData, currentUserId) {
-    // Remove req, res parameters
-    const { username, phoneNumber, firstName, lastName, email, roleId } =
-      updateData;
+  static async updateProfile(employeeId, updateData, currentUserId) {
+    const { username, phoneNumber, firstName, lastName, email } = updateData;
 
-    const [currentUser, userToUpdate] = await Promise.all([
-      Prisma.user.findUnique({
-        where: { id: currentUserId },
-        include: { role: { select: this.roleSelectFields } },
-      }),
-      Prisma.user.findUnique({
-        where: { id: userId },
-        include: { role: { select: this.roleSelectFields } },
-      }),
+    const [currentUser, employee] = await Promise.all([
+      models.User.findByPk(currentUserId),
+      models.Employee.findByPk(employeeId),
     ]);
 
-    if (!currentUser) {
-      throw ApiError.unauthorized("Current user not found");
-    }
-
-    if (!userToUpdate) {
-      throw ApiError.notFound("Employee not found");
-    }
-
-    if (userToUpdate.role.type !== "employee") {
-      throw ApiError.badRequest("Can only update employees");
-    }
-
-    // Authorization check - ADMIN aur employee dono update kar sakte hain
-    const isAdmin = currentUser.role.name === "ADMIN";
-    const isEmployee = currentUser.role.type === "employee";
-
-    // ADMIN aur employee dono ko full access hai kisi bhi employee ka profile update karne ka
-    if (!isAdmin && !isEmployee) {
-      const canUpdate = await this.checkPermission(
-        currentUserId,
-        "UPDATE_EMPLOYEE"
-      );
-      if (!canUpdate) {
-        throw ApiError.forbidden(
-          "You don't have permission to update employee profiles"
-        );
-      }
+    if (!currentUser || !employee) {
+      throw ApiError.notFound("User not found");
     }
 
     // Check unique constraints
-    await this.checkUniqueConstraints(userId, { username, phoneNumber, email });
-
-    const updatePayload = this.buildUpdatePayload(
-      {
-        username,
-        firstName,
-        lastName,
-        phoneNumber,
-        email,
-        roleId,
-      },
-      isAdmin // Only admin can change role
-    );
-
-    const updatedUser = await Prisma.user.update({
-      where: { id: userId },
-      data: updatePayload,
-      include: {
-        role: { select: this.roleSelectFields },
-        parent: { select: this.userSelectFields },
-      },
+    await this.checkUniqueConstraints(employeeId, {
+      username,
+      phoneNumber,
+      email,
     });
 
-    // Handle email change
-    if (email && email !== userToUpdate.email) {
-      await this.regenerateCredentialsAndNotify(userId, email);
+    const updatePayload = {};
+    const updatedFields = [];
+
+    if (username) {
+      updatePayload.username = username.trim();
+      updatedFields.push("username");
+    }
+    if (firstName) {
+      updatePayload.firstName = this.formatName(firstName);
+      updatedFields.push("firstName");
+    }
+    if (lastName) {
+      updatePayload.lastName = this.formatName(lastName);
+      updatedFields.push("lastName");
+    }
+    if (phoneNumber) {
+      updatePayload.phoneNumber = phoneNumber;
+      updatedFields.push("phoneNumber");
+    }
+    if (email) {
+      updatePayload.email = email.trim().toLowerCase();
+      updatedFields.push("email");
     }
 
-    // Simple audit log without req, res
-    await AuditLogService.createAuditLog({
-      userId: currentUserId,
+    const [_, [updatedEmployee]] = await models.Employee.update(updatePayload, {
+      where: { id: employeeId },
+      returning: true,
+    });
+
+    await AuditService.createLog({
       action: "EMPLOYEE_PROFILE_UPDATED",
-      entityType: "EMPLOYEE",
-      entityId: userId,
-      metadata: {
-        updatedFields: Object.keys(updateData),
-        emailChanged: !!email,
-        roleChanged: !!roleId,
-        roleName: currentUser.role.name,
-        roleType: currentUser.role.type,
-        isAdminAction: isAdmin,
-        isEmployeeAction: isEmployee,
-      },
+      entity: "EMPLOYEE",
+      entityId: employeeId,
+      performedById: currentUserId,
+      performedByType: "USER",
+      description: "Employee profile updated",
+      metadata: { updatedFields },
     });
 
-    return updatedUser;
-  }
-
-  static async updateProfileImage(
-    employeeId,
-    profileImagePath,
-    req = null,
-    res = null
-  ) {
-    try {
-      // Find employee with role information
-      const employee = await Prisma.user.findUnique({
-        where: { id: employeeId },
-        include: {
-          role: {
-            select: {
-              id: true,
-              name: true,
-              level: true,
-              description: true,
-              type: true,
-            },
-          },
-        },
-      });
-
-      if (!employee) {
-        await AuditLogService.createAuditLog({
-          userId: req?.user?.id,
-          action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
-          entityType: "EMPLOYEE",
-          entityId: employeeId,
-          ipAddress: req ? Helper.getClientIP(req) : null,
-          metadata: {
-            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "EMPLOYEE_NOT_FOUND",
-            roleName: req?.user?.role,
-            updatedBy: req?.user?.id,
-          },
-        });
-        throw ApiError.notFound("Employee not found");
-      }
-
-      // Ensure it's an employee user
-      if (employee.role.type !== "employee") {
-        await AuditLogService.createAuditLog({
-          userId: req?.user?.id,
-          action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
-          entityType: "EMPLOYEE",
-          entityId: employeeId,
-          ipAddress: req ? Helper.getClientIP(req) : null,
-          metadata: {
-            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "NON_EMPLOYEE_USER",
-            roleName: req?.user?.role,
-            updatedBy: req?.user?.id,
-          },
-        });
-        throw ApiError.badRequest("Can only update employee profile images");
-      }
-
-      // Get current user with role information
-      const currentUserId = req?.user?.id;
-      let currentUserRoleType = req?.user?.role?.type;
-      let currentUserRoleName = req?.user?.role?.name;
-
-      // If role info not in request, fetch from database
-      if (!currentUserRoleType || !currentUserRoleName) {
-        const currentUser = await Prisma.user.findUnique({
-          where: { id: currentUserId },
-          include: {
-            role: {
-              select: {
-                type: true,
-                name: true,
-              },
-            },
-          },
-        });
-        currentUserRoleType = currentUser?.role?.type;
-        currentUserRoleName = currentUser?.role?.name;
-      }
-
-      // Authorization check - ADMIN aur employee dono kisi bhi employee ka profile update kar sakte hain
-      const isAdmin = currentUserRoleName === "ADMIN";
-      const isEmployee = currentUserRoleType === "employee";
-      const isUpdatingOwnProfile = employeeId === currentUserId;
-
-      // ADMIN aur employee dono ko full access hai kisi bhi employee ka profile update karne ka
-      if (!isAdmin && !isEmployee) {
-        // Agar user na admin hai na employee, to check karo UPDATE_EMPLOYEE permission
-        const canUpdate = await this.checkPermission(
-          currentUserId,
-          "UPDATE_EMPLOYEE"
-        );
-        if (!canUpdate) {
-          await AuditLogService.createAuditLog({
-            userId: currentUserId,
-            action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
-            entityType: "EMPLOYEE",
-            entityId: employeeId,
-            ipAddress: req ? Helper.getClientIP(req) : null,
-            metadata: {
-              ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-              reason: "INSUFFICIENT_PERMISSIONS",
-              roleName: currentUserRoleName,
-              roleType: currentUserRoleType,
-              updatedBy: currentUserId,
-            },
-          });
-          throw ApiError.forbidden(
-            "You don't have permission to update employee profile images"
-          );
-        }
-      }
-
-      let oldImageDeleted = false;
-      // Delete old profile image if exists
-      if (employee.profileImage) {
-        try {
-          await S3Service.delete({ fileUrl: employee.profileImage });
-          oldImageDeleted = true;
-        } catch (error) {
-          console.error("Failed to delete old profile image", {
-            employeeId,
-            profileImage: employee.profileImage,
-            error,
-          });
-          // Continue with update even if old image deletion fails
-        }
-      }
-
-      // Upload new profile image
-      const profileImageUrl =
-        (await S3Service.upload(profileImagePath, "profile")) ?? "";
-
-      // Update employee profile image
-      const updatedEmployee = await Prisma.user.update({
-        where: { id: employeeId },
-        data: { profileImage: profileImageUrl },
-        include: {
-          role: {
-            select: { id: true, name: true, level: true, description: true },
-          },
-          parent: {
-            select: {
-              id: true,
-              username: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phoneNumber: true,
-              profileImage: true,
-            },
-          },
-          EmployeePermissionsOwned: {
-            where: { isActive: true },
-            select: { permission: true, assignedAt: true },
-          },
-        },
-      });
-
-      // Audit log for successful profile image update
-      await AuditLogService.createAuditLog({
-        userId: currentUserId,
-        action: "EMPLOYEE_PROFILE_IMAGE_UPDATED",
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          oldImageDeleted: oldImageDeleted,
-          isOwnProfile: isUpdatingOwnProfile,
-          roleName: currentUserRoleName,
-          roleType: currentUserRoleType,
-          updatedBy: currentUserId,
-          isAdminAction: isAdmin,
-          isEmployeeAction: isEmployee,
-        },
-      });
-
-      return updatedEmployee;
-    } catch (error) {
-      await AuditLogService.createAuditLog({
-        userId: req?.user?.id,
-        action: "EMPLOYEE_PROFILE_IMAGE_UPDATE_FAILED",
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: error.message,
-          roleName: req?.user?.role,
-          updatedBy: req?.user?.id,
-        },
-      });
-      console.error("Employee profile image update error:", error);
-      throw error;
-    } finally {
-      // Clean up temporary file
-      if (profileImagePath) {
-        Helper.deleteOldImage(profileImagePath);
-      }
-    }
-  }
-
-  // PERMANENTLY DELETE EMPLOYEE
-  static async deleteEmployee(
-    employeeId,
-    deletedBy,
-    reason = "No reason provided",
-    req = null,
-    res = null
-  ) {
-    try {
-      // Validate inputs
-      if (!employeeId) {
-        throw ApiError.badRequest("Employee ID is required");
-      }
-
-      if (!deletedBy) {
-        throw ApiError.unauthorized("Authentication required");
-      }
-
-      // Get employee and current user details
-      const [employee, currentUser] = await Promise.all([
-        Prisma.user.findUnique({
-          where: { id: employeeId },
-          include: {
-            role: true,
-            EmployeePermissionsOwned: true,
-          },
-        }),
-        Prisma.user.findUnique({
-          where: { id: deletedBy },
-          include: { role: true },
-        }),
-      ]);
-
-      // Validate employee exists
-      if (!employee) {
-        await AuditLogService.createAuditLog({
-          userId: deletedBy,
-          action: "EMPLOYEE_DELETION_FAILED",
-          entityType: "EMPLOYEE",
-          entityId: employeeId,
-          ipAddress: req ? Helper.getClientIP(req) : null,
-          metadata: {
-            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "EMPLOYEE_NOT_FOUND",
-            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-            deletedBy: deletedBy,
-          },
-        });
-        throw ApiError.notFound("Employee not found");
-      }
-
-      // Authorization check - ADMIN aur employee dono delete kar sakte hain
-      const isAdmin = currentUser?.role?.name === "ADMIN";
-      const isEmployee = currentUser?.role?.type === "employee";
-
-      // ADMIN aur employee dono ko full access hai employee delete karne ka
-      if (!isAdmin && !isEmployee) {
-        await AuditLogService.createAuditLog({
-          userId: deletedBy,
-          action: "EMPLOYEE_DELETION_FAILED",
-          entityType: "EMPLOYEE",
-          entityId: employeeId,
-          ipAddress: req ? Helper.getClientIP(req) : null,
-          metadata: {
-            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "INSUFFICIENT_PERMISSIONS",
-            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-            roleType: currentUser?.role?.type,
-            deletedBy: deletedBy,
-          },
-        });
-        throw ApiError.forbidden(
-          "Only administrators and employees can permanently delete employees"
-        );
-      }
-
-      // Ensure we're only deleting employees
-      if (employee.role.type !== "employee") {
-        await AuditLogService.createAuditLog({
-          userId: deletedBy,
-          action: "EMPLOYEE_DELETION_FAILED",
-          entityType: "EMPLOYEE",
-          entityId: employeeId,
-          ipAddress: req ? Helper.getClientIP(req) : null,
-          metadata: {
-            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "NON_EMPLOYEE_DELETION",
-            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-            deletedBy: deletedBy,
-          },
-        });
-        throw ApiError.badRequest("Can only delete employee accounts");
-      }
-
-      // Optional: Check if employee has any important relationships
-      // that might need to be handled before deletion
-      const hasSubordinates = await Prisma.user.findFirst({
-        where: { parentId: employeeId },
-      });
-
-      if (hasSubordinates) {
-        await AuditLogService.createAuditLog({
-          userId: deletedBy,
-          action: "EMPLOYEE_DELETION_FAILED",
-          entityType: "EMPLOYEE",
-          entityId: employeeId,
-          ipAddress: req ? Helper.getClientIP(req) : null,
-          metadata: {
-            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "EMPLOYEE_HAS_SUBORDINATES",
-            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-            deletedBy: deletedBy,
-          },
-        });
-        throw ApiError.conflict(
-          "Cannot delete employee who has subordinates. Please reassign subordinates first."
-        );
-      }
-
-      // Use transaction for atomic deletion
-      const result = await Prisma.$transaction(async (tx) => {
-        // 1. Delete all employee permissions
-        await tx.employeePermission.deleteMany({
-          where: { userId: employeeId },
-        });
-
-        // 2. Delete profile image from S3 if exists
-        if (employee.profileImage) {
-          try {
-            await S3Service.delete({ fileUrl: employee.profileImage });
-          } catch (s3Error) {
-            console.warn("Failed to delete profile image from S3:", s3Error);
-            // Continue with deletion even if S3 deletion fails
-          }
-        }
-
-        // 3. Permanently delete the employee
-        const deletedEmployee = await tx.user.delete({
-          where: { id: employeeId },
-          include: {
-            role: { select: this.roleSelectFields },
-          },
-        });
-
-        return deletedEmployee;
-      });
-
-      // Create audit log
-      await AuditLogService.createAuditLog({
-        userId: deletedBy,
-        action: "EMPLOYEE_PERMANENTLY_DELETED",
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          employeeEmail: employee.email,
-          employeeRole: employee.role.name,
-          deletionReason: reason,
-          roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-          roleType: currentUser?.role?.type,
-          deletedBy: deletedBy,
-          isAdminAction: isAdmin,
-          isEmployeeAction: isEmployee,
-        },
-      });
-      return {
-        success: true,
-        message: "Employee permanently deleted successfully",
-        deletedEmployee: {
-          id: result.id,
-          email: result.email,
-          username: result.username,
-          role: result.role.name,
-        },
-        deletionDetails: {
-          deletedBy: currentUser.id,
-          reason: reason,
-          timestamp: new Date(),
-          deletedByRole: currentUser.role.name,
-          deletedByRoleType: currentUser.role.type,
-        },
-      };
-    } catch (error) {
-      console.error("Employee deletion error:", error);
-
-      if (error instanceof ApiError) {
-        throw error;
-      }
-
-      // Handle Prisma errors
-      if (error.code === "P2025") {
-        await AuditLogService.createAuditLog({
-          userId: deletedBy,
-          action: "EMPLOYEE_DELETION_FAILED",
-          entityType: "EMPLOYEE",
-          entityId: employeeId,
-          ipAddress: req ? Helper.getClientIP(req) : null,
-          metadata: {
-            ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-            reason: "EMPLOYEE_NOT_FOUND_OR_ALREADY_DELETED",
-            roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-            deletedBy: deletedBy,
-          },
-        });
-        throw ApiError.notFound("Employee not found or already deleted");
-      }
-
-      await AuditLogService.createAuditLog({
-        userId: deletedBy,
-        action: "EMPLOYEE_DELETION_FAILED",
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "UNKNOWN_ERROR",
-          error: error.message,
-          roleName: currentUser?.role?.name, // Use currentUser instead of req.user
-          deletedBy: deletedBy,
-        },
-      });
-      throw ApiError.internal("Failed to delete employee permanently");
-    }
+    return updatedEmployee;
   }
 
   // GET EMPLOYEE BY ID
-  static async getEmployeeById(employeeId, currentUser) {
-    const user = await Prisma.user.findUnique({
-      where: { id: employeeId },
-      include: {
-        EmployeePermissionsOwned: {
+  static async getEmployeeById(employeeId, currentUser = null) {
+    const employee = await models.Employee.findByPk(employeeId, {
+      include: [
+        { model: models.Department, as: "department" },
+        {
+          model: models.EmployeePermission,
+          as: "employeePermissions",
           where: { isActive: true },
-          select: { permission: true, assignedAt: true },
+          required: false,
         },
-        role: { select: this.roleSelectFields },
-        parent: { select: this.userSelectFields },
-      },
+      ],
     });
 
-    if (!user) throw ApiError.notFound("Employee not found");
-    if (user.role.type !== "employee") {
-      throw ApiError.badRequest("User is not an employee");
-    }
+    if (!employee) throw ApiError.notFound("Employee not found");
 
-    return this.sanitizeUserData(user, currentUser);
+    return this.sanitizeEmployeeData(employee, currentUser);
   }
 
-  // GET ALL EMPLOYEES BY PARENT ID (FIXED - Only active permissions)
+  // GET ALL EMPLOYEES BY PARENT ID
   static async getAllEmployeesByParentId(parentId, options = {}) {
     const {
       page = 1,
@@ -896,198 +323,189 @@ class EmployeeServices {
       search = "",
     } = options;
 
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-    // Get parent user with role information
-    const parent = await Prisma.user.findUnique({
-      where: { id: parentId },
-      include: { role: true },
-    });
-
-    if (!parent) {
-      throw ApiError.notFound("Parent user not found");
-    }
-
-    let targetParentId = parentId;
-    let whereConditions = {
-      role: { type: "employee" },
-      deletedAt: null,
+    const whereConditions = {
+      createdById: parentId,
+      ...(status !== "ALL" ? { status } : {}),
     };
 
-    // If parent is employee, use admin's ID instead
-    if (parent.role?.type === "employee") {
-      const adminUser = await Prisma.user.findFirst({
-        where: {
-          role: {
-            name: "ADMIN",
-          },
-        },
-      });
-
-      if (!adminUser) {
-        throw new Error("Admin user not found");
-      }
-
-      targetParentId = adminUser.id;
-    }
-
-    // Build query based on user role
-    if (parent.role?.name === "ADMIN" || parent.role?.type === "employee") {
-      // For ADMIN and employee users, show all employees (no parent filter)
-      whereConditions = {
-        ...whereConditions,
-        // No parentId filter for admin and employee
-      };
-    } else {
-      // For other users, show only their children
-      whereConditions = {
-        ...whereConditions,
-        parentId: targetParentId,
-      };
-    }
-
-    // Add status filter
-    if (status !== "ALL") {
-      whereConditions.status = status;
-    }
-
-    // Add search filter
     if (search.trim()) {
       const searchTerm = `%${search.toLowerCase()}%`;
-      whereConditions.OR = [
-        { username: { contains: searchTerm, mode: "insensitive" } },
-        { firstName: { contains: searchTerm, mode: "insensitive" } },
-        { lastName: { contains: searchTerm, mode: "insensitive" } },
-        { email: { contains: searchTerm, mode: "insensitive" } },
-        { phoneNumber: { contains: searchTerm } },
+      whereConditions[models.Sequelize.Op.or] = [
+        { username: { [models.Sequelize.Op.iLike]: searchTerm } },
+        { firstName: { [models.Sequelize.Op.iLike]: searchTerm } },
+        { lastName: { [models.Sequelize.Op.iLike]: searchTerm } },
+        { email: { [models.Sequelize.Op.iLike]: searchTerm } },
+        { phoneNumber: { [models.Sequelize.Op.iLike]: searchTerm } },
       ];
     }
 
-    const [users, total] = await Promise.all([
-      Prisma.user.findMany({
-        where: whereConditions,
-        include: {
-          role: { select: this.roleSelectFields },
-          parent: { select: this.userSelectFields },
-          EmployeePermissionsOwned: {
-            where: { isActive: true }, // ONLY ACTIVE PERMISSIONS
-            select: { permission: true, isActive: true },
-          },
+    const { count, rows: employees } = await models.Employee.findAndCountAll({
+      where: whereConditions,
+      include: [
+        { model: models.Department, as: "department" },
+        {
+          model: models.EmployeePermission,
+          as: "employeePermissions",
+          where: { isActive: true },
+          required: false,
         },
-        orderBy: { createdAt: sort },
-        skip,
-        take: limit,
-      }),
-      Prisma.user.count({ where: whereConditions }),
-    ]);
+      ],
+      order: [["createdAt", sort === "desc" ? "DESC" : "ASC"]],
+      offset,
+      limit,
+    });
 
-    const safeUsers = users.map((user) =>
-      this.sanitizeUserData(user, parent.role)
+    const safeEmployees = employees.map((employee) =>
+      this.sanitizeEmployeeData(employee)
     );
 
     return {
-      users: safeUsers,
-      total,
+      users: safeEmployees,
+      total: count,
       page: parseInt(page),
       limit: parseInt(limit),
-      totalPages: Math.ceil(total / parseInt(limit)),
-      meta: {
-        parentRole: parent.role.name,
-        parentRoleType: parent.role.type,
-        isEmployeeViewingAdminData: parent.role?.type === "employee",
-        targetParentId: targetParentId,
-      },
+      totalPages: Math.ceil(count / parseInt(limit)),
     };
   }
 
+  // EMPLOYEE STATUS MANAGEMENT
+  static async deactivateEmployee(employeeId, deactivatedBy, reason) {
+    return this.updateEmployeeStatus(
+      employeeId,
+      deactivatedBy,
+      "INACTIVE",
+      "EMPLOYEE_DEACTIVATED",
+      reason
+    );
+  }
+
+  static async reactivateEmployee(employeeId, reactivatedBy, reason) {
+    return this.updateEmployeeStatus(
+      employeeId,
+      reactivatedBy,
+      "ACTIVE",
+      "EMPLOYEE_REACTIVATED",
+      reason
+    );
+  }
+
+  // DELETE EMPLOYEE
+  static async deleteEmployee(employeeId, deletedBy, reason) {
+    const employee = await models.Employee.findByPk(employeeId);
+    if (!employee) {
+      throw ApiError.notFound("Employee not found");
+    }
+
+    const deleter = await models.User.findByPk(deletedBy);
+    if (!deleter) {
+      throw ApiError.unauthorized("Invalid deleter user");
+    }
+
+    // Use transaction for deletion
+    const transaction = await models.sequelize.transaction();
+
+    try {
+      // Delete permissions first
+      await models.EmployeePermission.destroy({
+        where: { employeeId },
+        transaction,
+      });
+
+      // Delete profile image from S3 if exists
+      if (employee.profileImage) {
+        try {
+          await S3Service.delete({ fileUrl: employee.profileImage });
+        } catch (s3Error) {
+          console.warn("Failed to delete profile image from S3:", s3Error);
+        }
+      }
+
+      // Delete employee
+      await models.Employee.destroy({
+        where: { id: employeeId },
+        transaction,
+      });
+
+      await transaction.commit();
+
+      await AuditService.createLog({
+        action: "EMPLOYEE_DELETED",
+        entity: "EMPLOYEE",
+        entityId: employeeId,
+        performedById: deletedBy,
+        performedByType: "USER",
+        description: "Employee permanently deleted",
+        metadata: {
+          reason: reason || "No reason provided",
+          employeeEmail: employee.email,
+        },
+      });
+
+      return {
+        success: true,
+        message: "Employee permanently deleted successfully",
+        deletedEmployee: {
+          id: employee.id,
+          email: employee.email,
+          username: employee.username,
+        },
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
   // PERMISSION CHECK METHODS
-  static async checkPermission(userId, permission) {
-    const userPermission = await Prisma.employeePermission.findFirst({
+  static async checkPermission(employeeId, permission) {
+    const employeePermission = await models.EmployeePermission.findOne({
       where: {
-        userId,
+        employeeId,
         permission,
         isActive: true,
       },
     });
 
-    return !!userPermission;
+    return !!employeePermission;
   }
 
-  static async checkPermissions(userId, permissions) {
-    const userPermissions = await Prisma.employeePermission.findMany({
+  static async checkPermissions(employeeId, permissions) {
+    const employeePermissions = await models.EmployeePermission.findAll({
       where: {
-        userId,
-        permission: { in: permissions },
+        employeeId,
+        permission: { [models.Sequelize.Op.in]: permissions },
         isActive: true,
       },
-      select: { permission: true },
+      attributes: ["permission"],
     });
 
-    const userPermissionSet = new Set(userPermissions.map((p) => p.permission));
+    const permissionSet = new Set(employeePermissions.map((p) => p.permission));
 
     const result = {};
     permissions.forEach((permission) => {
-      result[permission] = userPermissionSet.has(permission);
+      result[permission] = permissionSet.has(permission);
     });
 
     return {
-      hasAll: permissions.every((p) => userPermissionSet.has(p)),
-      hasAny: permissions.some((p) => userPermissionSet.has(p)),
+      hasAll: permissions.every((p) => permissionSet.has(p)),
+      hasAny: permissions.some((p) => permissionSet.has(p)),
       permissions: result,
-      granted: Array.from(userPermissionSet),
-      missing: permissions.filter((p) => !userPermissionSet.has(p)),
+      granted: Array.from(permissionSet),
+      missing: permissions.filter((p) => !permissionSet.has(p)),
     };
   }
 
-  // STATUS MANAGEMENT METHODS
-  static async deactivateEmployee(
-    employeeId,
-    deactivatedBy,
-    reason,
-    req = null,
-    res = null
-  ) {
-    return this.updateEmployeeStatus(
-      employeeId,
-      deactivatedBy,
-      "IN_ACTIVE",
-      "EMPLOYEE_DEACTIVATED",
-      reason,
-      req,
-      res
-    );
-  }
-
-  static async reactivateEmployee(employeeId, reactivatedBy, reason, req, res) {
-    return this.updateEmployeeStatus(
-      employeeId,
-      reactivatedBy,
-      "ACTIVE",
-      "EMPLOYEE_ACTIVATED",
-      reason,
-      req,
-      res
-    );
-  }
-
   // HELPER METHODS
-  static async validateEmployeeRole(roleId) {
-    const role = await Prisma.role.findUnique({ where: { id: roleId } });
-    if (!role) throw ApiError.badRequest("Invalid roleId");
-    if (role.type !== "employee") {
-      throw ApiError.badRequest("Only employee type roles can be assigned");
-    }
-    return role;
-  }
-
-  static async checkExistingUser({ email, phoneNumber, username }) {
-    const existingUser = await Prisma.user.findFirst({
+  static async checkExistingEmployee({ email, phoneNumber, username }) {
+    const existingEmployee = await models.Employee.findOne({
       where: {
-        OR: [{ email }, { phoneNumber }, { username }],
+        [models.Sequelize.Op.or]: [{ email }, { phoneNumber }, { username }],
       },
     });
 
-    if (existingUser) {
+    if (existingEmployee) {
       throw ApiError.badRequest("Employee already exists");
     }
   }
@@ -1095,21 +513,9 @@ class EmployeeServices {
   static async setupHierarchy(parentId) {
     if (!parentId) return { hierarchyLevel: 0, hierarchyPath: "" };
 
-    const parent = await Prisma.user.findUnique({
-      where: { id: parentId },
-      include: { role: true },
-    });
-
-    if (!parent) throw ApiError.badRequest("Invalid parentId");
-
-    // FIXED: ADMIN aur employee dono create kar sakte hain
-    const isAdmin = parent.role.name === "ADMIN";
-    const isEmployee = parent.role.type === "employee";
-
-    if (!isAdmin && !isEmployee) {
-      throw ApiError.forbidden(
-        "Only admin and employee users can create employees"
-      );
+    const parent = await models.User.findByPk(parentId);
+    if (!parent) {
+      throw ApiError.badRequest("Invalid parent user");
     }
 
     return {
@@ -1122,7 +528,6 @@ class EmployeeServices {
 
   static async handleProfileImageUpload(profileImage) {
     if (!profileImage) return "";
-
     try {
       return (await S3Service.upload(profileImage, "profile")) ?? "";
     } catch (uploadErr) {
@@ -1131,61 +536,34 @@ class EmployeeServices {
     }
   }
 
-  static async sendEmployeeCredentials(user, password, permissions) {
+  static async assignEmployeePermissions(employeeId, permissions, adminId) {
+    const permissionRecords = permissions.map((permission) => ({
+      employeeId,
+      permission,
+      createdByType: "ADMIN",
+      createdById: adminId,
+      isActive: true,
+      assignedAt: new Date(),
+    }));
+
+    await models.EmployeePermission.bulkCreate(permissionRecords);
+  }
+
+  static async sendEmployeeCredentials(employee, password, permissions) {
     await sendCredentialsEmail(
-      user,
+      employee,
       password,
       null,
       "created",
-      `Your employee account has been created by admin. You have been assigned the role: ${user.role.name}`,
+      "Your employee account has been created.",
       "employee",
       {
-        role: user.role.name,
         permissions: permissions,
       }
     );
   }
 
-  static async authorizeEmployeeUpdate(
-    currentUser,
-    userToUpdate,
-    userId,
-    email,
-    roleId
-  ) {
-    const isAdmin = currentUser.role.name === "ADMIN";
-    const isUpdatingOwnProfile = userId === currentUser.id;
-
-    if (!isUpdatingOwnProfile && !isAdmin) {
-      const canUpdate = await this.checkPermission(
-        currentUser.id,
-        "UPDATE_EMPLOYEE"
-      );
-      if (!canUpdate) {
-        throw ApiError.forbidden(
-          "You don't have permission to update this employee"
-        );
-      }
-    }
-
-    if (email && email !== userToUpdate.email && !isAdmin) {
-      const permissionCheck = await this.checkPermissions(currentUser.id, [
-        "UPDATE_EMPLOYEE_EMAIL",
-        "FULL_EMPLOYEE_ACCESS",
-      ]);
-      if (!permissionCheck.hasAny) {
-        throw ApiError.forbidden(
-          "You don't have permission to update email addresses"
-        );
-      }
-    }
-
-    if (roleId && !isAdmin) {
-      throw ApiError.forbidden("Only administrators can change employee roles");
-    }
-  }
-
-  static async checkUniqueConstraints(userId, fields) {
+  static async checkUniqueConstraints(employeeId, fields) {
     const { username, phoneNumber, email } = fields;
     const conditions = [];
 
@@ -1195,59 +573,23 @@ class EmployeeServices {
 
     if (conditions.length === 0) return;
 
-    const existingUser = await Prisma.user.findFirst({
+    const existingEmployee = await models.Employee.findOne({
       where: {
-        AND: [{ id: { not: userId } }, { OR: conditions }],
+        [models.Sequelize.Op.and]: [
+          { id: { [models.Sequelize.Op.ne]: employeeId } },
+          { [models.Sequelize.Op.or]: conditions },
+        ],
       },
     });
 
-    if (existingUser) {
-      if (existingUser.username === username)
+    if (existingEmployee) {
+      if (existingEmployee.username === username)
         throw ApiError.badRequest("Username already taken");
-      if (existingUser.phoneNumber === phoneNumber)
+      if (existingEmployee.phoneNumber === phoneNumber)
         throw ApiError.badRequest("Phone number already registered");
-      if (existingUser.email === email)
+      if (existingEmployee.email === email)
         throw ApiError.badRequest("Email already registered");
     }
-  }
-
-  static buildUpdatePayload(fields, isAdmin) {
-    const { username, firstName, lastName, phoneNumber, email, roleId } =
-      fields;
-    const payload = {};
-
-    if (username) payload.username = username.trim();
-    if (firstName) payload.firstName = this.formatName(firstName);
-    if (lastName) payload.lastName = this.formatName(lastName);
-    if (phoneNumber) payload.phoneNumber = phoneNumber;
-    if (email) payload.email = email.trim().toLowerCase();
-    if (roleId && isAdmin) payload.roleId = roleId;
-
-    return payload;
-  }
-
-  static sanitizeUserData(user, currentUserRole) {
-    const serialized = Helper.serializeUser(user);
-
-    // ADMIN can see decrypted passwords
-    if (
-      currentUserRole.name === "ADMIN" ||
-      currentUserRole.type === "employee"
-    ) {
-      if (serialized.password) {
-        try {
-          serialized.password = CryptoService.decrypt(serialized.password);
-        } catch {
-          serialized.password = "Error decrypting";
-        }
-      }
-      const { transactionPin, refreshToken, ...safeData } = serialized;
-      return safeData;
-    }
-
-    // For employee and other users, remove sensitive data
-    const { password, transactionPin, refreshToken, ...safeData } = serialized;
-    return safeData;
   }
 
   static async updateEmployeeStatus(
@@ -1255,182 +597,56 @@ class EmployeeServices {
     changedBy,
     status,
     action,
-    reason,
-    req = null,
-    res = null
+    reason
   ) {
-    const [user, changer] = await Promise.all([
-      Prisma.user.findUnique({
-        where: { id: employeeId },
-        include: { role: true },
-      }),
-      Prisma.user.findUnique({
-        where: { id: changedBy },
-        include: { role: true },
-      }),
+    const [employee, changer] = await Promise.all([
+      models.Employee.findByPk(employeeId),
+      models.User.findByPk(changedBy),
     ]);
 
-    if (!user) {
-      await AuditLogService.createAuditLog({
-        userId: changedBy,
-        action: `${action}_FAILED`,
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "EMPLOYEE_NOT_FOUND",
-          roleName: changer?.role?.name, // Use changer instead of req.user
-          changedBy: changedBy,
-        },
-      });
+    if (!employee || !changer) {
       throw ApiError.notFound("Employee not found");
     }
 
-    if (user.role.type !== "employee") {
-      await AuditLogService.createAuditLog({
-        userId: changedBy,
-        action: `${action}_FAILED`,
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "NOT_AN_EMPLOYEE",
-          roleName: changer?.role?.name, // Use changer instead of req.user
-          changedBy: changedBy,
-        },
-      });
-      throw ApiError.badRequest(
-        `Can only ${action.toLowerCase().split("_")[1]} employees`
-      );
+    if (employee.status === status) {
+      throw ApiError.badRequest(`Employee is already ${status.toLowerCase()}`);
     }
 
-    // Authorization check - ADMIN aur employee dono status change kar sakte hain
-    const isAdmin = changer?.role?.name === "ADMIN";
-    const isEmployee = changer?.role?.type === "employee";
-
-    // ADMIN aur employee dono ko full access hai employee status change karne ka
-    if (!isAdmin && !isEmployee) {
-      await AuditLogService.createAuditLog({
-        userId: changedBy,
-        action: `${action}_FAILED`,
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "UNAUTHORIZED",
-          roleName: changer?.role?.name, // Use changer instead of req.user
-          roleType: changer?.role?.type,
-          changedBy: changedBy,
-        },
-      });
-      throw ApiError.forbidden(
-        `Only administrators and employees can ${action.toLowerCase().split("_")[1]} employees`
-      );
-    }
-
-    if (user.status === status) {
-      await AuditLogService.createAuditLog({
-        userId: changedBy,
-        action: `${action}_FAILED`,
-        entityType: "EMPLOYEE",
-        entityId: employeeId,
-        ipAddress: req ? Helper.getClientIP(req) : null,
-        metadata: {
-          ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-          reason: "ALREADY_IN_STATE",
-          currentStatus: user.status,
-          attemptedStatus: status,
-          roleName: changer?.role?.name, // Use changer instead of req.user
-          changedBy: changedBy,
-        },
-      });
-      throw ApiError.badRequest(
-        `Employee is already ${status === "ACTIVE" ? "active" : "deactivated"}`
-      );
-    }
-
-    const updatedUser = await Prisma.user.update({
-      where: { id: employeeId },
-      data: {
+    const [_, [updatedEmployee]] = await models.Employee.update(
+      {
         status,
         deactivationReason: reason,
         updatedAt: new Date(),
       },
-      include: {
-        role: { select: this.roleSelectFields },
-        parent: { select: this.userSelectFields },
-      },
-    });
-
-    await AuditLogService.createAuditLog({
-      userId: changedBy,
-      action: action,
-      entityType: "EMPLOYEE",
-      entityId: employeeId,
-      ipAddress: req ? Helper.getClientIP(req) : null,
-      metadata: {
-        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-        previousStatus: user.status,
-        newStatus: status,
-        reason: reason || "No reason provided",
-        roleName: changer?.role?.name, // Use changer instead of req.user
-        roleType: changer?.role?.type,
-        changedBy: changedBy,
-        isAdminAction: isAdmin,
-        isEmployeeAction: isEmployee,
-      },
-    });
-
-    return updatedUser;
-  }
-
-  static async regenerateCredentialsAndNotify(userId, newEmail) {
-    const generatedPassword = Helper.generatePassword();
-    const hashedPassword = CryptoService.encrypt(generatedPassword);
-
-    const user = await Prisma.user.update({
-      where: { id: userId },
-      data: {
-        password: hashedPassword,
-        email: newEmail,
-      },
-      include: { role: true },
-    });
-
-    const permissions = await this.getEmployeePermissions(userId);
-
-    await sendCredentialsEmail(
-      user,
-      generatedPassword,
-      null,
-      "updated",
-      `Your employee account credentials have been updated. Here are your new login credentials.`,
-      "employee",
       {
-        role: user.role.name,
-        permissions: permissions,
+        where: { id: employeeId },
+        returning: true,
       }
     );
 
-    // Audit log for credential regeneration
-    await AuditLogService.createAuditLog({
-      userId: currentUserId,
-      action: "EMPLOYEE_CREDENTIALS_REGENERATED",
-      entityType: "EMPLOYEE",
-      entityId: userId,
-      ipAddress: req ? Helper.getClientIP(req) : null,
+    await AuditService.createLog({
+      action,
+      entity: "EMPLOYEE",
+      entityId: employeeId,
+      performedById: changedBy,
+      performedByType: "USER",
+      description: `Employee status changed to ${status}`,
       metadata: {
-        ...(req && res ? Helper.generateCommonMetadata(req, res) : {}),
-        newEmail: newEmail,
-        roleName: req?.user?.role,
-        regeneratedBy: currentUserId,
+        previousStatus: employee.status,
+        newStatus: status,
+        reason: reason || "No reason provided",
       },
     });
 
-    return user;
+    return updatedEmployee;
+  }
+
+  static sanitizeEmployeeData(employee, currentUser = null) {
+    const serialized = Helper.serializeUser(employee);
+
+    // Remove sensitive data for all users
+    const { password, refreshToken, ...safeData } = serialized;
+    return safeData;
   }
 
   static formatName(name) {

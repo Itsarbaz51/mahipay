@@ -1,117 +1,85 @@
-import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
+import express from "express";
 import EmployeeController from "../controllers/employee.controller.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
+import AuthMiddleware from "../middlewares/auth.middleware.js";
+import PermissionMiddleware from "../middlewares/permission.middleware.js";
 import upload from "../middlewares/multer.middleware.js";
-import EmployeeValidationSchemas from "../validations/employeeValidation.schemas.js";
 
-const employeeRoutes = Router();
+const router = express.Router();
 
-// ✅ GET ALL EMPLOYEES BY PARENT ID
-employeeRoutes.get(
-  "/",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  EmployeeController.getAllEmployeesByParentId
-);
+// // All routes require authentication
+// router.use(AuthMiddleware.authenticate);
 
-// ✅ GET EMPLOYEE BY ID
-employeeRoutes.get(
-  "/:employeeId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  EmployeeController.getEmployeeById
-);
+// // Employee Registration & Management
+// router.post(
+//   "/register",
+//   AuthMiddleware.requirePermissions("employee:create"),
+//   upload.single("profileImage"),
+//   EmployeeController.register
+// );
 
-// ✅ REGISTER EMPLOYEE
-employeeRoutes.post(
-  "/register",
-  upload.single("profileImage"),
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(EmployeeValidationSchemas.register),
-  EmployeeController.register
-);
+// router.put(
+//   "/:employeeId/profile",
+//   PermissionMiddleware.requireOwnership("employee", "employeeId"),
+//   AuthMiddleware.requirePermissions("employee:update"),
+//   EmployeeController.updateProfile
+// );
 
-// ✅ UPDATE EMPLOYEE PERMISSIONS
-employeeRoutes.put(
-  "/:employeeId/permissions",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(EmployeeValidationSchemas.updatePermissions),
-  EmployeeController.updatePermissions
-);
+// router.put(
+//   "/:employeeId/profile-image",
+//   PermissionMiddleware.requireOwnership("employee", "employeeId"),
+//   AuthMiddleware.requirePermissions("employee:update"),
+//   upload.single("profileImage"),
+//   EmployeeController.updateProfileImage
+// );
 
-// ✅ UPDATE EMPLOYEE PROFILE
-employeeRoutes.put(
-  "/:employeeId/profile",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(EmployeeValidationSchemas.updateProfile),
-  EmployeeController.updateProfile
-);
+// // Employee Permissions Management
+// router.put(
+//   "/:employeeId/permissions",
+//   AuthMiddleware.requirePermissions("employee:manage"),
+//   EmployeeController.updatePermissions
+// );
 
-// ✅ UPDATE EMPLOYEE PROFILE IMAGE
-employeeRoutes.put(
-  "/:employeeId/profile-image",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  upload.single("profileImage"),
-  validateRequest(EmployeeValidationSchemas.updateProfileImage),
-  EmployeeController.updateProfileImage
-);
+// router.get(
+//   "/:employeeId/permissions",
+//   AuthMiddleware.requirePermissions("employee:view"),
+//   EmployeeController.getPermissions
+// );
 
-// ✅ GET EMPLOYEE PERMISSIONS
-employeeRoutes.get(
-  "/:employeeId/permissions",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  EmployeeController.getPermissions
-);
+// // Employee Access
+// router.get(
+//   "/",
+//   AuthMiddleware.requirePermissions("employee:view"),
+//   EmployeeController.getAllEmployeesByParentId
+// );
 
-// ✅ DEACTIVATE EMPLOYEE
-employeeRoutes.patch(
-  "/:employeeId/deactivate",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(EmployeeValidationSchemas.deactivateEmployee),
-  EmployeeController.deactivateEmployee
-);
+// router.get(
+//   "/:employeeId",
+//   AuthMiddleware.requirePermissions("employee:view"),
+//   EmployeeController.getEmployeeById
+// );
 
-// ✅ REACTIVATE EMPLOYEE
-employeeRoutes.patch(
-  "/:employeeId/reactivate",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(EmployeeValidationSchemas.reactivateEmployee),
-  EmployeeController.reactivateEmployee
-);
+// // Employee Status Management
+// router.patch(
+//   "/:employeeId/deactivate",
+//   AuthMiddleware.requirePermissions("employee:manage"),
+//   EmployeeController.deactivateEmployee
+// );
 
-// ✅ DELETE EMPLOYEE
-employeeRoutes.delete(
-  "/:employeeId/delete",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "ADMIN", "SUPER ADMIN"]),
-  validateRequest(EmployeeValidationSchemas.deleteEmployee),
-  EmployeeController.deleteEmployee
-);
+// router.patch(
+//   "/:employeeId/reactivate",
+//   AuthMiddleware.requirePermissions("employee:manage"),
+//   EmployeeController.reactivateEmployee
+// );
 
-// ✅ CHECK SINGLE PERMISSION (For employees themselves)
-employeeRoutes.post(
-  "/check-permission",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee", "business"]),
-  validateRequest(EmployeeValidationSchemas.checkPermission),
-  EmployeeController.checkPermission
-);
+// router.delete(
+//   "/:employeeId",
+//   AuthMiddleware.requirePermissions("employee:delete"),
+//   EmployeeController.deleteEmployee
+// );
 
-// ✅ CHECK MULTIPLE PERMISSIONS (For employees themselves)
-employeeRoutes.post(
-  "/check-permissions",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["employee"]),
-  validateRequest(EmployeeValidationSchemas.checkPermissions),
-  EmployeeController.checkPermissions
-);
+// // Permission Checks
+// router.post("/check-permission", EmployeeController.checkPermission);
 
-export default employeeRoutes;
+// router.post("/check-permissions", EmployeeController.checkPermissions);
+
+export default router;

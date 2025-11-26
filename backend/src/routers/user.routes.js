@@ -1,176 +1,89 @@
-import { Router } from "express";
-import AuthMiddleware from "../middlewares/auth.middleware.js";
+import express from "express";
 import UserController from "../controllers/user.controller.js";
-import { validateRequest } from "../middlewares/validateRequest.js";
+import AuthMiddleware from "../middlewares/auth.middleware.js";
+import PermissionMiddleware from "../middlewares/permission.middleware.js";
 import upload from "../middlewares/multer.middleware.js";
-import UserValidationSchemas from "../validations/userValidation.schemas.js";
+import PermissionRegistry from "../utils/permissionRegistry.js";
 
-const userRoutes = Router();
+const router = express.Router();
 
-//  GET CURRENT BUSINESS USER
-userRoutes.get(
-  "/me",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorizeRoleTypes(["business", "employee"]),
-  UserController.getCurrentUser
-);
+// All routes require authentication
+router.use(AuthMiddleware.authenticate);
 
-//  GET BUSINESS USERS BY ROLE
-userRoutes.get(
-  "/role/:roleId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  UserController.getAllUsersByRole
-);
-
-//  GET BUSINESS USERS BY CHILDREN ID
-userRoutes.get(
-  "/children/:userId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  UserController.getAllUsersByChildrenId
-);
-
-//  GET BUSINESS USERS COUNT BY PARENT ID
-userRoutes.get(
-  "/count/parent/:parentId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  UserController.getAllUsersCountByParentId
-);
-
-//  GET BUSINESS USERS COUNT BY CHILDREN ID
-userRoutes.get(
-  "/count/children/:userId",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  UserController.getAllUsersCountByChildrenId
-);
-
-//  GET BUSINESS USER BY ID
-userRoutes.get(
-  "/:id",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  UserController.getUserById
-);
-
-//  REGISTER BUSINESS USER
-userRoutes.post(
+// Business User Registration
+router.post(
   "/register",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireUser,
+  PermissionMiddleware.requirePermission(
+    PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[0]
+  ),
   upload.single("profileImage"),
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  validateRequest(UserValidationSchemas.register),
   UserController.register
 );
 
-//  UPDATE BUSINESS USER PROFILE
-userRoutes.put(
+// Business User Profile Management
+router.put(
   "/:userId/profile",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  validateRequest(UserValidationSchemas.updateProfile),
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireUser,
+  PermissionMiddleware.requirePermission(
+    PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[2]
+  ),
   UserController.updateProfile
 );
 
-//  UPDATE BUSINESS USER PROFILE IMAGE
-userRoutes.put(
+router.put(
   "/:userId/profile-image",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireUser,
+  PermissionMiddleware.requirePermission(
+    PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[6]
+  ),
   upload.single("profileImage"),
-  validateRequest(UserValidationSchemas.updateProfileImage),
   UserController.updateProfileImage
 );
 
-//  GET ALL BUSINESS USERS BY PARENT ID
-userRoutes.get(
-  "/",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize([
-    "ADMIN", "SUPER ADMIN",
-    "STATE HEAD",
-    "MASTER DISTRIBUTOR",
-    "DISTRIBUTOR",
-    "employee",
-  ]),
-  UserController.getAllRoleTypeUsersByParentId
+router.get(
+  "/:userId",
+  AuthMiddleware.authenticate,
+  AuthMiddleware.requireUser,
+  PermissionMiddleware.requirePermission(
+    PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[1]
+  ),
+  UserController.getUserById
 );
 
-//  DEACTIVATE BUSINESS USER
-userRoutes.patch(
-  "/:userId/deactivate",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  validateRequest(UserValidationSchemas.deactivateUser),
-  UserController.deactivateUser
-);
+// // Business User Management
+// router.get(
+//   "/role/:roleId",
+//   AuthMiddleware.requirePermissions("user:view"),
+//   UserController.getAllUsersByRole
+// );
 
-//  REACTIVATE BUSINESS USER
-userRoutes.patch(
-  "/:userId/reactivate",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  validateRequest(UserValidationSchemas.reactivateUser),
-  UserController.reactivateUser
-);
+// router.get(
+//   "/parent/children",
+//   AuthMiddleware.requirePermissions("user:view"),
+//   UserController.getAllRoleTypeUsersByParentId
+// );
 
-//  DELETE BUSINESS USER
-userRoutes.delete(
-  "/:userId/delete",
-  AuthMiddleware.isAuthenticated,
-  AuthMiddleware.authorize(["ADMIN", "SUPER ADMIN", "employee"]),
-  validateRequest(UserValidationSchemas.deleteUser),
-  UserController.deleteUser
-);
+// // Business User Status Management
+// router.patch(
+//   "/:userId/deactivate",
+//   AuthMiddleware.requirePermissions("user:manage"),
+//   UserController.deactivateUser
+// );
 
-export default userRoutes;
+// router.patch(
+//   "/:userId/reactivate",
+//   AuthMiddleware.requirePermissions("user:manage"),
+//   UserController.reactivateUser
+// );
+
+// router.delete(
+//   "/:userId",
+//   AuthMiddleware.requirePermissions("user:delete"),
+//   UserController.deleteUser
+// );
+
+export default router;
