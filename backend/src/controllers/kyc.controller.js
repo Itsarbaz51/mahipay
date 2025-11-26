@@ -1,167 +1,162 @@
-import asyncHandler from "../utils/AsyncHandler.js";
-import KycServices from "../services/kyc.service.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { ApiError } from "../utils/ApiError.js";
-import RootKycServices from "../services/root/kyc.service.js";
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
+import asyncHandler from "../../utils/AsyncHandler.js";
+import RootKycService from "../services/root/kyc.service.js";
+import AdminKycService from "../services/admin/kyc.service.js";
+import EmployeeKycService from "../services/employee/kyc.service.js";
 
-class UserKycController {
-  static index = asyncHandler(async (req, res) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      throw ApiError.internal("User ID not found in request");
-    }
+export class KycController {
+  static getAllKyc = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
+    const { status, page, limit, sort, search } = req.query;
 
-    const { status, page, limit, sort, search } = req.body;
+    let result;
 
-    let allKyc;
-
-    if (req.user.role === "SUPER ADMIN") {
-      allKyc = await RootKycServices.getAllBySuperAdmin(
-        {
-          userId,
-          status,
-          page,
-          limit,
-          sort,
-          search,
-        },
-        userId,
-        req,
-        res
-      );
+    if (currentUser.role === "ROOT") {
+      result = await RootKycService.getAllKyc(currentUser, {
+        status,
+        page,
+        limit,
+        sort,
+        search,
+      });
+    } else if (currentUser.userType === "BUSINESS") {
+      result = await AdminKycService.getAllKyc(currentUser, {
+        status,
+        page,
+        limit,
+        sort,
+        search,
+      });
+    } else if (
+      currentUser.userType === "EMPLOYEE" &&
+      (currentUser.creator === "ROOT" || currentUser.creator === "ADMIN")
+    ) {
+      result = await EmployeeKycService.getAllKyc(currentUser, {
+        status,
+        page,
+        limit,
+        sort,
+        search,
+      });
     } else {
-      allKyc = await KycServices.getAllByAdmin(
-        {
-          userId,
-          status,
-          page,
-          limit,
-          sort,
-          search,
-        },
-        userId,
-        req,
-        res
-      );
+      throw ApiError.unauthorized("Invalid role");
     }
 
     return res
       .status(200)
       .json(
-        ApiResponse.success(allKyc, "User KYC list fetched successfully", 200)
+        ApiResponse.success(
+          result,
+          "KYC applications fetched successfully",
+          200
+        )
       );
   });
 
-  static show = asyncHandler(async (req, res) => {
-    const requestingUser = req.user;
-    if (!requestingUser) {
-      throw ApiError.unauthorized("User not authenticated");
-    }
-
+  static getKycById = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
     const { id } = req.params;
 
-    if (!id) throw ApiError.badRequest("id is missing");
+    let kyc;
 
-    const kyc = await KycServices.showUserKyc(id, requestingUser);
+    if (currentUser.role === "ROOT") {
+      kyc = await RootKycService.getKycById(id, currentUser);
+    } else if (currentUser.role === "ADMIN") {
+      kyc = await AdminKycService.getKycById(id, currentUser);
+    } else if (
+      currentUser.userType === "EMPLOYEE" &&
+      (currentUser.creator === "ROOT" || currentUser.creator === "ADMIN")
+    ) {
+      kyc = await EmployeeKycService.getKycById(id, currentUser);
+    } else {
+      throw ApiError.unauthorized("Invalid role");
+    }
 
     return res
       .status(200)
-      .json(ApiResponse.success(kyc, "KYC fetched successfully", 200));
+      .json(
+        ApiResponse.success(kyc, "KYC application fetched successfully", 200)
+      );
   });
 
-  static store = asyncHandler(async (req, res) => {
-    const userId = req.user?.id;
-    if (!userId) throw ApiError.internal("User ID not found in request");
+  static createKyc = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
+    const payload = {
+      ...req.body,
+      files: req.files,
+    };
 
-    const files = req.files;
+    let result;
 
-    const panFile = files.panFile?.[0];
-    const aadhaarFile = files.aadhaarFile?.[0];
-    const addressProofFile = files.addressProofFile?.[0];
-    const photo = files.photo?.[0];
-
-    if (!panFile || !aadhaarFile || !addressProofFile || !photo) {
-      throw ApiError.badRequest(
-        "All KYC files are required (PAN, Aadhaar, Address Proof, Photo)."
-      );
+    if (currentUser.userType === "BUSINESS") {
+      result = await AdminKycService.createKyc(currentUser, payload);
+    } else {
+      throw ApiError.unauthorized("Invalid role");
     }
-
-    const dbStoreData = await KycServices.storeUserKyc(
-      {
-        ...req.body,
-
-        panFile,
-        aadhaarFile,
-        addressProofFile,
-        photo,
-        userId,
-      },
-      req,
-      res
-    );
 
     return res
       .status(201)
       .json(
         ApiResponse.success(
-          dbStoreData,
-          "User KYC submitted, waiting for approval",
+          result,
+          "KYC application submitted successfully",
           201
         )
       );
   });
 
-  static update = asyncHandler(async (req, res) => {
-    const userId = req.user?.id;
-    if (!userId) throw ApiError.internal("User ID not found in request");
-
+  static updateKyc = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
     const { id } = req.params;
-    if (!id) throw ApiError.badRequest("KYC ID is required in params");
-
-    const files = req.files;
-
-    const panFile = files.panFile?.[0];
-    const aadhaarFile = files.aadhaarFile?.[0];
-    const addressProofFile = files.addressProofFile?.[0];
-    const photo = files.photo?.[0];
-
-    const updateData = {
+    const payload = {
       ...req.body,
-      userId, // Pass userId to service for validation
+      files: req.files,
     };
 
-    if (panFile) updateData.panFile = panFile;
-    if (aadhaarFile) updateData.aadhaarFile = aadhaarFile;
-    if (addressProofFile) updateData.addressProofFile = addressProofFile;
-    if (photo) updateData.photo = photo;
-
-    const dbUpdateData = await KycServices.updateUserKyc(
-      id,
-      updateData,
-      req,
-      res
-    );
+    let result;
+    if (currentUser.userType === "BUSINESS") {
+      result = await AdminKycService.updateKyc(id, currentUser, payload);
+    } else {
+      throw ApiError.unauthorized("Invalid role");
+    }
 
     return res
       .status(200)
       .json(
-        ApiResponse.success(dbUpdateData, "User KYC updated successfully", 200)
+        ApiResponse.success(result, "KYC application updated successfully", 200)
       );
   });
 
-  static verification = asyncHandler(async (req, res) => {
-    const dbStoreData = await KycServices.verifyUserKyc(req.body, req, res);
+  static verifyKyc = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
+    const payload = req.body;
+
+    let result;
+
+    if (currentUser.role === "ROOT") {
+      result = await RootKycService.verifyKyc(currentUser, payload);
+    } else if (currentUser.role === "ADMIN") {
+      result = await AdminKycService.verifyKyc(currentUser, payload);
+    } else if (
+      currentUser.userType === "EMPLOYEE" &&
+      (currentUser.creator === "ADMIN" || currentUser.creator === "ROOT")
+    ) {
+      result = await EmployeeKycService.verifyKyc(currentUser, payload);
+    } else {
+      throw ApiError.unauthorized("Only Root and Admin can verify KYC");
+    }
 
     return res
       .status(200)
       .json(
         ApiResponse.success(
-          dbStoreData,
-          `User KYC ${req.body.status} successfully`,
+          result,
+          `KYC ${payload.status.toLowerCase()} successfully`,
           200
         )
       );
   });
 }
 
-export { UserKycController };
+export default KycController;

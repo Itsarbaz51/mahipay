@@ -1,169 +1,79 @@
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
+import AdminAddressService from "../services/admin/address.service.js";
 import asyncHandler from "../utils/AsyncHandler.js";
-import AddressValidationSchemas from "../validations/addressValidation.schemas.js";
-import AddressServices from "../services/address.service.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { ApiError } from "../utils/ApiError.js";
 
-class AddressController {
-  static show = asyncHandler(async (req, res) => {
+export class AddressController {
+  static getAddressById = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
     const { id } = req.params;
-    if (!id) {
-      throw ApiError.badRequest("Address ID is required");
+
+    let address;
+
+    if (currentUser.userType === "BUSINESS") {
+      address = await AdminAddressService.getAddressById(id, currentUser);
+    } else {
+      throw ApiError.unauthorized("Invalid role");
     }
-    const dbShowData = await AddressServices.showAddress(id);
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbShowData, "Address fetched successfully", 201)
-      );
+
+    return res
+      .status(200)
+      .json(ApiResponse.success(address, "Address fetched successfully", 200));
   });
-  static store = asyncHandler(async (req, res) => {
-    const dbStoreData = await AddressServices.storeUserAddress(req.body);
-    if (!dbStoreData) {
-      throw ApiError.internal("Failed to create address");
+
+  static createAddress = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
+    const payload = req.body;
+
+    let result;
+
+    if (currentUser.userType === "BUSINESS") {
+      result = await AdminAddressService.createAddress(currentUser, payload);
+    } else {
+      throw ApiError.unauthorized("Only Business users can create addresses");
     }
-    res
+
+    return res
       .status(201)
-      .json(
-        ApiResponse.success(dbStoreData, "Address created successfully", 201)
-      );
+      .json(ApiResponse.success(result, "Address created successfully", 201));
   });
-  static update = asyncHandler(async (req, res) => {
-    const validatedData = await AddressValidationSchemas.Address.parseAsync(
-      req.body
-    );
+
+  static updateAddress = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
     const { id } = req.params;
-    if (!id) {
-      throw ApiError.badRequest("Address ID is required");
-    }
-    const dbUpdateData = await AddressServices.updateUserAddress(
-      validatedData,
-      id
-    );
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbUpdateData, "Address updated successfully", 201)
+    const payload = req.body;
+
+    let result;
+
+    if (currentUser.userType === "BUSINESS") {
+      result = await AdminAddressService.updateAddress(
+        id,
+        currentUser,
+        payload
       );
+    } else {
+      throw ApiError.unauthorized("Only Business users can update addresses");
+    }
+
+    return res
+      .status(200)
+      .json(ApiResponse.success(result, "Address updated successfully", 200));
   });
-  static destroy = asyncHandler(async (req, res) => {
+
+  static deleteAddress = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
     const { id } = req.params;
-    if (!id) {
-      throw ApiError.badRequest("Address ID is requir");
+
+    if (currentUser.userType === "BUSINESS") {
+      await AdminAddressService.deleteAddress(id, currentUser);
+    } else {
+      throw ApiError.unauthorized("Only Business users can delete addresses");
     }
-    const dbDeleteData = await AddressServices.deleteUserAddress(id);
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbDeleteData, "Address deleted successfully", 201)
-      );
+
+    return res
+      .status(200)
+      .json(ApiResponse.success({}, "Address deleted successfully", 200));
   });
 }
 
-class StateController {
-  static index = asyncHandler(async (req, res) => {
-    const dbStoreData = await AddressServices.indexState();
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbStoreData, "States fetched successfully", 201)
-      );
-  });
-  static store = asyncHandler(async (req, res) => {
-    const validatedData = await AddressValidationSchemas.State.parseAsync(
-      req.body
-    );
-
-    const dbStoreData = await AddressServices.storeState(validatedData);
-
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbStoreData, "State created successfully", 201)
-      );
-  });
-  static update = asyncHandler(async (req, res) => {
-    const validatedData = await AddressValidationSchemas.State.parseAsync(
-      req.body
-    );
-
-    const { id } = req.params;
-
-    if (!id) {
-      throw ApiError.badRequest("State ID is required");
-    }
-
-    const dbUpdateData = await AddressServices.updateState(validatedData, id);
-
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbUpdateData, "State updated successfully", 201)
-      );
-  });
-  static destroy = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-
-    if (!id) {
-      throw ApiError.badRequest("State ID is required");
-    }
-
-    const dbDeleteData = await AddressServices.deleteState(id);
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbDeleteData, "State deleted successfully", 201)
-      );
-  });
-}
-
-class CityController {
-  static index = asyncHandler(async (req, res) => {
-    const dbStoreData = await AddressServices.indexCity();
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbStoreData, "Cities fetched successfully", 201)
-      );
-  });
-  static store = asyncHandler(async (req, res) => {
-    const validatedData = await AddressValidationSchemas.City.parseAsync(
-      req.body
-    );
-
-    const dbStoreData = await AddressServices.storeCity(validatedData);
-
-    res
-      .status(201)
-      .json(ApiResponse.success(dbStoreData, "City created successfully", 201));
-  });
-  static update = asyncHandler(async (req, res) => {
-    const validatedData = await AddressValidationSchemas.City.parseAsync(
-      req.body
-    );
-    const { id } = req.params;
-    if (!id) {
-      throw ApiError.badRequest("City ID is required");
-    }
-    const dbUpdateData = await AddressServices.updateCity(validatedData, id);
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbUpdateData, "City updated successfully", 201)
-      );
-  });
-  static destroy = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    if (!id) {
-      throw ApiError.badRequest("City ID is required");
-    }
-    const dbDeleteData = await AddressServices.deleteCity(id);
-    res
-      .status(201)
-      .json(
-        ApiResponse.success(dbDeleteData, "City deleted successfully", 201)
-      );
-  });
-}
-
-export { AddressController, StateController, CityController };
+export default AddressController;

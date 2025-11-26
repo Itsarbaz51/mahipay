@@ -1,40 +1,65 @@
 import { z } from "zod";
 
-class RoleValidationSchemas {
-  static get createRole() {
-    return z.object({
-      name: z
-        .string()
-        .trim()
-        .min(1, "Role name is required")
-        .max(50, "Role name is too long")
-        .regex(/^[A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*$/, {
-          message:
-            'Role name must start with capital letters (e.g. "Admin", "Super Admin")',
-        }),
-      description: z.string().trim().max(2000).nullable().optional(),
-      level: z.number().int().positive().optional(),
-      type: z.enum(["employee"]).default("employee"), // Only allow employee type
-    });
-  }
+export const getAllRolesByTypeSchema = z.object({
+  params: z.object({
+    type: z.enum(["employee", "business"], {
+      errorMap: () => ({
+        message: "Type must be either 'employee' or 'business'",
+      }),
+    }),
+  }),
+});
 
-  static get updateRole() {
-    return z.object({
+export const upsertRoleSchema = z
+  .object({
+    body: z.object({
+      id: z.string().uuid("Invalid role ID format").optional(),
       name: z
         .string()
-        .trim()
-        .min(1, "Role name is required")
-        .max(50, "Role name is too long")
-        .regex(/^[A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*$/, {
-          message:
-            'Role name must start with capital letters (e.g. "Admin", "Super Admin")',
-        })
+        .min(2, "Name must be at least 2 characters long")
+        .max(50, "Name must not exceed 50 characters")
+        .regex(
+          /^[a-zA-Z0-9_ ]+$/,
+          "Name can only contain letters, numbers, spaces and underscores"
+        )
         .optional(),
-      description: z.string().trim().max(2000).nullable().optional(),
-      level: z.number().int().positive().optional(),
-      type: z.enum(["employee"]).optional(), // Only allow employee type
-    });
-  }
-}
+      description: z
+        .string()
+        .max(1000, "Description must not exceed 1000 characters")
+        .optional()
+        .nullable(),
+      type: z.enum(["employee", "business"], {
+        errorMap: () => ({
+          message: "Type must be either 'employee' or 'business'",
+        }),
+      }),
+    }),
+  })
+  .refine(
+    (data) => {
+      // If no ID provided (create operation), name is required
+      if (!data.body.id) {
+        return data.body.name !== undefined;
+      }
+      return true;
+    },
+    {
+      message: "Name is required when creating a new role",
+      path: ["body", "name"],
+    }
+  );
 
-export default RoleValidationSchemas;
+export const deleteRoleSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid role ID format"),
+  }),
+  body: z.object({
+    type: z
+      .enum(["employee", "business"], {
+        errorMap: () => ({
+          message: "Type must be either 'employee' or 'business'",
+        }),
+      })
+      .optional(),
+  }),
+});

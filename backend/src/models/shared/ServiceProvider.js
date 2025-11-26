@@ -3,63 +3,76 @@ export default (sequelize, DataTypes) => {
     "ServiceProvider",
     {
       id: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
+        type: DataTypes.BIGINT,
         primaryKey: true,
+        autoIncrement: true,
       },
-      name: {
-        type: DataTypes.STRING,
+      userId: {
+        type: DataTypes.BIGINT,
+        field: "user_id",
         allowNull: false,
       },
-      code: {
-        type: DataTypes.STRING,
-        unique: true,
+      integrationId: {
+        type: DataTypes.BIGINT,
+        field: "integration_id",
         allowNull: false,
       },
-      isActive: {
-        type: DataTypes.BOOLEAN,
-        field: "is_active",
-        defaultValue: false,
-      },
-      iconUrl: {
+      serviceName: {
         type: DataTypes.STRING,
-        field: "icon_url",
-        allowNull: true,
+        field: "service_name",
+        allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
       },
-      description: {
-        type: DataTypes.TEXT,
-        allowNull: true,
+      status: {
+        type: DataTypes.ENUM("ACTIVE", "INACTIVE"),
+        defaultValue: "ACTIVE",
+        validate: {
+          isIn: [["ACTIVE", "INACTIVE"]],
+        },
       },
-      envConfig: {
-        type: DataTypes.JSON,
-        field: "env_config",
-        allowNull: true,
+      // Who assigned this service (ROOT or ADMIN)
+      assignedByType: {
+        type: DataTypes.ENUM("ROOT", "ADMIN"),
+        field: "assigned_by_type",
+        allowNull: false,
+        validate: {
+          isIn: [["ROOT", "ADMIN"]],
+        },
       },
-      apiIntegrationStatus: {
-        type: DataTypes.BOOLEAN,
-        field: "api_integration_status",
-        defaultValue: false,
-        allowNull: true,
+      assignedById: {
+        type: DataTypes.BIGINT,
+        field: "assigned_by_id",
+        allowNull: false,
       },
-      parentId: {
-        type: DataTypes.UUID,
-        field: "parent_id",
-        allowNull: true,
+      rootId: {
+        type: DataTypes.BIGINT,
+        field: "root_id",
+        allowNull: false,
       },
+      // Hierarchy fields
       hierarchyLevel: {
-        type: DataTypes.STRING,
+        type: DataTypes.INTEGER,
         field: "hierarchy_level",
         allowNull: false,
+        defaultValue: 0,
+        validate: {
+          min: 0,
+        },
       },
       hierarchyPath: {
         type: DataTypes.TEXT,
         field: "hierarchy_path",
         allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
       },
-      createdByRootId: {
-        type: DataTypes.UUID,
-        field: "created_by_root_id",
-        allowNull: false,
+      canReassign: {
+        type: DataTypes.BOOLEAN,
+        field: "can_reassign",
+        defaultValue: true,
       },
       createdAt: {
         type: DataTypes.DATE,
@@ -78,51 +91,147 @@ export default (sequelize, DataTypes) => {
       underscored: true,
       indexes: [
         {
-          fields: ["parent_id"],
+          fields: ["user_id"],
         },
         {
-          fields: ["created_by_root_id"],
+          fields: ["integration_id"],
+        },
+        {
+          fields: ["root_id"],
+        },
+        {
+          fields: ["assigned_by_id", "assigned_by_type"],
+        },
+        {
+          fields: ["hierarchy_path"],
+        },
+        {
+          fields: ["status"],
         },
       ],
     }
   );
 
   ServiceProvider.associate = function (models) {
-    ServiceProvider.belongsTo(ServiceProvider, {
-      foreignKey: "parent_id",
-      as: "parent",
+    // User who owns this service provider
+    ServiceProvider.belongsTo(models.User, {
+      foreignKey: "user_id",
+      as: "user",
+      onDelete: "CASCADE",
     });
-    ServiceProvider.hasMany(ServiceProvider, {
-      foreignKey: "parent_id",
-      as: "subServices",
+
+    // API Integration
+    ServiceProvider.belongsTo(models.ApiIntegration, {
+      foreignKey: "integration_id",
+      as: "integration",
+      onDelete: "CASCADE",
     });
-    ServiceProvider.hasMany(models.ApiEntity, {
-      foreignKey: "service_id",
-      as: "apiEntities",
+
+    // Root association
+    ServiceProvider.belongsTo(models.Root, {
+      foreignKey: "root_id",
+      as: "root",
+      onDelete: "CASCADE",
     });
+
+    // Transaction relations
     ServiceProvider.hasMany(models.Transaction, {
       foreignKey: "service_id",
       as: "transactions",
+      onDelete: "RESTRICT",
     });
-    ServiceProvider.hasMany(models.RolePermission, {
-      foreignKey: "service_id",
-      as: "rolePermissions",
-    });
-    ServiceProvider.hasMany(models.UserPermission, {
-      foreignKey: "service_id",
-      as: "userPermissions",
-    });
+
+    // Commission relations
     ServiceProvider.hasMany(models.CommissionSetting, {
       foreignKey: "service_id",
       as: "commissionSettings",
+      onDelete: "CASCADE",
     });
+
+    // Ledger entries
     ServiceProvider.hasMany(models.LedgerEntry, {
       foreignKey: "service_id",
       as: "ledgerEntries",
+      onDelete: "RESTRICT",
     });
+
+    // Role permissions for this service
+    ServiceProvider.hasMany(models.RolePermission, {
+      foreignKey: "service_id",
+      as: "rolePermissions",
+      onDelete: "CASCADE",
+    });
+
+    // User permissions for this service
+    ServiceProvider.hasMany(models.UserPermission, {
+      foreignKey: "service_id",
+      as: "userPermissions",
+      onDelete: "CASCADE",
+    });
+
+    // FIXED: Polymorphic assigner association - use proper condition
     ServiceProvider.belongsTo(models.Root, {
-      foreignKey: "created_by_root_id",
-      as: "createdByRoot",
+      foreignKey: "assigned_by_id",
+      as: "assignedByRoot",
+      constraints: false,
+      scope: {
+        assigned_by_type: "ROOT",
+      },
+    });
+
+    ServiceProvider.belongsTo(models.User, {
+      foreignKey: "assigned_by_id",
+      as: "assignedByAdmin",
+      constraints: false,
+      scope: {
+        assigned_by_type: "ADMIN",
+      },
+    });
+  };
+  
+  // Instance methods
+  ServiceProvider.prototype.isActive = function () {
+    return this.status === "ACTIVE";
+  };
+
+  ServiceProvider.prototype.canBeReassigned = function () {
+    return this.canReassign && this.isActive();
+  };
+
+  // Class methods
+  ServiceProvider.findByUserAndIntegration = function (userId, integrationId) {
+    return this.findOne({
+      where: {
+        userId,
+        integrationId,
+      },
+    });
+  };
+
+  ServiceProvider.findActiveByUser = function (userId) {
+    return this.findAll({
+      where: {
+        userId,
+        status: "ACTIVE",
+      },
+    });
+  };
+
+  ServiceProvider.findByRoot = function (rootId) {
+    return this.findAll({
+      where: {
+        rootId,
+      },
+      include: [
+        {
+          association: "user",
+          attributes: ["id", "firstName", "lastName", "email"],
+        },
+        {
+          association: "integration",
+          attributes: ["id", "platformName", "serviceName"],
+        },
+      ],
     });
   };
 

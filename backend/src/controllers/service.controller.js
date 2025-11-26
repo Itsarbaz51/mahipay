@@ -1,180 +1,112 @@
-import { ServiceProviderService } from "../services/service.service.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import asyncHandler from "../utils/AsyncHandler.js";
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
+import asyncHandler from "../../utils/AsyncHandler.js";
 
-class ServiceProviderController {
-  static create = asyncHandler(async (req, res) => {
-    const user = req.user.id;
-
-    if (!user) {
-      throw ApiError.badRequest("Please login before creating a service");
-    }
-
-    const iconFile = req.file;
-
-    if (iconFile) {
-      if (iconFile.size > 5 * 1024 * 1024) {
-        throw ApiError.badRequest("Icon file size must be less than 5 MB");
-      }
-
-      const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
-
-      if (!allowedMimeTypes.includes(iconFile.mimetype)) {
-        throw ApiError.badRequest("Icon file must be an image (jpeg/png/webp)");
-      }
-    }
-
-    const serviceProvider = await ServiceProviderService.create(
-      req.body,
-      {
-        icon: [iconFile],
-      },
-      req,
-      res
-    );
-
-    return res
-      .status(201)
-      .json(
-        ApiResponse.success(
-          serviceProvider,
-          `Service Provider ${serviceProvider.code} created successfully`,
-          201
-        )
-      );
-  });
-
-  static getAll = asyncHandler(async (req, res) => {
-    const user = req.user;
-    const { type } = req.body; // 'all', 'active', 'inactive'
-
-    let serviceProviders;
-
-    if (
-      user.role === "ADMIN" ||
-      user.role === "SUPER ADMIN" ||
-      user.roleType === "employee"
-    ) {
-      // ADMIN can see all services based on type
-      switch (type) {
-        case "active":
-          serviceProviders = await ServiceProviderService.getActive();
-          break;
-        case "allServices":
-          serviceProviders = await ServiceProviderService.allServices();
-          break;
-        default:
-          serviceProviders = await ServiceProviderService.getAll();
-      }
-    }
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          serviceProviders,
-          "Service Providers fetched successfully",
-          200
-        )
-      );
-  });
-
-  static updateEnvConfig = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { envConfig, subServices } = req.body;
-
-    if (!id) {
-      throw ApiError.badRequest("Service Provider ID is required");
-    }
-
-    const updatedServiceProvider = await ServiceProviderService.updateEnvConfig(
-      id,
-      {
-        envConfig,
-        subServices,
-      },
-      req,
-      res
-    );
-
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(
-          updatedServiceProvider,
-          "Environment configuration updated successfully",
-          200
-        )
-      );
-  });
-
-  static toggleServiceStatus = asyncHandler(async (req, res) => {
-    const { id } = req.params;
+// serviceProvider.controller.js
+export class ServiceProviderController {
+  // Assign Services - Handles both Single and Bulk
+  static assignServices = asyncHandler(async (req, res) => {
     const currentUser = req.user;
+    const payload = req.body;
 
-    if (!id) {
-      throw ApiError.badRequest("Service ID is required");
-    }
-
+    const isBulk = Array.isArray(payload);
     let result;
-    if (currentUser.role === "SUPER ADMIN") {
-      result = await ServiceProviderService.toggleServiceStatusBySuperAdmin(
-        id,
-        req,
-        res
+
+    if (currentUser.role === "ROOT") {
+      result = await RootServiceService.assignServices(currentUser, payload);
+    } else if (currentUser.role === "ADMIN") {
+      result = await AdminServiceService.assignServices(currentUser, payload);
+    } else if (currentUser.userType === "EMPLOYEE") {
+      // Employee ke andar hi check karo creator kya hai
+      result = await EmployeeServiceService.assignServices(
+        currentUser,
+        payload
       );
     } else {
-      result = await ServiceProviderService.toggleServiceStatusByAdmin(
-        id,
-        req,
-        res
-      );
+      throw ApiError.unauthorized("Invalid role for service assignment");
     }
 
-    return res
-      .status(200)
-      .json(ApiResponse.success(result, "service updated", 200));
+    const message = isBulk
+      ? `Services assigned successfully (${result.successful.length} successful, ${result.failed.length} failed)`
+      : "Service assigned successfully";
+
+    return res.status(201).json(ApiResponse.success(result, message, 201));
   });
 
-  static toggleApiIntigrationStatus = asyncHandler(async (req, res) => {
+  // Update Service Status - Handles both Single and Bulk
+  static updateServiceStatus = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
     const { id } = req.params;
+    const { status, serviceIds } = req.body;
 
-    if (!id) {
-      throw ApiError.badRequest("Api Intigration ID is required");
+    const serviceIdentifier = id ? id : serviceIds || [];
+    const isBulk = Array.isArray(serviceIdentifier);
+    let result;
+
+    if (currentUser.role === "ROOT") {
+      result = await RootServiceService.updateServiceStatus(
+        currentUser,
+        serviceIdentifier,
+        status
+      );
+    } else if (currentUser.role === "ADMIN") {
+      result = await AdminServiceService.updateServiceStatus(
+        currentUser,
+        serviceIdentifier,
+        status
+      );
+    } else if (currentUser.userType === "EMPLOYEE") {
+      // Employee ke andar hi check karo creator kya hai
+      result = await EmployeeServiceService.updateServiceStatus(
+        currentUser,
+        serviceIdentifier,
+        status
+      );
+    } else {
+      throw ApiError.unauthorized("Invalid role for service status update");
     }
 
-    const result = await ServiceProviderService.toggleApiIntigrationStatus(
-      id,
-      req,
-      res
-    );
+    const message = isBulk
+      ? `${result.successful.length} services ${status.toLowerCase()} successfully, ${result.failed.length} failed`
+      : `Service ${status.toLowerCase()} successfully`;
 
-    return res
-      .status(200)
-      .json(
-        ApiResponse.success(result, "successfully Api Intigration chnage", 200)
-      );
+    return res.status(200).json(ApiResponse.success(result, message, 200));
   });
 
-  static apiTestConnection = asyncHandler(async (req, res) => {
+  // Delete Services - Handles both Single and Bulk
+  static deleteServices = asyncHandler(async (req, res) => {
+    const currentUser = req.user;
     const { id } = req.params;
-    const { envConfig } = req.body;
+    const { serviceIds } = req.body;
 
-    if (!id) {
-      throw ApiError.badRequest("Service Provider ID is required");
+    const serviceIdentifier = id ? id : serviceIds || [];
+    const isBulk = Array.isArray(serviceIdentifier);
+    let result;
+
+    if (currentUser.role === "ROOT") {
+      result = await RootServiceService.deleteServices(
+        currentUser,
+        serviceIdentifier
+      );
+    } else if (currentUser.role === "ADMIN") {
+      result = await AdminServiceService.deleteServices(
+        currentUser,
+        serviceIdentifier
+      );
+    } else if (currentUser.userType === "EMPLOYEE") {
+      // Employee ke andar hi check karo creator kya hai
+      result = await EmployeeServiceService.deleteServices(
+        currentUser,
+        serviceIdentifier
+      );
+    } else {
+      throw ApiError.unauthorized("Invalid role for service deletion");
     }
 
-    const testResult = await ServiceProviderService.testApiConnection(
-      id,
-      envConfig,
-      req,
-      res
-    );
+    const message = isBulk
+      ? `${result.successful.length} services deleted successfully, ${result.failed.length} failed`
+      : "Service deleted successfully";
 
-    return res
-      .status(200)
-      .json(ApiResponse.success(testResult, "Connection test successful", 200));
+    return res.status(200).json(ApiResponse.success(result, message, 200));
   });
 }
-
-export default ServiceProviderController;

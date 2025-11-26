@@ -1,38 +1,50 @@
 import { z } from "zod";
 
-class AddressValidationSchemas {
-  static get Address() {
-    return z.object({
-      address: z
-        .string()
-        .min(5, "Address must be at least 5 characters long.")
-        .max(500, "Address must be at most 500 characters long."),
-      pinCode: z
-        .string()
-        .length(6, "Pin code must be exactly 6 digits.")
-        .regex(/^[0-9]{6}$/, "Pin code must contain only numeric digits."),
-      stateId: z.string().uuid("State ID must be a valid UUID."),
-      cityId: z.string().uuid("City ID must be a valid UUID."),
-    });
-  }
+export const getAddressByIdSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid address ID format"),
+  }),
+});
 
-  static get State() {
-    return z.object({
-      stateName: z
-        .string()
-        .min(2, "State name must be at least 2 characters long.")
-        .max(100, "State name must be at most 100 characters long."),
-    });
-  }
+export const createAddressSchema = z.object({
+  body: z.object({
+    address: z
+      .string()
+      .min(1, "Address is required")
+      .max(1000, "Address too long"),
+    pinCode: z
+      .string()
+      .min(6, "PIN code must be 6 characters")
+      .max(6, "PIN code must be 6 characters")
+      .regex(/^\d{6}$/, "Invalid PIN code format"),
+    stateId: z.string().uuid("Invalid state ID"),
+    cityId: z.string().uuid("Invalid city ID"),
+  }),
+});
 
-  static get City() {
-    return z.object({
-      cityName: z
-        .string()
-        .min(2, "City name must be at least 2 characters long.")
-        .max(100, "City name must be at most 100 characters long."),
-    });
-  }
-}
+export const updateAddressSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid address ID format"),
+  }),
+  body: z.object({
+    address: z
+      .string()
+      .min(1, "Address is required")
+      .max(1000, "Address too long")
+      .optional(),
+    pinCode: z
+      .string()
+      .min(6, "PIN code must be 6 characters")
+      .max(6, "PIN code must be 6 characters")
+      .regex(/^\d{6}$/, "Invalid PIN code format")
+      .optional(),
+    stateId: z.string().uuid("Invalid state ID").optional(),
+    cityId: z.string().uuid("Invalid city ID").optional(),
+  }),
+});
 
-export default AddressValidationSchemas;
+export const deleteAddressSchema = z.object({
+  params: z.object({
+    id: z.string().uuid("Invalid address ID format"),
+  }),
+});

@@ -1,54 +1,70 @@
 import { z } from "zod";
 
-export class ServiceValidationSchemas {
-  static get createServiceProvider() {
-    return z.object({
-      code: z
-        .string()
-        .min(2, {
-          message: "Service Provider code must be at least 2 characters",
-        })
-        .max(50, {
-          message: "Service Provider code must not exceed 50 characters",
-        }),
-      name: z.string().min(1, "Name is required").max(255),
-      description: z
-        .string()
-        .min(5, "Description must be at least 5 characters long")
-        .max(150, "Description must be at most 30 characters long")
-        .optional(),
-      isActive: z.boolean().optional().default(true),
-      parentId: z.string().uuid().optional().nullable(),
-    });
-  }
+// Base service assignment schema
+const baseServiceAssignmentSchema = z.object({
+  userId: z.string().min(1, "User ID is required"),
+  integrationId: z.string().min(1, "Integration ID is required"),
+  serviceName: z
+    .string()
+    .min(1, "Service name is required")
+    .max(255, "Service name too long"),
+  hierarchyLevel: z.number().int().min(0).optional().default(0),
+  hierarchyPath: z
+    .string()
+    .min(1, "Hierarchy path is required")
+    .optional()
+    .default("0"),
+});
 
-  static get toggleStatus() {
-    return z.object({
-      isActive: z.boolean(),
-    });
-  }
+// Service Assignment - Handles both Single and Bulk
+export const assignServicesSchema = z.object({
+  body: z.union([
+    // Single assignment
+    baseServiceAssignmentSchema,
+    // Bulk assignment
+    z
+      .array(baseServiceAssignmentSchema)
+      .min(1, "At least one assignment required")
+      .max(100, "Maximum 100 assignments allowed"),
+  ]),
+});
 
-  static get updateServiceProvider() {
-    return z.object({
-      type: z
-        .enum(["BULKPAY", "CC_PAYOUT", "AEPS", "BBPS", "DMT", "RECHARGE"])
-        .optional(),
-      code: z
-        .string()
-        .min(2)
-        .max(50)
-        .regex(/^[A-Z0-9_]+$/)
-        .optional(),
-      name: z.string().min(1).max(255).optional(),
-      config: z.any().optional(),
-      isActive: z.boolean().optional(),
-      parentId: z.string().uuid().optional().nullable(),
-    });
-  }
+// Update Service Status - Handles both Single and Bulk
+export const updateServiceStatusSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, "Service ID is required").optional(),
+  }),
+  body: z.object({
+    status: z.enum(["ACTIVE", "INACTIVE"]),
+    serviceIds: z.array(z.string().min(1)).optional(), // For bulk operations
+  }),
+});
 
-  static get updateCredentials() {
-    return z.object({
-      credentials: z.object({}).passthrough(), // Allows any object structure
-    });
-  }
-}
+// Delete Services - Handles both Single and Bulk
+export const deleteServicesSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, "Service ID is required").optional(),
+  }),
+  body: z.object({
+    serviceIds: z.array(z.string().min(1)).optional(), // For bulk operations
+  }),
+});
+
+// Get services with filters
+export const getServicesSchema = z.object({
+  query: z.object({
+    status: z.enum(["ACTIVE", "INACTIVE", "ALL"]).optional().default("ALL"),
+    userId: z.string().optional(),
+    platformName: z.string().optional(),
+    serviceName: z.string().optional(),
+    page: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val) : 1)),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val) : 10)),
+    sort: z.enum(["asc", "desc"]).optional().default("desc"),
+  }),
+});

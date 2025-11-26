@@ -271,6 +271,9 @@ export default (sequelize, DataTypes) => {
       foreignKey: "verified_by_id",
       as: "verifiedUserKycs",
       constraints: false,
+      scope: {
+        verified_by_type: "USER",
+      },
     });
 
     // Transaction relations
@@ -317,21 +320,37 @@ export default (sequelize, DataTypes) => {
       onDelete: "CASCADE",
     });
 
+    // FIXED: Service Provider relations
+    User.hasMany(models.ServiceProvider, {
+      foreignKey: "user_id",
+      as: "serviceProviders",
+      onDelete: "CASCADE",
+    });
+
     // Management relations
     User.hasMany(models.Employee, {
       foreignKey: "created_by_id",
       as: "employeesCreated",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
     User.hasMany(models.CommissionSetting, {
       foreignKey: "created_by_id",
       as: "commissionSettingsCreated",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
     User.hasMany(models.Role, {
       foreignKey: "created_by_id",
       as: "rolesCreated",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
     User.hasMany(models.CommissionSetting, {
       foreignKey: "target_user_id",
@@ -342,6 +361,9 @@ export default (sequelize, DataTypes) => {
       foreignKey: "created_by_id",
       as: "departments",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
     User.hasMany(models.Employee, {
       foreignKey: "user_id",
@@ -354,21 +376,33 @@ export default (sequelize, DataTypes) => {
       foreignKey: "created_by_id",
       as: "createdRolePermissions",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
     User.hasMany(models.UserPermission, {
       foreignKey: "created_by_id",
       as: "createdUserPermissions",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
     User.hasMany(models.DepartmentPermission, {
       foreignKey: "created_by_id",
       as: "createdDepartmentPermissions",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
     User.hasMany(models.EmployeePermission, {
       foreignKey: "created_by_id",
       as: "createdEmployeePermissions",
       constraints: false,
+      scope: {
+        created_by_type: "USER",
+      },
     });
   };
 
