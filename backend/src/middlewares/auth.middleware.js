@@ -39,7 +39,6 @@ class AuthMiddleware {
   // Find user with complete context including permissions and creator
   static async findUserWithContext(userId, userType = null) {
     if (!userId) return null;
-    console.log("===================== userType", userType);
 
     try {
       // If userType is provided, query directly to the specific table
