@@ -1,16 +1,7 @@
-// validations/stateValidation.schemas.js
 import { z } from "zod";
 
 export const getAllStatesSchema = z.object({
   query: z.object({
-    page: z
-      .string()
-      .optional()
-      .transform((val) => (val ? parseInt(val) : 1)),
-    limit: z
-      .string()
-      .optional()
-      .transform((val) => (val ? parseInt(val) : 10)),
     search: z.string().optional(),
   }),
 });
@@ -30,8 +21,8 @@ export const upsertStateSchema = z.object({
       .max(100, "State name too long"),
     stateCode: z
       .string()
-      .min(1, "State code is required")
-      .max(10, "State code too long")
+      .min(2, "State code is required")
+      .max(2, "State code too long")
       .optional(),
   }),
 });
