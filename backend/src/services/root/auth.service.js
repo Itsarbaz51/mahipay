@@ -199,7 +199,7 @@ class RootAuthService extends BaseAuthService {
       };
     }
 
-    const { token, tokenHash, expires } = this.generatePasswordResetToken();
+    const { token, tokenHash, expires } = CryptoService.generateSecureToken();
 
     await models.Root.update(
       {
@@ -231,7 +231,7 @@ class RootAuthService extends BaseAuthService {
 
   static async confirmPasswordReset(encryptedToken, newPassword, req = null) {
     try {
-      const token = CryptoService.decrypt(encryptedToken);
+      const token = CryptoService.verifySecureToken(encryptedToken);
       const tokenHash = CryptoService.hashData(token);
 
       const user = await this.validatePasswordResetToken(
@@ -260,7 +260,10 @@ class RootAuthService extends BaseAuthService {
       console.error("Root password reset confirmation error:", error);
 
       await this.createAuthAuditLog(
-        { id: null, userType: "ROOT" },
+        {
+          ...user.toJSON(),
+          userType: "ROOT",
+        },
         "PASSWORD_RESET_CONFIRMATION_ERROR",
         req,
         {

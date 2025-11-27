@@ -118,17 +118,9 @@ class BaseAuthService {
     );
   }
 
-  static generatePasswordResetToken() {
-    const token = CryptoService.generateSecureToken(32);
-    const tokenHash = CryptoService.hashData(token);
-    const expires = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
-
-    return { token, tokenHash, expires };
-  }
-
   static async sendPasswordResetEmail(user, token, userType) {
     const encryptedToken = CryptoService.encrypt(token);
-    const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${encodeURIComponent(encryptedToken)}&type=${userType}`;
+    const resetUrl = `${process.env.CLIENT_URL}/auth/password-reset/confirm?token=${encodeURIComponent(encryptedToken)}&type=${userType}`;
 
     await sendPasswordResetEmail(user, resetUrl, userType);
   }
