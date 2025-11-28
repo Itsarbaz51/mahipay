@@ -231,14 +231,9 @@ export default (sequelize, DataTypes) => {
       constraints: false,
     });
     Root.hasMany(models.BusinessKyc, {
-      foreignKey: "verified_by_root_id",
+      foreignKey: "verified_by_id",
       as: "verifiedBusinessKycs",
-      onDelete: "RESTRICT",
-    });
-    Root.hasMany(models.BusinessKyc, {
-      foreignKey: "root_id",
-      as: "ownedBusinessKycs",
-      onDelete: "CASCADE",
+      constraints: false,
     });
 
     // Service Management

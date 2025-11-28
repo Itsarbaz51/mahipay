@@ -106,8 +106,22 @@ class AuthMiddleware {
         },
         {
           association: "createdByRoot",
-          attributes: ["id", "firstName", "lastName", "email", "username"],
+          attributes: [
+            "id",
+            "firstName",
+            "lastName",
+            "email",
+            "username",
+            "roleId",
+          ],
           required: false,
+          include: [
+            {
+              association: "role",
+              attributes: ["name"],
+              required: false,
+            },
+          ],
         },
         {
           association: "createdByUser",
@@ -145,6 +159,7 @@ class AuthMiddleware {
       creator = {
         ...user.createdByRoot.toJSON(),
         userType: "ROOT",
+        role: user.createdByRoot.role?.name,
       };
     } else if (user.createdByType === "ADMIN" && user.createdByUser) {
       creator = {
@@ -155,7 +170,8 @@ class AuthMiddleware {
     }
 
     // Destructure to remove unwanted fields without overwriting `user`
-    const { createdByRoot, department, createdByUser, ...userData } = user.toJSON();
+    const { createdByRoot, department, createdByUser, ...userData } =
+      user.toJSON();
 
     return {
       ...userData,
