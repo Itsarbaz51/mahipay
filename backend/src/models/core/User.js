@@ -179,6 +179,17 @@ export default (sequelize, DataTypes) => {
         field: "deactivation_reason",
         allowNull: true,
       },
+      createdById: {
+        type: DataTypes.UUID,
+        field: "created_by_id",
+        allowNull: true,
+      },
+      createdByType: {
+        type: DataTypes.ENUM("USER", "ROOT"),
+        field: "created_by_type",
+        defaultValue: "USER",
+        allowNull: false,
+      },
     },
     {
       tableName: "users",
@@ -220,11 +231,30 @@ export default (sequelize, DataTypes) => {
         {
           fields: ["created_at"],
         },
+        {
+          fields: ["created_by_id"],
+        },
+        {
+          fields: ["created_by_type"],
+        },
       ],
     }
   );
 
   User.associate = function (models) {
+    User.belongsTo(models.Root, {
+      foreignKey: "created_by_id",
+      as: "creatorRoot",
+      constraints: false,
+    });
+
+    User.belongsTo(User, {
+      foreignKey: "created_by_id",
+      as: "creatorUser",
+      constraints: false,
+      scope: { created_by_type: "USER" },
+    });
+
     // Hierarchical self-reference
     User.belongsTo(User, {
       foreignKey: "parent_id",

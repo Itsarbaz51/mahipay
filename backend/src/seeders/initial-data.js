@@ -217,6 +217,8 @@ export default {
           created_at: currentTime,
           updated_at: currentTime,
           deleted_at: null,
+          created_by_id: rootUserId,
+          created_by_type: "ROOT"
         },
       ]);
       console.log("✅ Admin user created");
