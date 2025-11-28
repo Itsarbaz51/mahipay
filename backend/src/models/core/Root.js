@@ -163,6 +163,12 @@ export default (sequelize, DataTypes) => {
   );
 
   Root.associate = function (models) {
+    Root.hasMany(models.IpWhitelist, {
+      foreignKey: "created_by_id",
+      as: "createdIpWhitelists",
+      constraints: false,
+    });
+
     Root.hasMany(models.User, {
       foreignKey: "created_by_id",
       as: "creatorRoot",
