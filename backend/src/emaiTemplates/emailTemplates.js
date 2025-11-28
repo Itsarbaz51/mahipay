@@ -296,6 +296,159 @@ class EmailTemplates {
     };
   }
 
+  // ==================== ROOT USER EMAIL TEMPLATES ====================
+
+  static generateRootUserCredentialsTemplate(options) {
+    const {
+      firstName,
+      username,
+      email,
+      password,
+      actionType = "created",
+      customMessage = null,
+    } = options;
+
+    const formattedFirstName = this.formatName(firstName);
+
+    const actionText =
+      actionType === "reset"
+        ? "Your Root Administrator Account Credentials Have Been Reset"
+        : "Your Root Administrator Account Has Been Created";
+
+    const actionDescription =
+      actionType === "reset"
+        ? "Your root administrator account credentials have been reset. Here are your new login credentials:"
+        : "Your root administrator account has been successfully created. Here are your login credentials:";
+
+    const dynamicMessage = customMessage || actionDescription;
+
+    return {
+      subject: `Root Administrator Account ${actionType === "reset" ? "Credentials Reset" : "Created"}`,
+      html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Root Administrator Account Credentials</title>
+          <style>
+              ${this.getCommonStyles()}
+              .root-features {
+                background: #fff3e0;
+                border-left: 4px solid #ff9800;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 4px;
+              }
+              .feature-item {
+                display: flex;
+                align-items: center;
+                margin: 8px 0;
+              }
+              .feature-icon {
+                margin-right: 10px;
+                font-size: 16px;
+              }
+              .security-highlight {
+                background: #ffebee;
+                border-left: 4px solid #f44336;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 4px;
+              }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <div class="header" style="background: linear-gradient(135deg, #dc2626, #b91c1c);">
+                  <h1>Root Administrator Account ${actionType === "reset" ? "Credentials Reset" : "Created"}</h1>
+                  <p>${actionType === "reset" ? "Your root credentials have been updated" : "Welcome to the root administrator portal"}</p>
+              </div>
+              
+              <div class="content">
+                  <div class="greeting">
+                      Hello <strong>${formattedFirstName}</strong>,
+                  </div>
+                  
+                  <div class="instruction-box">
+                      <h3>${actionText}</h3>
+                      ${dynamicMessage}
+                  </div>
+
+                  <div class="security-highlight">
+                      <h4>⚠️ ULTRA-HIGH SECURITY ACCESS</h4>
+                      <p>You are receiving credentials for a <strong>Root Administrator Account</strong> with full system access and privileges.</p>
+                  </div>
+
+                  <div class="root-features">
+                      <h4>🔧 Root Administrator Capabilities</h4>
+                      <div class="feature-item">
+                          <span class="feature-icon">⚙️</span>
+                          <span>Full System Configuration Access</span>
+                      </div>
+                      <div class="feature-item">
+                          <span class="feature-icon">👥</span>
+                          <span>User and Role Management</span>
+                      </div>
+                      <div class="feature-item">
+                          <span class="feature-icon">📊</span>
+                          <span>System-wide Analytics and Reports</span>
+                      </div>
+                      <div class="feature-item">
+                          <span class="feature-icon">🔐</span>
+                          <span>Security Settings and Audit Logs</span>
+                      </div>
+                      <div class="feature-item">
+                          <span class="feature-icon">🚨</span>
+                          <span>Emergency System Controls</span>
+                      </div>
+                  </div>
+                  
+                  <div class="credentials-card">
+                      <h3>Your Root Administrator Credentials</h3>
+                      <div class="credential-item">
+                          <span class="credential-label">Username:</span>
+                          <span class="credential-value">${username}</span>
+                      </div>
+                      <div class="credential-item">
+                          <span class="credential-label">Email:</span>
+                          <span class="credential-value">${email}</span>
+                      </div>
+                      <div class="credential-item">
+                          <span class="credential-label">Password:</span>
+                          <span class="credential-value">${password}</span>
+                      </div>
+                  </div>
+                  
+                  <div class="security-notice">
+                      <h4>🔒 CRITICAL SECURITY REQUIREMENTS</h4>
+                      <ul>
+                          <li>This is a SUPER ADMIN account with full system access</li>
+                          <li>Never share these credentials with anyone</li>
+                          <li>Use only from secure, trusted networks</li>
+                          <li>Enable two-factor authentication immediately</li>
+                          <li>Change password on first login and regularly thereafter</li>
+                          <li>Monitor account activity closely for any suspicious behavior</li>
+                          <li>Log out immediately after completing administrative tasks</li>
+                      </ul>
+                  </div>
+                  
+                  <div class="support-info">
+                      <p><strong>Root Account Security Protocol:</strong> Any suspicious activity must be reported immediately to the security team.</p>
+                  </div>
+              </div>
+              
+              <div class="footer">
+                  <p>Root Administrator System Access - STRICTLY CONFIDENTIAL</p>
+              </div>
+          </div>
+      </body>
+      </html>
+    `,
+      text: this.generateRootUserCredentialsPlainText(options),
+    };
+  }
+
   // ==================== PASSWORD RESET TEMPLATES ====================
 
   static generatePasswordResetTemplate(options) {
@@ -710,6 +863,60 @@ Security Team
 This is an automated security message. Please do not reply to this email.
 If you didn't request a password reset, please secure your account immediately.
     `.trim();
+  }
+
+  static generateRootUserCredentialsPlainText(options) {
+    const {
+      firstName,
+      username,
+      email,
+      password,
+      actionType = "created",
+      customMessage = null,
+    } = options;
+
+    const formattedFirstName = this.formatName(firstName);
+
+    return `
+ROOT ADMINISTRATOR ACCOUNT ${actionType === "reset" ? "CREDENTIALS RESET" : "CREATED"}
+
+Hello ${formattedFirstName},
+
+${customMessage || `Your root administrator account has been ${actionType === "reset" ? "credentials reset" : "successfully created"}.`}
+
+⚠️ ULTRA-HIGH SECURITY ACCESS
+─────────────────────────────
+You are receiving credentials for a ROOT ADMINISTRATOR ACCOUNT with full system access and privileges.
+
+ROOT ADMINISTRATOR CAPABILITIES:
+────────────────────────────────
+• Full System Configuration Access
+• User and Role Management
+• System-wide Analytics and Reports
+• Security Settings and Audit Logs
+• Emergency System Controls
+
+YOUR ROOT ADMINISTRATOR CREDENTIALS:
+────────────────────────────────────
+Username: ${username}
+Email: ${email}
+Password: ${password}
+
+CRITICAL SECURITY REQUIREMENTS:
+───────────────────────────────
+• This is a SUPER ADMIN account with full system access
+• Never share these credentials with anyone
+• Use only from secure, trusted networks
+• Enable two-factor authentication immediately
+• Change password on first login and regularly thereafter
+• Monitor account activity closely for any suspicious behavior
+• Log out immediately after completing administrative tasks
+
+Root Account Security Protocol: Any suspicious activity must be reported immediately to the security team.
+
+──────────────────────────
+Root Administrator System Access - STRICTLY CONFIDENTIAL
+  `.trim();
   }
 
   // ==================== COMMON UTILITIES ====================

@@ -5,6 +5,7 @@ import { validateRequest } from "../middlewares/validateRequest.js";
 import AuthValidationSchemas from "../validations/authValidation.schemas.js";
 import PermissionRegistry from "../utils/permissionRegistry.js";
 import PermissionMiddleware from "../middlewares/permission.middleware.js";
+import upload from "../middlewares/multer.middleware.js";
 
 const authRoutes = Router();
 
@@ -20,7 +21,11 @@ authRoutes.post(
   validateRequest(AuthValidationSchemas.forgotPassword),
   AuthController.requestPasswordReset
 );
-authRoutes.post("/password-reset/confirm", AuthController.confirmPasswordReset);
+authRoutes.post(
+  "/password-reset/confirm",
+  validateRequest(AuthValidationSchemas.confirmPasswordReset),
+  AuthController.confirmPasswordReset
+); // ✅
 
 // Protected routes
 authRoutes.post("/logout", AuthMiddleware.authenticate, AuthController.logout); // ✅
@@ -34,6 +39,8 @@ authRoutes.get(
   AuthMiddleware.authenticate,
   AuthController.getCurrentUser
 ); // ✅
+
+//Everyone credentials UPDATE METHODS
 authRoutes.put(
   "/:userId/credentials",
   AuthMiddleware.authenticate,
@@ -43,21 +50,32 @@ authRoutes.put(
     PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[5]
   ),
   AuthController.updateCredentials
-);
+); // ✅
 
 authRoutes.get(
   "/dashboard",
   AuthMiddleware.authenticate,
   AuthController.getDashboard
-);
+); // ✅
+
+//own profile update
 authRoutes.put(
   "/profile",
   AuthMiddleware.authenticate,
+  validateRequest(AuthValidationSchemas.updateProfile),
+  AuthController.updateProfile
+); // ✅
+
+//own profile image update
+authRoutes.put(
+  "/profile-image",
+  AuthMiddleware.authenticate,
   AuthMiddleware.requireUser,
   PermissionMiddleware.requirePermission(
-    PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[2]
+    PermissionRegistry.PERMISSIONS.USER_MANAGEMENT[6]
   ),
-  AuthController.updateProfile
+  upload.single("profileImage"),
+  AuthController.updateProfileImage
 );
 
 export default authRoutes;

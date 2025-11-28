@@ -18,6 +18,7 @@ class PermissionRegistry {
       "employee:update",
       "employee:delete",
       "employee:manage",
+      "employee:update:credentials",
     ],
     WALLET_MANAGEMENT: [
       "wallet:view",
@@ -128,7 +129,7 @@ class PermissionRegistry {
             is_active: true,
             revoked_at: null,
           },
-          attributes: ["permission", "service_id"],
+          attributes: ["permission"],
           raw: true,
         }),
         models.Employee.findByPk(employeeId, {
@@ -140,7 +141,7 @@ class PermissionRegistry {
                   association: "departmentPermissions",
                   where: { is_active: true, revoked_at: null },
                   required: false,
-                  attributes: ["permission", "service_id"],
+                  attributes: ["permission"],
                 },
               ],
             },

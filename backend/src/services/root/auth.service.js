@@ -2,9 +2,10 @@ import models from "../../models/index.js";
 import { ApiError } from "../../utils/ApiError.js";
 import Helper from "../../utils/helper.js";
 import { CryptoService } from "../../utils/cryptoService.js";
-import BaseAuthService from "../shared/baseAuth.service.js";
+import { sendCredentialsEmail } from "../../utils/sendCredentialsEmail.js";
+import S3Service from "../../utils/S3Service.js";
 
-class RootAuthService extends BaseAuthService {
+class RootAuthService {
   static async login(payload, req = null) {
     const { emailOrUsername, password } = payload;
 
@@ -27,7 +28,7 @@ class RootAuthService extends BaseAuthService {
       });
 
       if (!user) {
-        await this.createAuthAuditLog(
+        await Helper.createAuthAuditLog(
           {
             id: null,
             userType: "ROOT",
@@ -40,13 +41,13 @@ class RootAuthService extends BaseAuthService {
       }
 
       // Verify password
-      const isValidPassword = await this.verifyPassword(
+      const isValidPassword = await Helper.verifyPassword(
         user.password,
         password
       );
 
       if (!isValidPassword) {
-        await this.createAuthAuditLog(
+        await Helper.createAuthAuditLog(
           {
             ...user.toJSON(),
             userType: "ROOT",
@@ -62,7 +63,7 @@ class RootAuthService extends BaseAuthService {
       }
 
       // Check user status
-      await this.checkUserStatus(user);
+      await Helper.checkUserStatus(user);
 
       // Build token payload
       const tokenPayload = {
@@ -84,13 +85,13 @@ class RootAuthService extends BaseAuthService {
         { where: { id: user.id } }
       );
 
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { ...user.toJSON(), userType: "ROOT" },
         "LOGIN_SUCCESS",
         req
       );
       return {
-        user: this.sanitizeUserData(user),
+        user: Helper.sanitizeUserData(user),
         accessToken,
         refreshToken,
         userType: "root",
@@ -109,7 +110,7 @@ class RootAuthService extends BaseAuthService {
         { where: { id: userId } }
       );
 
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { id: userId, userType: "ROOT" },
         "LOGOUT",
         req,
@@ -129,7 +130,7 @@ class RootAuthService extends BaseAuthService {
     try {
       payload = Helper.verifyRefreshToken(refreshToken);
     } catch (error) {
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { id: payload?.id, userType: "ROOT" },
         "REFRESH_TOKEN_INVALID",
         req,
@@ -143,7 +144,7 @@ class RootAuthService extends BaseAuthService {
     });
 
     if (!user) {
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { id: payload.id, userType: "ROOT" },
         "REFRESH_TOKEN_USER_NOT_FOUND",
         req
@@ -168,12 +169,12 @@ class RootAuthService extends BaseAuthService {
       { where: { id: user.id } }
     );
 
-    await this.createAuthAuditLog(user, "REFRESH_TOKEN_SUCCESS", req);
+    await Helper.createAuthAuditLog(user, "REFRESH_TOKEN_SUCCESS", req);
 
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      user: this.sanitizeUserData(user),
+      user: Helper.sanitizeUserData(user),
     };
   }
 
@@ -183,7 +184,7 @@ class RootAuthService extends BaseAuthService {
     });
 
     if (!user) {
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         {
           id: null,
           userType: "ROOT",
@@ -209,9 +210,9 @@ class RootAuthService extends BaseAuthService {
       { where: { id: user.id } }
     );
 
-    await this.sendPasswordResetEmail(user, token, "root");
+    await Helper.sendPasswordResetEmail(user, token, "root");
 
-    await this.createAuthAuditLog(
+    await Helper.createAuthAuditLog(
       {
         ...user.toJSON(),
         userType: "ROOT",
@@ -230,16 +231,27 @@ class RootAuthService extends BaseAuthService {
   }
 
   static async confirmPasswordReset(encryptedToken, newPassword, req = null) {
+    let user;
     try {
       const token = CryptoService.verifySecureToken(encryptedToken);
       const tokenHash = CryptoService.hashData(token);
 
-      const user = await this.validatePasswordResetToken(
-        tokenHash,
-        models.Root
-      );
+      user = await models.Root.findOne({
+        where: {
+          passwordResetToken: tokenHash,
+          passwordResetExpires: { [models.Sequelize.Op.gt]: new Date() },
+        },
+        include: [
+          {
+            association: "role",
+            attributes: ["name"],
+            required: false,
+          },
+        ],
+      });
+
       if (!user) {
-        await this.createAuthAuditLog(
+        await Helper.createAuthAuditLog(
           { id: null, userType: "ROOT" },
           "PASSWORD_RESET_CONFIRMATION_FAILED",
           req,
@@ -248,9 +260,23 @@ class RootAuthService extends BaseAuthService {
         throw ApiError.badRequest("Invalid or expired token");
       }
 
-      await this.updateUserPassword(user.id, newPassword, models.Root);
+      const generatedPassword = Helper.generatePassword();
 
-      await this.createAuthAuditLog(user, "PASSWORD_RESET_CONFIRMED", req);
+      await Helper.updateRootPassword(user.id, generatedPassword);
+
+      await sendCredentialsEmail(
+        user,
+        generatedPassword,
+        null,
+        "reset",
+        `Your root account password has been reset successfully. Here are your new login credentials.`,
+        "ROOT", // Changed to uppercase to match your sendCredentialsEmail function
+        {
+          role: user.role?.name || "Root Administrator",
+        }
+      );
+
+      await Helper.createAuthAuditLog(user, "PASSWORD_RESET_CONFIRMED", req);
 
       return {
         message:
@@ -259,9 +285,9 @@ class RootAuthService extends BaseAuthService {
     } catch (error) {
       console.error("Root password reset confirmation error:", error);
 
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         {
-          ...user.toJSON(),
+          ...(user?.toJSON() || { userType: "ROOT" }),
           userType: "ROOT",
         },
         "PASSWORD_RESET_CONFIRMATION_ERROR",
@@ -281,37 +307,141 @@ class RootAuthService extends BaseAuthService {
     }
   }
 
-  static async updateCredentials(rootId, credentialsData, req = null) {
-    const root = await models.Root.findByPk(rootId);
-    if (!root) {
-      throw ApiError.notFound("Root user not found");
-    }
+  static async updateCredentials({
+    currentUserId,
+    targetUserId,
+    credentialsData,
+    req,
+    currentUserType,
+  }) {
+    // ACCESS CONTROL - Root has full access
+    // No restrictions for ROOT user
+    const { User, Root, Employee } = models;
 
-    // Verify current password
-    const isValidPassword = await this.verifyPassword(
-      root.password,
-      credentialsData.currentPassword
-    );
+    let targetUser;
+    let targetUserType;
+    let userModel;
 
-    if (!isValidPassword) {
-      await this.createAuthAuditLog(root, "CREDENTIALS_UPDATE_FAILED", req, {
-        reason: "INVALID_CURRENT_PASSWORD",
+    // Determine target user type
+    const rootUser = await Root.findByPk(targetUserId);
+    if (rootUser) {
+      targetUser = rootUser;
+      targetUserType = "ROOT";
+      userModel = Root;
+    } else {
+      const employeeUser = await Employee.findByPk(targetUserId, {
+        include: [
+          {
+            association: "department",
+            attributes: ["name"],
+          },
+        ],
       });
-      throw ApiError.unauthorized("Current password is incorrect");
+      if (employeeUser) {
+        targetUser = employeeUser;
+        targetUserType = employeeUser.department.name;
+        userModel = Employee;
+      } else {
+        const businessUser = await User.findByPk(targetUserId, {
+          include: [
+            {
+              association: "role",
+              attributes: ["name"],
+            },
+          ],
+        });
+        if (businessUser) {
+          targetUser = businessUser;
+          targetUserType = businessUser.role.name;
+          userModel = User;
+        } else {
+          throw ApiError.notFound("User not found");
+        }
+      }
     }
 
-    const updateData = {
-      password: CryptoService.encrypt(credentialsData.newPassword),
-      refreshToken: null, // Invalidate all sessions
-    };
+    if (!targetUser) {
+      throw ApiError.notFound("User not found");
+    }
 
-    await models.Root.update(updateData, { where: { id: rootId } });
+    const isOwnUpdate = currentUserId === targetUserId;
 
-    await this.createAuthAuditLog(root, "CREDENTIALS_UPDATED", req, {
-      updatedFields: ["password"],
+    // -------------------------------
+    // 3. Prepare update data
+    // -------------------------------
+    const updateData = {};
+    const updatedFields = [];
+
+    // Password update
+    if (credentialsData.newPassword) {
+      // Root doesn't need current password for others, but needs for self
+      if (isOwnUpdate && credentialsData.currentPassword) {
+        const decryptedStoredPassword = CryptoService.decrypt(
+          targetUser.password
+        );
+        if (decryptedStoredPassword !== credentialsData.currentPassword) {
+          throw ApiError.unauthorized("Current password is incorrect");
+        }
+      }
+
+      updateData.password = CryptoService.encrypt(credentialsData.newPassword);
+      updateData.refreshToken = null;
+      updatedFields.push("password");
+    }
+
+    // Transaction PIN update (only for BUSINESS users)
+    if (credentialsData.newTransactionPin && targetUserType === "BUSINESS") {
+      // Root doesn't need current PIN for others
+      if (isOwnUpdate && credentialsData.currentTransactionPin) {
+        if (!targetUser.transactionPin) {
+          throw ApiError.badRequest("Transaction PIN not set for this user");
+        }
+
+        const decryptedPin = CryptoService.decrypt(targetUser.transactionPin);
+        if (decryptedPin !== credentialsData.currentTransactionPin) {
+          throw ApiError.unauthorized("Current transaction PIN is incorrect");
+        }
+      }
+
+      updateData.transactionPin = CryptoService.encrypt(
+        credentialsData.newTransactionPin
+      );
+      updatedFields.push("transactionPin");
+    }
+
+    if (updatedFields.length === 0) {
+      throw ApiError.badRequest("No valid fields to update");
+    }
+
+    // -------------------------------
+    // 4. Update in Database
+    // -------------------------------
+    await userModel.update(updateData, {
+      where: { id: targetUserId },
     });
 
-    return { message: "Credentials updated successfully" };
+    // -------------------------------
+    // 5. AUDIT LOG
+    // -------------------------------
+    await Helper.createAuthAuditLog(
+      { id: currentUserId, userType: currentUserType }, // user object
+      "CREDENTIALS_UPDATED", // action
+      req, // request object
+      {
+        updatedFields,
+        isOwnUpdate,
+        targetUserId,
+        targetUserType,
+        performedById: currentUserId,
+        performedByType: currentUserType,
+      }
+    );
+
+    return {
+      message: "Credentials updated successfully",
+      updatedFields,
+      targetUserType,
+    };
   }
 
   static async getProfile(rootId) {
@@ -331,7 +461,7 @@ class RootAuthService extends BaseAuthService {
       throw ApiError.notFound("Root user not found");
     }
 
-    return this.sanitizeUserData(user);
+    return Helper.sanitizeUserData(user);
   }
 
   static async updateProfile(rootId, updateData, req = null) {
@@ -345,7 +475,7 @@ class RootAuthService extends BaseAuthService {
       "lastName",
       "username",
       "phoneNumber",
-      "profileImage",
+      "email",
     ];
 
     const updatePayload = {};
@@ -366,7 +496,7 @@ class RootAuthService extends BaseAuthService {
 
     await models.Root.update(updatePayload, { where: { id: rootId } });
 
-    await this.createAuthAuditLog(user, "PROFILE_UPDATED", req, {
+    await Helper.createAuthAuditLog(user, "PROFILE_UPDATED", req, {
       updatedFields: Object.keys(updatePayload),
       previousValues,
     });
@@ -374,76 +504,172 @@ class RootAuthService extends BaseAuthService {
     return await this.getProfile(rootId);
   }
 
+  static async updateProfileImage(rootId, profileImagePath, req = null) {
+    try {
+      const { Root } = models;
+
+      // Verify root user exists
+      const root = await Root.findByPk(rootId);
+      if (!root) {
+        throw ApiError.notFound("Root user not found");
+      }
+
+      let oldImageDeleted = false;
+      let profileImageUrl = "";
+
+      // Delete old profile image if exists
+      if (root.profileImage) {
+        try {
+          await S3Service.delete({ fileUrl: root.profileImage });
+          oldImageDeleted = true;
+          console.log("Old root profile image deleted", { rootId });
+        } catch (error) {
+          console.error("Failed to delete old root profile image", {
+            rootId,
+            error: error.message,
+          });
+        }
+      }
+
+      // Upload new profile image
+      try {
+        profileImageUrl = await S3Service.upload(profileImagePath, "profile");
+
+        if (!profileImageUrl) {
+          throw new Error("Failed to upload image to S3");
+        }
+
+        console.log("New root profile image uploaded", { rootId });
+      } catch (uploadError) {
+        console.error("Failed to upload root profile image", {
+          rootId,
+          error: uploadError.message,
+        });
+        throw ApiError.internal("Failed to upload profile image");
+      }
+
+      // Update root record
+      try {
+        await Root.update(
+          { profileImage: profileImageUrl },
+          { where: { id: rootId } }
+        );
+
+        console.log("Root profile image updated in database", { rootId });
+      } catch (updateError) {
+        console.error("Failed to update root profile image in database", {
+          rootId,
+          error: updateError.message,
+        });
+
+        // Rollback: Delete uploaded image
+        try {
+          await S3Service.delete({ fileUrl: profileImageUrl });
+        } catch (rollbackError) {
+          console.error(
+            "Failed to rollback root uploaded image",
+            rollbackError
+          );
+        }
+
+        throw ApiError.internal("Failed to update profile in database");
+      }
+
+      // Delete local file
+      try {
+        await Helper.deleteOldImage(profileImagePath);
+      } catch (deleteError) {
+        console.error("Failed to delete root local file", deleteError);
+      }
+
+      // Audit log
+      if (req) {
+        await Helper.createAuthAuditLog(
+          { id: rootId, userType: "ROOT" },
+          "PROFILE_IMAGE_UPDATED",
+          req,
+          {
+            oldImageDeleted,
+            userType: "ROOT",
+          }
+        );
+      }
+
+      // Get updated root data
+      const updatedRoot = await Root.findByPk(rootId, {
+        attributes: { exclude: ["password", "refreshToken"] },
+      });
+
+      return {
+        user: updatedRoot,
+        message: "Root profile image updated successfully",
+      };
+    } catch (error) {
+      console.error("Error in RootAuthService.updateProfileImage:", {
+        rootId,
+        error: error.message,
+      });
+
+      // Cleanup local file
+      try {
+        await Helper.deleteOldImage(profileImagePath);
+      } catch (cleanupError) {
+        console.error("Failed to cleanup root local file", cleanupError);
+      }
+
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw ApiError.internal("Failed to update root profile image");
+    }
+  }
+
   static async getRootDashboard(rootUser, req = null) {
     if (!rootUser || rootUser.userType !== "ROOT") {
       throw ApiError.forbidden("Root access required");
     }
 
-    const [
-      totalAdmins,
-      totalBusinessUsers,
-      totalEmployees,
-      totalRootUsers,
-      pendingKyc,
-    ] = await Promise.all([
-      models.User.count({
-        include: [
-          {
-            model: models.Role,
-            as: "role",
-            where: { name: "ADMIN" },
-          },
-        ],
-      }),
-      models.User.count({
-        include: [
-          {
-            model: models.Role,
-            as: "role",
-            where: { name: { [models.Sequelize.Op.ne]: "ADMIN" } },
-          },
-        ],
-      }),
-      models.Employee.count(),
-      models.Root.count(),
-      models.UserKyc.count({ where: { status: "PENDING" } }),
-    ]);
+    const [totalAdmins, totalBusinessUsers, totalEmployees, pendingKyc] =
+      await Promise.all([
+        models.User.count({
+          include: [
+            {
+              model: models.Role,
+              as: "role",
+              where: { name: "ADMIN" },
+            },
+          ],
+        }),
+        models.User.count({
+          include: [
+            {
+              model: models.Role,
+              as: "role",
+              where: { name: { [models.Sequelize.Op.ne]: "ADMIN" } },
+            },
+          ],
+        }),
+        models.Employee.count(),
+        models.UserKyc.count({ where: { status: "PENDING" } }),
+      ]);
 
     const systemStats = {
       totalAdmins,
       totalBusinessUsers,
       totalEmployees,
-      totalRootUsers,
       pendingKyc,
       systemRevenue: await this.getSystemRevenue(),
     };
 
     const recentActivities = await this.getRecentSystemActivities();
 
-    await this.createAuthAuditLog(rootUser, "DASHBOARD_ACCESSED", req, {
+    await Helper.createAuthAuditLog(rootUser, "DASHBOARD_ACCESSED", req, {
       dashboardType: "ROOT_DASHBOARD",
     });
 
     return {
       systemStats,
       recentActivities: recentActivities.slice(0, 10),
-      quickActions: [
-        {
-          action: "create_root",
-          label: "Create Root User",
-          description: "Create new root user account",
-        },
-        {
-          action: "system_analytics",
-          label: "View Analytics",
-          description: "View system-wide analytics",
-        },
-        {
-          action: "audit_logs",
-          label: "Audit Logs",
-          description: "View comprehensive audit logs",
-        },
-      ],
     };
   }
 

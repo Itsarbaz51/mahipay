@@ -7,13 +7,13 @@ export async function sendCredentialsEmail(
   transactionPin,
   actionType = "created",
   customMessage = null,
-  userType = "business", // 'business' or 'employee'
+  userType = "business", // 'business' or 'employee' or 'root'
   additionalData = {} // { role, permissions } for employees
 ) {
   try {
     let emailContent;
 
-    if (userType === "employee") {
+    if (userType === "EMPLOYEE") {
       emailContent = EmailTemplates.generateEmployeeCredentialsTemplate({
         firstName: user.firstName,
         username: user.username,
@@ -24,7 +24,18 @@ export async function sendCredentialsEmail(
         actionType: actionType,
         customMessage: customMessage,
       });
-    } else {
+    }
+    if (userType === "ROOT") {
+      emailContent = EmailTemplates.generateRootUserCredentialsTemplate({
+        firstName: user.firstName,
+        username: user.username,
+        email: user.email,
+        password: password,
+        transactionPin: transactionPin,
+        actionType: actionType,
+        customMessage: customMessage,
+      });
+    } if (userType === "BUSINESS") {
       emailContent = EmailTemplates.generateBusinessUserCredentialsTemplate({
         firstName: user.firstName,
         username: user.username,

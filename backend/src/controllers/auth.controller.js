@@ -27,7 +27,7 @@ class AuthController {
       throw ApiError.badRequest("User type is required");
     }
 
-    let user, accessToken, refreshToken, authenticatedUserType;
+    let user, accessToken, refreshToken, authenticatedUserType, permissions;
 
     switch (userType.toUpperCase()) {
       case "ROOT":
@@ -45,6 +45,7 @@ class AuthController {
           accessToken,
           refreshToken,
           userType: authenticatedUserType,
+          permissions,
         } = await BusinessAuthService.login(req.body, req));
         break;
 
@@ -54,6 +55,7 @@ class AuthController {
           accessToken,
           refreshToken,
           userType: authenticatedUserType,
+          permissions,
         } = await EmployeeAuthService.login(req.body, req));
         break;
 
@@ -70,17 +72,20 @@ class AuthController {
       ...userWithoutSensitiveData
     } = safeUser;
 
+    const responseData = {
+      user: userWithoutSensitiveData,
+      accessToken,
+      userType: authenticatedUserType,
+      ...(permissions && { permissions }),
+    };
+
     return res
       .status(200)
       .cookie("accessToken", accessToken, cookieOptions)
       .cookie("refreshToken", refreshToken, refreshCookieOptions)
       .json(
         ApiResponse.success(
-          {
-            user: userWithoutSensitiveData,
-            accessToken,
-            userType: authenticatedUserType,
-          },
+          responseData,
           `${userWithoutSensitiveData.email} login successful`,
           200
         )
@@ -176,7 +181,7 @@ class AuthController {
       throw ApiError.unauthorized("Refresh token missing");
     }
 
-    let accessToken, refreshToken, user;
+    let accessToken, refreshToken, user, permissions;
 
     // Try each service until we find the right one
     try {
@@ -186,10 +191,10 @@ class AuthController {
       ));
     } catch (error) {
       try {
-        ({ accessToken, refreshToken, user } =
+        ({ accessToken, refreshToken, user, permissions } =
           await BusinessAuthService.refreshToken(incomingRefresh, req));
       } catch (error) {
-        ({ accessToken, refreshToken, user } =
+        ({ accessToken, refreshToken, user, permissions } =
           await EmployeeAuthService.refreshToken(incomingRefresh, req));
       }
     }
@@ -209,16 +214,17 @@ class AuthController {
       ...userWithoutSensitiveData
     } = safeUser;
 
-    return res.status(200).json(
-      ApiResponse.success(
-        {
-          accessToken,
-          user: userWithoutSensitiveData,
-        },
-        "Token refreshed successfully",
-        200
-      )
-    );
+    const responseData = {
+      accessToken,
+      user: userWithoutSensitiveData,
+      ...(permissions && { permissions }),
+    };
+
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(responseData, "Token refreshed successfully", 200)
+      );
   });
 
   static requestPasswordReset = asyncHandler(async (req, res) => {
@@ -253,45 +259,25 @@ class AuthController {
   static confirmPasswordReset = asyncHandler(async (req, res) => {
     // Get token + userType from URL query
     const token = req.query.token;
-    const userType = req.query.type; // or req.query.userType
+    const userType = req.query.type;
 
-    console.log(token);
-    console.log(userType);
-
-    // Get password from request body
-    const { newPassword } = req.body;
-
-    if (!token || !userType || !newPassword) {
-      throw ApiError.badRequest(
-        "Token, user type and new password are required"
-      );
+    if (!token || !userType) {
+      throw ApiError.badRequest("Token and user type are required");
     }
 
     let result;
 
     switch (userType.toUpperCase()) {
       case "ROOT":
-        result = await RootAuthService.confirmPasswordReset(
-          token,
-          newPassword,
-          req
-        );
+        result = await RootAuthService.confirmPasswordReset(token, req);
         break;
 
       case "BUSINESS":
-        result = await BusinessAuthService.confirmPasswordReset(
-          token,
-          newPassword,
-          req
-        );
+        result = await BusinessAuthService.confirmPasswordReset(token, req);
         break;
 
       case "EMPLOYEE":
-        result = await EmployeeAuthService.confirmPasswordReset(
-          token,
-          newPassword,
-          req
-        );
+        result = await EmployeeAuthService.confirmPasswordReset(token, req);
         break;
 
       default:
@@ -301,10 +287,12 @@ class AuthController {
     return res.status(200).json(ApiResponse.success(null, result.message, 200));
   });
 
+  //Everyone credentials UPDATE METHODS
   static updateCredentials = asyncHandler(async (req, res) => {
-    const { userId } = req.params;
     const currentUserId = req.user?.id;
     const currentUserType = req.user?.userType;
+    const targetUserId = req.params.userId;
+    const currentUserRole = req.user?.role;
 
     if (!currentUserId || !currentUserType) {
       throw ApiError.unauthorized("User not authenticated");
@@ -316,40 +304,50 @@ class AuthController {
 
     switch (currentUserType.toUpperCase()) {
       case "ROOT":
-        result = await RootAuthService.updateCredentials(
-          userId,
+        result = await RootAuthService.updateCredentials({
+          currentUserId,
+          currentUserType,
+          targetUserId,
           credentialsData,
-          req
-        );
+          currentUserRole,
+          req,
+        });
         break;
 
       case "BUSINESS":
-        result = await BusinessAuthService.updateCredentials(
-          userId,
-          credentialsData,
+        result = await BusinessAuthService.updateCredentials({
           currentUserId,
-          req
-        );
+          currentUserType,
+          targetUserId,
+          credentialsData,
+          currentUserRole,
+          req,
+        });
         break;
 
       case "EMPLOYEE":
-        result = await EmployeeAuthService.updateCredentials(
-          userId,
+        result = await EmployeeAuthService.updateCredentials({
+          currentUserId,
+          currentUserType,
+          targetUserId,
           credentialsData,
-          req
-        );
+          currentUserRole,
+          req,
+        });
         break;
 
       default:
         throw ApiError.badRequest("Invalid user type");
     }
 
-    const isUpdatingOwnAccount = currentUserId === userId;
+    const isUpdatingOwnAccount = currentUserId === targetUserId;
 
     return res.status(200).json(
       ApiResponse.success(
         {
           isOwnUpdate: isUpdatingOwnAccount,
+          updatedFields: result.updatedFields,
+          targetUserType: result.targetUserType,
         },
         result.message,
         200
@@ -360,9 +358,6 @@ class AuthController {
   // DASHBOARD METHODS
   static getDashboard = asyncHandler(async (req, res) => {
     const userType = req.user?.userType;
-
-    console.log(req.user);
-    
 
     if (!userType) {
       throw ApiError.unauthorized("User not authenticated");
@@ -404,13 +399,13 @@ class AuthController {
       );
   });
 
-  // PROFILE UPDATE METHODS
+  //OWN PROFILE UPDATE METHODS
   static updateProfile = asyncHandler(async (req, res) => {
-    const userId = req.user?.id;
+    const currentUserId = req.user?.id;
     const userType = req.user?.userType;
     const updateData = req.body;
 
-    if (!userId || !userType) {
+    if (!currentUserId || !userType) {
       throw ApiError.unauthorized("User not authenticated");
     }
 
@@ -419,19 +414,23 @@ class AuthController {
     switch (userType.toUpperCase()) {
       case "ROOT":
         updatedProfile = await RootAuthService.updateProfile(
-          userId,
+          currentUserId,
           updateData,
           req
         );
         break;
 
       case "BUSINESS":
-        updatedProfile = await BusinessAuthService.getProfile(userId); // Business might not have updateProfile
+        updatedProfile = await BusinessAuthService.updateProfile(
+          currentUserId,
+          updateData,
+          req
+        );
         break;
 
       case "EMPLOYEE":
         updatedProfile = await EmployeeAuthService.updateProfile(
-          userId,
+          currentUserId,
           updateData,
           req
         );
@@ -447,6 +446,82 @@ class AuthController {
         ApiResponse.success(
           { user: updatedProfile },
           "Profile updated successfully",
+          200
+        )
+      );
+  });
+
+  //OWN PROFILE UPDATE METHODS
+  static updateProfileImage = asyncHandler(async (req, res) => {
+    const currentUserId = req.user?.id;
+    const userType = req.user?.userType;
+
+    if (!currentUserId || !userType) {
+      throw ApiError.unauthorized("User not authenticated");
+    }
+
+    if (!req.file) {
+      throw ApiError.badRequest("Profile image is required");
+    }
+
+    // File validation
+    const allowedMimeTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+      "image/gif",
+    ];
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      await Helper.deleteOldImage(req.file.path);
+      throw ApiError.badRequest(
+        "Invalid file type. Only JPEG, PNG, JPG, GIF are allowed"
+      );
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (req.file.size > maxSize) {
+      await Helper.deleteOldImage(req.file.path);
+      throw ApiError.badRequest("File size too large. Maximum size is 5MB");
+    }
+
+    let updateResult;
+
+    switch (userType.toUpperCase()) {
+      case "ROOT":
+        updateResult = await RootAuthService.updateProfileImage(
+          currentUserId,
+          req.file.path,
+          req
+        );
+        break;
+
+      case "BUSINESS":
+        updateResult = await BusinessAuthService.updateProfileImage(
+          currentUserId,
+          req.file.path,
+          req
+        );
+        break;
+
+      case "EMPLOYEE":
+        updateResult = await EmployeeAuthService.updateProfileImage(
+          currentUserId,
+          req.file.path,
+          req
+        );
+        break;
+
+      default:
+        await Helper.deleteOldImage(req.file.path);
+        throw ApiError.badRequest("Invalid user type");
+    }
+
+    return res
+      .status(200)
+      .json(
+        ApiResponse.success(
+          updateResult,
+          "Profile image updated successfully",
           200
         )
       );

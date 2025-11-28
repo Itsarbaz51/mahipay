@@ -1,6 +1,6 @@
-import { z } from "zod";
+import { file, z } from "zod";
 
-const RoleEnums = z.enum(["BUSINESS", "ROOT", "EMPLOYEE"]);
+const RoleEnums = z.enum(["business", "root", "employee"]);
 
 class AuthValidationSchemas {
   // LOGIN
@@ -27,23 +27,6 @@ class AuthValidationSchemas {
   // confirm Password Reset
   static get confirmPasswordReset() {
     return z.object({
-      body: z
-        .object({
-          newPassword: z
-            .string()
-            .min(8, "Password must be at least 8 characters")
-            .regex(
-              /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/,
-              "Password must contain uppercase, lowercase, number and special character"
-            ),
-
-          confirmPassword: z.string(),
-        })
-        .refine((data) => data.newPassword === data.confirmPassword, {
-          message: "Passwords do not match",
-          path: ["confirmPassword"],
-        }),
-
       query: z.object({
         token: z.string().min(1, "Reset token is required"),
         type: RoleEnums,
@@ -119,6 +102,31 @@ class AuthValidationSchemas {
 
       params: z.object({
         userId: z.string().uuid("Invalid User ID format"),
+      }),
+    });
+  }
+
+  static get updateProfile() {
+    return z.object({
+      body: z.object({
+        username: z
+          .string()
+          .min(3, "Username must be at least 3 characters")
+          .max(30, "Username cannot exceed 30 characters")
+          .regex(
+            /^[a-zA-Z0-9_]+$/,
+            "Username can only contain letters, numbers, and underscores"
+          )
+          .transform((val) => val.trim())
+          .optional(),
+        firstName: z.string().min(1, "First name is required").optional(),
+        lastName: z.string().min(1, "Last name is required").optional(),
+        phoneNumber: z
+          .string()
+          .regex(/^\d{10}$/, "Phone number must be 10 digits")
+          .optional(),
+        email: z.string().email("Invalid email address").optional(),
+        roleId: z.string().uuid("Invalid role ID").optional(),
       }),
     });
   }

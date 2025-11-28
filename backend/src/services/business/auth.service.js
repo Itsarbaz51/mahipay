@@ -2,10 +2,10 @@ import models from "../../models/index.js";
 import { ApiError } from "../../utils/ApiError.js";
 import Helper from "../../utils/helper.js";
 import { CryptoService } from "../../utils/cryptoService.js";
-import BaseAuthService from "../shared/baseAuth.service.js";
 import PermissionRegistry from "../../utils/permissionRegistry.js";
+import HierarchyService from "../../utils/HierarchyService.js";
 
-class BusinessAuthService extends BaseAuthService {
+class BusinessAuthService {
   static async login(payload, req = null) {
     const { emailOrUsername, password } = payload;
 
@@ -35,7 +35,7 @@ class BusinessAuthService extends BaseAuthService {
       });
 
       if (!user) {
-        await this.createAuthAuditLog(
+        await Helper.createAuthAuditLog(
           { id: null, userType: "BUSINESS" },
           "LOGIN_FAILED",
           req,
@@ -45,12 +45,12 @@ class BusinessAuthService extends BaseAuthService {
       }
 
       // Verify password
-      const isValidPassword = await this.verifyPassword(
+      const isValidPassword = await Helper.verifyPassword(
         user.password,
         password
       );
       if (!isValidPassword) {
-        await this.createAuthAuditLog(
+        await Helper.createAuthAuditLog(
           {
             ...user.toJSON(),
             userType: "BUSINESS",
@@ -65,7 +65,7 @@ class BusinessAuthService extends BaseAuthService {
       }
 
       // Check user status
-      await this.checkUserStatus(user);
+      await Helper.checkUserStatus(user);
 
       // Get effective permissions
       const permissions = await PermissionRegistry.getUserEffectivePermissions(
@@ -94,7 +94,7 @@ class BusinessAuthService extends BaseAuthService {
         { where: { id: user.id } }
       );
 
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         {
           ...user.toJSON(),
           userType: "BUSINESS",
@@ -104,7 +104,7 @@ class BusinessAuthService extends BaseAuthService {
       );
 
       return {
-        user: this.sanitizeUserData(user),
+        user: Helper.sanitizeUserData(user),
         accessToken,
         refreshToken,
         userType: "business",
@@ -124,7 +124,7 @@ class BusinessAuthService extends BaseAuthService {
         { where: { id: userId } }
       );
 
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { id: userId, userType: "BUSINESS" },
         "LOGOUT",
         req,
@@ -144,7 +144,7 @@ class BusinessAuthService extends BaseAuthService {
     try {
       payload = Helper.verifyRefreshToken(refreshToken);
     } catch (error) {
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { id: payload?.id, userType: "BUSINESS" },
         "REFRESH_TOKEN_INVALID",
         req,
@@ -165,7 +165,7 @@ class BusinessAuthService extends BaseAuthService {
     });
 
     if (!user) {
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { id: payload.id, userType: "BUSINESS" },
         "REFRESH_TOKEN_USER_NOT_FOUND",
         req
@@ -197,7 +197,7 @@ class BusinessAuthService extends BaseAuthService {
       { where: { id: user.id } }
     );
 
-    await this.createAuthAuditLog(
+    await Helper.createAuthAuditLog(
       {
         ...user.toJSON(),
         userType: "BUSINESS",
@@ -209,7 +209,7 @@ class BusinessAuthService extends BaseAuthService {
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      user: this.sanitizeUserData(user),
+      user: Helper.sanitizeUserData(user),
       permissions: tokenPayload.permissions,
     };
   }
@@ -228,7 +228,7 @@ class BusinessAuthService extends BaseAuthService {
 
     if (!user) {
       // Don't reveal whether user exists for security
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         { id: null, userType: "BUSINESS" },
         "PASSWORD_RESET_REQUEST_FAILED",
         req,
@@ -251,9 +251,9 @@ class BusinessAuthService extends BaseAuthService {
       { where: { id: user.id } }
     );
 
-    await this.sendPasswordResetEmail(user, token, "admin");
+    await Helper.sendPasswordResetEmail(user, token, "admin");
 
-    await this.createAuthAuditLog(
+    await Helper.createAuthAuditLog(
       {
         ...user.toJSON(),
         userType: "BUSINESS",
@@ -271,17 +271,28 @@ class BusinessAuthService extends BaseAuthService {
     };
   }
 
-  static async confirmPasswordReset(encryptedToken, newPassword, req = null) {
+  static async confirmPasswordReset(encryptedToken, req = null) {
+    let user;
     try {
       const token = CryptoService.verifySecureToken(encryptedToken);
       const tokenHash = CryptoService.hashData(token);
 
-      const user = await this.validatePasswordResetToken(
-        tokenHash,
-        models.User
-      );
+      user = await models.User.findOne({
+        where: {
+          passwordResetToken: tokenHash,
+          passwordResetExpires: { [models.Sequelize.Op.gt]: new Date() },
+        },
+        include: [
+          {
+            model: models.Role,
+            as: "role",
+            required: false,
+          },
+        ],
+      });
+
       if (!user) {
-        await this.createAuthAuditLog(
+        await Helper.createAuthAuditLog(
           { id: null, userType: "BUSINESS" },
           "PASSWORD_RESET_CONFIRMATION_FAILED",
           req,
@@ -290,24 +301,27 @@ class BusinessAuthService extends BaseAuthService {
         throw ApiError.badRequest("Invalid or expired token");
       }
 
-      // Verify this is an admin user
-      const adminUser = await models.User.findByPk(user.id, {
-        include: [
-          {
-            model: models.Role,
-            as: "role",
-            required: true,
-          },
-        ],
-      });
+      // Generate new password and transaction PIN
+      const generatedPassword = Helper.generatePassword();
+      const generatedTransactionPin = Helper.generateTransactionPin();
 
-      if (!adminUser) {
-        throw ApiError.forbidden("Invalid user type");
-      }
+      await Helper.updateUserPassword(user.id, generatedPassword);
+      await Helper.updateUserPin(user.id, generatedTransactionPin);
 
-      await this.updateUserPassword(user.id, newPassword, models.User);
+      // Send credentials email for business user
+      await sendCredentialsEmail(
+        user,
+        generatedPassword,
+        generatedTransactionPin, // Send the plain transaction PIN for email
+        "reset",
+        `Your business account password has been reset successfully. Here are your new login credentials.`,
+        "BUSINESS",
+        {
+          role: user.role?.name || "Business User",
+        }
+      );
 
-      await this.createAuthAuditLog(
+      await Helper.createAuthAuditLog(
         {
           ...user.toJSON(),
           userType: "BUSINESS",
@@ -321,10 +335,13 @@ class BusinessAuthService extends BaseAuthService {
           "Password reset successfully. You can now login with your new password.",
       };
     } catch (error) {
-      console.error("Admin password reset confirmation error:", error);
+      console.error("Business password reset confirmation error:", error);
 
-      await this.createAuthAuditLog(
-        { id: null, userType: "BUSINESS" },
+      await Helper.createAuthAuditLog(
+        {
+          ...(user?.toJSON() || { userType: "BUSINESS" }),
+          userType: "BUSINESS",
+        },
         "PASSWORD_RESET_CONFIRMATION_ERROR",
         req,
         {
@@ -342,74 +359,201 @@ class BusinessAuthService extends BaseAuthService {
     }
   }
 
-  static async updateCredentials(adminId, credentialsData, req = null) {
-    const admin = await models.User.findByPk(adminId, {
-      include: [
-        {
-          model: models.Role,
-          as: "role",
-          required: true,
-        },
-      ],
-    });
+  static async updateCredentials({
+    currentUserId,
+    currentUserType,
+    targetUserId,
+    credentialsData,
+    currentUserRole,
+    req,
+  }) {
+    const { User, Employee } = models;
 
-    if (!admin) {
-      throw ApiError.notFound("Admin user not found");
-    }
+    // 1. ACCESS CONTROL
+    const isOwnUpdate = currentUserId === targetUserId;
 
-    // Verify current password
-    const isValidPassword = await this.verifyPassword(
-      admin.password,
-      credentialsData.currentPassword
-    );
-
-    if (!isValidPassword) {
-      await this.createAuthAuditLog(admin, "CREDENTIALS_UPDATE_FAILED", req, {
-        reason: "INVALID_CURRENT_PASSWORD",
-      });
-      throw ApiError.unauthorized("Current password is incorrect");
-    }
-
-    const updateData = {
-      password: CryptoService.encrypt(credentialsData.newPassword),
-      refreshToken: null, // Invalidate all sessions
-    };
-
-    // Handle transaction pin update if provided
-    if (credentialsData.newTransactionPin) {
-      if (!credentialsData.currentTransactionPin) {
-        throw ApiError.badRequest("Current transaction PIN is required");
-      }
-
-      const isValidPin = await this.verifyTransactionPin(
-        admin.transactionPin,
-        credentialsData.currentTransactionPin
+    if (!isOwnUpdate) {
+      // Check if target user is in business user's hierarchy
+      const isChild = await HierarchyService.isChildOfAdmin(
+        currentUserId,
+        targetUserId
       );
 
-      if (!isValidPin) {
-        await this.createAuthAuditLog(admin, "CREDENTIALS_UPDATE_FAILED", req, {
-          reason: "INVALID_CURRENT_TRANSACTION_PIN",
-        });
-        throw ApiError.unauthorized("Current transaction PIN is incorrect");
+      if (!isChild) {
+        throw ApiError.forbidden(
+          "You can update only your own users or users in your hierarchy"
+        );
+      }
+    }
+
+    // 2. Fetch Target User
+    let targetUser;
+    let targetUserType;
+    let userModel;
+
+    // Business users can only update BUSINESS users and EMPLOYEES
+    const employeeUser = await Employee.findByPk(targetUserId);
+    if (employeeUser) {
+      targetUser = employeeUser;
+      targetUserType = "EMPLOYEE";
+      userModel = Employee;
+
+      // Verify this employee belongs to current business user
+      if (
+        employeeUser.userId !== currentUserId &&
+        employeeUser.createdById !== currentUserId
+      ) {
+        throw ApiError.forbidden("You can only update your own employees");
+      }
+    } else {
+      const businessUser = await User.findByPk(targetUserId, {
+        include: [
+          {
+            association: "role",
+            attributes: ["type"],
+          },
+        ],
+      });
+
+      if (businessUser) {
+        targetUser = businessUser;
+        targetUserType = "BUSINESS";
+        userModel = User;
+
+        // For business users, verify hierarchy
+        if (!isOwnUpdate) {
+          const isChildBusiness = await HierarchyService.isChildOfAdmin(
+            currentUserId,
+            targetUserId
+          );
+          if (!isChildBusiness) {
+            throw ApiError.forbidden(
+              "You can only update users in your hierarchy"
+            );
+          }
+        }
+      } else {
+        throw ApiError.notFound("User not found");
+      }
+    }
+
+    // -------------------------------
+    // 3. Verify current password for own updates
+    // -------------------------------
+    if (isOwnUpdate || credentialsData.currentPassword) {
+      if (!credentialsData.currentPassword) {
+        throw ApiError.badRequest("Current password is required");
+      }
+
+      const decryptedStoredPassword = CryptoService.decrypt(
+        targetUser.password
+      );
+      if (decryptedStoredPassword !== credentialsData.currentPassword) {
+        await Helper.createAuthAuditLog(
+          { id: currentUserId, userType: currentUserType },
+          "CREDENTIALS_UPDATE_FAILED",
+          req,
+          {
+            reason: "INVALID_CURRENT_PASSWORD",
+            targetUserType,
+            isOwnUpdate,
+          }
+        );
+
+        throw ApiError.unauthorized("Current password is incorrect");
+      }
+    }
+
+    // -------------------------------
+    // 4. Prepare update data
+    // -------------------------------
+    const updateData = {};
+    const updatedFields = [];
+
+    if (credentialsData.newPassword) {
+      if (credentialsData.newPassword.length < 6) {
+        throw ApiError.badRequest(
+          "Password must be at least 6 characters long"
+        );
+      }
+
+      updateData.password = CryptoService.encrypt(credentialsData.newPassword);
+      updateData.refreshToken = null;
+      updatedFields.push("password");
+    }
+
+    // Transaction PIN update (only for BUSINESS users)
+    if (credentialsData.newTransactionPin) {
+      if (targetUserType !== "BUSINESS") {
+        throw ApiError.badRequest(
+          "Transaction PIN is only available for business users"
+        );
+      }
+
+      if (
+        credentialsData.newTransactionPin.length < 4 ||
+        credentialsData.newTransactionPin.length > 6
+      ) {
+        throw ApiError.badRequest("Transaction PIN must be between 4-6 digits");
+      }
+
+      // Verify current transaction PIN for own updates
+      if (isOwnUpdate) {
+        if (!credentialsData.currentTransactionPin) {
+          throw ApiError.badRequest("Current transaction PIN is required");
+        }
+
+        if (!targetUser.transactionPin) {
+          throw ApiError.badRequest("Transaction PIN not set for this user");
+        }
+
+        const decryptedPin = CryptoService.decrypt(targetUser.transactionPin);
+        if (decryptedPin !== credentialsData.currentTransactionPin) {
+          throw ApiError.unauthorized("Current transaction PIN is incorrect");
+        }
       }
 
       updateData.transactionPin = CryptoService.encrypt(
         credentialsData.newTransactionPin
       );
-    }
-
-    await models.User.update(updateData, { where: { id: adminId } });
-
-    const updatedFields = ["password"];
-    if (credentialsData.newTransactionPin) {
       updatedFields.push("transactionPin");
     }
 
-    await this.createAuthAuditLog(admin, "CREDENTIALS_UPDATED", req, {
-      updatedFields,
+    if (updatedFields.length === 0) {
+      throw ApiError.badRequest("No valid fields to update");
+    }
+
+    // -------------------------------
+    // 5. Update in Database
+    // -------------------------------
+    await userModel.update(updateData, {
+      where: { id: targetUserId },
     });
 
-    return { message: "Credentials updated successfully" };
+    // -------------------------------
+    // 6. AUDIT LOG
+    // -------------------------------
+    await Helper.createAuthAuditLog(
+      { id: currentUserId, userType: currentUserType },
+      "CREDENTIALS_UPDATED",
+      req,
+      {
+        updatedFields,
+        isOwnUpdate,
+        requestedBy: currentUserId,
+        targetUserId,
+        targetUserType,
+        currentUserType: "BUSINESS",
+        userRole: currentUserRole,
+        performedBy: "BUSINESS_ADMIN",
+      }
+    );
+
+    return {
+      message: "Credentials updated successfully",
+      updatedFields,
+      targetUserType,
+    };
   }
 
   static async getProfile(adminId) {
@@ -442,7 +586,173 @@ class BusinessAuthService extends BaseAuthService {
       throw ApiError.notFound("user not found");
     }
 
-    return this.sanitizeUserData(user);
+    return Helper.sanitizeUserData(user);
+  }
+
+  static async updateProfile(userId, updateData, req = null) {
+    const user = await models.User.findByPk(userId);
+    if (!user) {
+      throw ApiError.notFound("User not found");
+    }
+
+    const allowedFields = [
+      "firstName",
+      "lastName",
+      "username",
+      "phoneNumber",
+      "email",
+    ];
+
+    const updatePayload = {};
+    Object.keys(updateData).forEach((key) => {
+      if (allowedFields.includes(key)) {
+        updatePayload[key] = updateData[key];
+      }
+    });
+
+    if (Object.keys(updatePayload).length === 0) {
+      throw ApiError.badRequest("No valid fields to update");
+    }
+
+    const previousValues = {};
+    Object.keys(updatePayload).forEach((key) => {
+      previousValues[key] = user[key];
+    });
+
+    await models.User.update(updatePayload, { where: { id: userId } });
+
+    await Helper.createAuthAuditLog(user, "PROFILE_UPDATED", req, {
+      updatedFields: Object.keys(updatePayload),
+      previousValues,
+    });
+
+    return await this.getProfile(userId);
+  }
+
+  static async updateProfileImage(userId, profileImagePath, req = null) {
+    try {
+      const { User } = models;
+
+      // Verify business user exists
+      const user = await User.findByPk(userId);
+      if (!user) {
+        throw ApiError.notFound("Business user not found");
+      }
+
+      let oldImageDeleted = false;
+      let profileImageUrl = "";
+
+      // Delete old profile image if exists
+      if (user.profileImage) {
+        try {
+          await S3Service.delete({ fileUrl: user.profileImage });
+          oldImageDeleted = true;
+          console.log("Old business profile image deleted", { userId });
+        } catch (error) {
+          console.error("Failed to delete old business profile image", {
+            userId,
+            error: error.message,
+          });
+        }
+      }
+
+      // Upload new profile image
+      try {
+        profileImageUrl = await S3Service.upload(profileImagePath, "profile");
+
+        if (!profileImageUrl) {
+          throw new Error("Failed to upload image to S3");
+        }
+
+        console.log("New business profile image uploaded", { userId });
+      } catch (uploadError) {
+        console.error("Failed to upload business profile image", {
+          userId,
+          error: uploadError.message,
+        });
+        throw ApiError.internal("Failed to upload profile image");
+      }
+
+      // Update user record
+      try {
+        await User.update(
+          { profileImage: profileImageUrl },
+          { where: { id: userId } }
+        );
+
+        console.log("Business profile image updated in database", { userId });
+      } catch (updateError) {
+        console.error("Failed to update business profile image in database", {
+          userId,
+          error: updateError.message,
+        });
+
+        // Rollback: Delete uploaded image
+        try {
+          await S3Service.delete({ fileUrl: profileImageUrl });
+        } catch (rollbackError) {
+          console.error(
+            "Failed to rollback business uploaded image",
+            rollbackError
+          );
+        }
+
+        throw ApiError.internal("Failed to update profile in database");
+      }
+
+      // Delete local file
+      try {
+        await Helper.deleteOldImage(profileImagePath);
+      } catch (deleteError) {
+        console.error("Failed to delete business local file", deleteError);
+      }
+
+      // Audit log
+      if (req) {
+        await Helper.createAuthAuditLog(
+          { id: userId, userType: "BUSINESS" },
+          "PROFILE_IMAGE_UPDATED",
+          req,
+          {
+            oldImageDeleted,
+            userType: "BUSINESS",
+          }
+        );
+      }
+
+      // Get updated user data
+      const updatedUser = await User.findByPk(userId, {
+        attributes: { exclude: ["password", "refreshToken", "transactionPin"] },
+        include: [
+          {
+            association: "role",
+            attributes: ["id", "name"],
+          },
+        ],
+      });
+
+      return {
+        user: updatedUser,
+        message: "Business profile image updated successfully",
+      };
+    } catch (error) {
+      console.error("Error in BusinessAuthService.updateProfileImage:", {
+        userId,
+        error: error.message,
+      });
+
+      // Cleanup local file
+      try {
+        await Helper.deleteOldImage(profileImagePath);
+      } catch (cleanupError) {
+        console.error("Failed to cleanup business local file", cleanupError);
+      }
+
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw ApiError.internal("Failed to update business profile image");
+    }
   }
 
   static async getAdminDashboard(adminUser, req = null) {
@@ -450,9 +760,12 @@ class BusinessAuthService extends BaseAuthService {
       throw ApiError.forbidden("Admin access required");
     }
 
+    const adminId = adminUser.id;
+
     const [totalUsers, totalEmployees, pendingKyc, activeSessions] =
       await Promise.all([
         models.User.count({
+          where: { parentId: adminId }, // 🔹 added here
           include: [
             {
               model: models.Role,
@@ -461,10 +774,23 @@ class BusinessAuthService extends BaseAuthService {
             },
           ],
         }),
-        models.Employee.count(),
-        models.UserKyc.count({ where: { status: "PENDING" } }),
+
+        models.Employee.count({
+          where: { createdById: adminId }, // 🔹 added here
+        }),
+
+        models.UserKyc.count({
+          where: {
+            status: "PENDING",
+            verifiedById: adminId, // 🔹 added here
+          },
+        }),
+
         models.User.count({
-          where: { refreshToken: { [models.Sequelize.Op.ne]: null } },
+          where: {
+            parentId: adminId, // 🔹 added here
+            refreshToken: { [models.Sequelize.Op.ne]: null },
+          },
         }),
       ]);
 
@@ -476,29 +802,12 @@ class BusinessAuthService extends BaseAuthService {
       totalRevenue: await this.getTotalRevenue(),
     };
 
-    await this.createAuthAuditLog(adminUser, "DASHBOARD_ACCESSED", req, {
+    await Helper.createAuthAuditLog(adminUser, "DASHBOARD_ACCESSED", req, {
       dashboardType: "ADMIN_DASHBOARD",
     });
 
     return {
       dashboardStats,
-      quickActions: [
-        {
-          action: "manage_users",
-          label: "Manage Users",
-          description: "Manage system users",
-        },
-        {
-          action: "manage_employees",
-          label: "Manage Employees",
-          description: "Manage employee accounts",
-        },
-        {
-          action: "view_reports",
-          label: "View Reports",
-          description: "View system reports and analytics",
-        },
-      ],
     };
   }
 
