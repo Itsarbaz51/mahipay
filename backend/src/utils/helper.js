@@ -202,16 +202,41 @@ class Helper {
     return crypto.createHash("sha256").update(data).digest("hex");
   }
 
-  static deleteOldImage(oldImagePath) {
-    if (fs.existsSync(oldImagePath)) {
-      try {
-        fs.unlinkSync(oldImagePath);
-        console.log("Local image deleted successfully::", oldImagePath);
-      } catch (err) {
-        console.log("Error deleting local image:", err.message);
+  static async deleteOldImage(input) {
+    if (!input) return;
+
+    let paths = [];
+
+    // CASE 1: String
+    if (typeof input === "string") {
+      paths = [input];
+    }
+
+    // CASE 2: Array of direct paths
+    else if (Array.isArray(input)) {
+      paths = input;
+    }
+
+    // CASE 3: Multer files object like payload.files
+    else if (typeof input === "object") {
+      for (let key in input) {
+        const file = input[key]?.[0];
+        if (file?.path) {
+          paths.push(file.path);
+        }
       }
-    } else {
-      console.log("No local image to delete at:", oldImagePath);
+    }
+
+    for (const p of paths) {
+      try {
+        if (p && fs.existsSync(p)) {
+          fs.unlinkSync(p);
+          console.log("🗑️ Deleted:", p);
+        }
+      } catch (err) {
+        console.log("❌ Error deleting file:", err.message);
+        //  IMPORTANT: Do NOT throw here
+      }
     }
   }
 
