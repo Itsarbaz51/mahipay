@@ -139,6 +139,7 @@ class AuthMiddleware {
     const effectivePerms =
       await PermissionRegistry.getEmployeeEffectivePermissions(user.id, models);
 
+    // Determine creator
     let creator = null;
     if (user.createdByType === "ROOT" && user.createdByRoot) {
       creator = {
@@ -153,8 +154,11 @@ class AuthMiddleware {
       };
     }
 
+    // Destructure to remove unwanted fields without overwriting `user`
+    const { createdByRoot, department, createdByUser, ...userData } = user.toJSON();
+
     return {
-      ...user.toJSON(),
+      ...userData,
       userType: "EMPLOYEE",
       role: user.department?.name,
       roleId: user.department?.id,
@@ -170,7 +174,6 @@ class AuthMiddleware {
         {
           association: "role",
           attributes: ["id", "name", "hierarchyLevel", "description"],
-          required: false,
         },
         {
           association: "parent",
@@ -182,12 +185,37 @@ class AuthMiddleware {
             "username",
             "customerId",
           ],
-          required: false,
           include: [
             {
               association: "role",
               attributes: ["name"],
-              required: false,
+            },
+          ],
+        },
+        {
+          association: "creatorRoot",
+          attributes: ["id", "firstName", "lastName", "email", "username"],
+          include: [
+            {
+              association: "role",
+              attributes: ["name"],
+            },
+          ],
+        },
+        {
+          association: "creatorUser",
+          attributes: [
+            "id",
+            "firstName",
+            "lastName",
+            "email",
+            "username",
+            "customerId",
+          ],
+          include: [
+            {
+              association: "role",
+              attributes: ["name"],
             },
           ],
         },
@@ -210,7 +238,19 @@ class AuthMiddleware {
     );
 
     let creator = null;
-    if (user.parent) {
+    if (user.creatorRoot) {
+      creator = {
+        ...user.creatorRoot.toJSON(),
+        userType: "ROOT",
+        role: user.creatorRoot.role?.name,
+      };
+    } else if (user.creatorUser) {
+      creator = {
+        ...user.creatorUser.toJSON(),
+        userType: "USER",
+        role: user.creatorUser.role?.name,
+      };
+    } else if (user.parent) {
       creator = {
         ...user.parent.toJSON(),
         userType: "BUSINESS",
@@ -218,8 +258,11 @@ class AuthMiddleware {
       };
     }
 
+    // Destructure to remove creatorRoot and creatorUser
+    const { creatorRoot, parent, creatorUser, ...userData } = user.toJSON();
+
     return {
-      ...user.toJSON(),
+      ...userData,
       userType: "BUSINESS",
       role: user.role?.name,
       roleLevel: user.role?.hierarchyLevel,

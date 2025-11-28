@@ -246,7 +246,6 @@ export default (sequelize, DataTypes) => {
       foreignKey: "created_by_id",
       as: "creatorRoot",
       constraints: false,
-      scope: { created_by_type: "ROOT" },
     });
 
     User.belongsTo(User, {

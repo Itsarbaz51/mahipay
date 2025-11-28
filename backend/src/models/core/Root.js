@@ -165,9 +165,8 @@ export default (sequelize, DataTypes) => {
   Root.associate = function (models) {
     Root.hasMany(models.User, {
       foreignKey: "created_by_id",
-      as: "createdUsers",
+      as: "creatorRoot",
       constraints: false,
-      scope: { created_by_type: "ROOT" },
     });
 
     // Root Business Capabilities
