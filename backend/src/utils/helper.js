@@ -538,6 +538,320 @@ class Helper {
       { where: { id: userId } }
     );
   }
+
+  //  =================== Helper method For Login ============================
+
+  // Helper method to determine whitelist source based on creator hierarchy
+  static async determineWhitelistSource(user) {
+    let creatorId = null;
+    let creatorType = null;
+
+    if (user.createdByType === "ROOT" && user.creatorRoot) {
+      creatorId = user.createdById;
+      creatorType = "ROOT";
+    } else if (user.createdByType === "USER" && user.creatorUser) {
+      creatorId = user.createdById;
+      creatorType = "USER";
+    }
+
+    return { creatorId, creatorType };
+  }
+
+  // Get relevant whitelist entries for validation
+  static async getRelevantWhitelistEntries(creatorId, creatorType, userId) {
+    const whitelistPromises = [];
+
+    // Get creator's whitelist entries
+    if (creatorId && creatorType) {
+      whitelistPromises.push(
+        models.IpWhitelist.findAll({
+          where: {
+            userId: creatorId,
+            userType: creatorType,
+          },
+          attributes: ["id", "domainName", "serverIp", "localIp"],
+        })
+      );
+    }
+
+    // Get user's own whitelist entries
+    whitelistPromises.push(
+      models.IpWhitelist.findAll({
+        where: {
+          userId: userId,
+          userType: "USER",
+        },
+        attributes: ["id", "domainName", "serverIp", "localIp"],
+      })
+    );
+
+    const results = await Promise.all(whitelistPromises);
+    return results.flat();
+  }
+
+  // Validate origin against whitelist domain names
+  static async isValidOrigin(clientOrigin, whitelistEntries) {
+    if (!clientOrigin) {
+      // Allow requests without origin (like mobile apps, direct API calls)
+      return true;
+    }
+
+    // Extract domain names from whitelist entries
+    const allowedDomains = whitelistEntries
+      .map((entry) => entry.domainName)
+      .filter((domain) => domain && domain.trim() !== "");
+
+    // If no domain restrictions in whitelist, allow all origins
+    if (allowedDomains.length === 0) {
+      return true;
+    }
+
+    // Parse client origin
+    let clientHostname, clientProtocol;
+    try {
+      const clientUrl = new URL(clientOrigin);
+      clientHostname = clientUrl.hostname;
+      clientProtocol = clientUrl.protocol;
+    } catch (error) {
+      // Invalid URL format
+      return false;
+    }
+
+    // Check if client origin matches any whitelisted domain
+    return allowedDomains.some((domain) => {
+      try {
+        const domainUrl = new URL(domain);
+        const domainHostname = domainUrl.hostname;
+        const domainProtocol = domainUrl.protocol;
+
+        // Protocol must match (http vs https)
+        if (domainProtocol !== clientProtocol) {
+          return false;
+        }
+
+        // Exact hostname match
+        if (domainHostname === clientHostname) {
+          return true;
+        }
+
+        // Support for wildcard subdomains (e.g., *.mahipay.com)
+        if (domainHostname.startsWith("*.")) {
+          const baseDomain = domainHostname.substring(2); // Remove '*.'
+          return (
+            clientHostname === baseDomain ||
+            clientHostname.endsWith("." + baseDomain)
+          );
+        }
+
+        return false;
+      } catch (error) {
+        // Handle case where domain is just a hostname without protocol
+        if (domain.startsWith("*.")) {
+          const baseDomain = domain.substring(2); // Remove '*.'
+          return (
+            clientHostname === baseDomain ||
+            clientHostname.endsWith("." + baseDomain)
+          );
+        }
+
+        // Exact match for hostname only
+        return domain === clientHostname;
+      }
+    });
+  }
+
+  // Validate IP against whitelist entries
+  static async isValidIp(clientIp, whitelistEntries) {
+    if (!clientIp || whitelistEntries.length === 0) {
+      // If no IP or no whitelist entries, allow access
+      return true;
+    }
+
+    const allowedIps = whitelistEntries
+      .flatMap((entry) => [entry.serverIp, entry.localIp])
+      .filter((ip) => ip && ip.trim() !== "");
+
+    if (allowedIps.length === 0) {
+      return true; // No specific IP restrictions
+    }
+
+    // Check for exact IP match
+    if (allowedIps.includes(clientIp)) {
+      return true;
+    }
+
+    // Check for CIDR notation (e.g., 192.168.1.0/24)
+    const cidrMatches = allowedIps.some((ipRange) => {
+      if (ipRange.includes("/")) {
+        return this.isIpInCidrRange(clientIp, ipRange);
+      }
+      return false;
+    });
+
+    if (cidrMatches) {
+      return true;
+    }
+
+    // For local development, allow all local IPs if any local IP is whitelisted
+    if (this.isLocalEnvironment(clientIp, allowedIps)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Check if IP is within CIDR range
+  static isIpInCidrRange(ip, cidr) {
+    try {
+      const [range, bits] = cidr.split("/");
+      const mask = ~(0xffffffff >>> parseInt(bits));
+
+      const ipLong = this.ipToLong(ip);
+      const rangeLong = this.ipToLong(range);
+
+      return (ipLong & mask) === (rangeLong & mask);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Convert IP to long integer
+  static ipToLong(ip) {
+    return (
+      ip.split(".").reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>>
+      0
+    );
+  }
+
+  // Check if we're in local development environment
+  static isLocalEnvironment(clientIp, allowedIps) {
+    const isLocalIp =
+      clientIp.startsWith("127.") ||
+      clientIp.startsWith("192.168.") ||
+      clientIp.startsWith("10.") ||
+      clientIp === "::1";
+
+    const hasLocalWhitelist = allowedIps.some(
+      (ip) =>
+        ip.startsWith("127.") ||
+        ip.startsWith("192.168.") ||
+        ip.startsWith("10.") ||
+        ip === "::1"
+    );
+
+    return isLocalIp && hasLocalWhitelist;
+  }
+
+  // Dynamic origin validation for Root users
+  static async isValidOriginForRoot(clientOrigin, whitelistEntries) {
+    if (!clientOrigin) {
+      // Allow requests without origin (like mobile apps, direct API calls)
+      return true;
+    }
+
+    // Extract domain names from whitelist entries
+    const allowedDomains = whitelistEntries
+      .map((entry) => entry.domainName)
+      .filter((domain) => domain && domain.trim() !== "");
+
+    // If no domain restrictions in whitelist, allow all origins for Root
+    if (allowedDomains.length === 0) {
+      return true;
+    }
+
+    // Parse client origin
+    let clientHostname, clientProtocol;
+    try {
+      const clientUrl = new URL(clientOrigin);
+      clientHostname = clientUrl.hostname;
+      clientProtocol = clientUrl.protocol;
+    } catch (error) {
+      // Invalid URL format
+      return false;
+    }
+
+    // Check if client origin matches any whitelisted domain
+    return allowedDomains.some((domain) => {
+      try {
+        const domainUrl = new URL(domain);
+        const domainHostname = domainUrl.hostname;
+        const domainProtocol = domainUrl.protocol;
+
+        // Protocol must match (http vs https)
+        if (domainProtocol !== clientProtocol) {
+          return false;
+        }
+
+        // Exact hostname match
+        if (domainHostname === clientHostname) {
+          return true;
+        }
+
+        // Support for wildcard subdomains (e.g., *.mahipay.com)
+        if (domainHostname.startsWith("*.")) {
+          const baseDomain = domainHostname.substring(2); // Remove '*.'
+          return (
+            clientHostname === baseDomain ||
+            clientHostname.endsWith("." + baseDomain)
+          );
+        }
+
+        return false;
+      } catch (error) {
+        // Handle case where domain is just a hostname without protocol
+        if (domain.startsWith("*.")) {
+          const baseDomain = domain.substring(2); // Remove '*.'
+          return (
+            clientHostname === baseDomain ||
+            clientHostname.endsWith("." + baseDomain)
+          );
+        }
+
+        // Exact match for hostname only
+        return domain === clientHostname;
+      }
+    });
+  }
+
+  // IP validation specifically for Root users
+  static async isValidIpForRoot(clientIp, whitelistEntries) {
+    if (!clientIp || whitelistEntries.length === 0) {
+      // If no IP or no whitelist entries, allow access
+      return true;
+    }
+
+    const allowedIps = whitelistEntries
+      .flatMap((entry) => [entry.serverIp, entry.localIp])
+      .filter((ip) => ip && ip.trim() !== "");
+
+    if (allowedIps.length === 0) {
+      return true; // No specific IP restrictions
+    }
+
+    // Check for exact IP match
+    if (allowedIps.includes(clientIp)) {
+      return true;
+    }
+
+    // Check for CIDR notation (e.g., 192.168.1.0/24)
+    const cidrMatches = allowedIps.some((ipRange) => {
+      if (ipRange.includes("/")) {
+        return this.isIpInCidrRange(clientIp, ipRange);
+      }
+      return false;
+    });
+
+    if (cidrMatches) {
+      return true;
+    }
+
+    // For local development, allow all local IPs if any local IP is whitelisted
+    if (this.isLocalEnvironment(clientIp, allowedIps)) {
+      return true;
+    }
+
+    return false;
+  }
 }
 
 export default Helper;

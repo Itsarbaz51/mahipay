@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { updateCredentials } from "../../redux/slices/authSlice";
-import ZodErrorCatch from "../../layouts/ZodErrorCatch";
+import { ZodErrorCatch } from "../../utils/ZodErrorCatch";
 
 const EditCredentialsModal = ({ userId, type, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({

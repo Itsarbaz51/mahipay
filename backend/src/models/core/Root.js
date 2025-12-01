@@ -163,10 +163,21 @@ export default (sequelize, DataTypes) => {
   );
 
   Root.associate = function (models) {
+    // For IP whitelists created by this root user
     Root.hasMany(models.IpWhitelist, {
       foreignKey: "created_by_id",
       as: "createdIpWhitelists",
       constraints: false,
+    });
+
+    // For IP whitelists where this root user is the owner (polymorphic)
+    Root.hasMany(models.IpWhitelist, {
+      foreignKey: "user_id",
+      as: "ipWhitelists",
+      constraints: false,
+      scope: {
+        user_type: "ROOT", // Only include where user_type is ROOT
+      },
     });
 
     Root.hasMany(models.User, {
@@ -217,11 +228,6 @@ export default (sequelize, DataTypes) => {
       foreignKey: "created_by_id",
       as: "commissionSettingsCreated",
       constraints: false,
-    });
-    Root.hasMany(models.IpWhitelist, {
-      foreignKey: "root_id",
-      as: "ipWhitelists",
-      onDelete: "CASCADE",
     });
 
     // KYC Verification Relations

@@ -12,6 +12,7 @@ export default {
       await queryInterface.sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
 
       // Truncate all tables in correct order to avoid foreign key constraints
+      await queryInterface.bulkDelete("ip_whitelists", null, {});
       await queryInterface.bulkDelete("wallets", null, {});
       await queryInterface.bulkDelete("root_wallets", null, {});
       await queryInterface.bulkDelete("employees", null, {});
@@ -19,7 +20,7 @@ export default {
       await queryInterface.bulkDelete("departments", null, {});
       await queryInterface.bulkDelete("cities", null, {});
       await queryInterface.bulkDelete("states", null, {});
-      await queryInterface.bulkDelete("roots", null, {}); // Move roots before roles
+      await queryInterface.bulkDelete("roots", null, {});
       await queryInterface.bulkDelete("roles", null, {});
 
       // Re-enable foreign key checks
@@ -65,6 +66,10 @@ export default {
     const retailerWalletId = uuidv4();
     const rootPrimaryWalletId = uuidv4();
 
+    // IP Whitelist IDs
+    const adminIpWhitelistId = uuidv4();
+    const rootIpWhitelistId = uuidv4();
+
     const currentTime = new Date();
 
     try {
@@ -76,7 +81,7 @@ export default {
           hierarchy_level: 0,
           description: "Root Administrator - Full System Access",
           created_by_type: "ROOT",
-          created_by_id: rootUserId, // This will be created later, but we need the reference
+          created_by_id: rootUserId,
           created_at: currentTime,
           updated_at: currentTime,
         },
@@ -169,6 +174,22 @@ export default {
       `);
       console.log("✅ Roles updated with root user reference");
 
+      // Create Root IP whitelist entry (root user exists now)
+      await queryInterface.bulkInsert("ip_whitelists", [
+        {
+          id: rootIpWhitelistId,
+          domain_name: "http://localhost:5174",
+          server_ip: "127.0.0.1",
+          local_ip: "localhost",
+          user_id: rootUserId,
+          user_type: "ROOT",
+          created_by_id: rootUserId, // FIXED: Added required created_by_id field
+          created_at: currentTime,
+          updated_at: currentTime,
+        },
+      ]);
+      console.log("✅ Root IP whitelist entry created");
+
       // Create HR Department by ROOT
       await queryInterface.bulkInsert("departments", [
         {
@@ -218,10 +239,26 @@ export default {
           updated_at: currentTime,
           deleted_at: null,
           created_by_id: rootUserId,
-          created_by_type: "ROOT"
+          created_by_type: "ROOT",
         },
       ]);
       console.log("✅ Admin user created");
+
+      // Create Admin IP whitelist entry (admin user exists now)
+      await queryInterface.bulkInsert("ip_whitelists", [
+        {
+          id: adminIpWhitelistId,
+          domain_name: "http://localhost:5173",
+          server_ip: "127.0.0.1",
+          local_ip: "localhost",
+          user_id: adminUserId,
+          user_type: "USER",
+          created_by_id: rootUserId, // FIXED: Added required created_by_id field
+          created_at: currentTime,
+          updated_at: currentTime,
+        },
+      ]);
+      console.log("✅ Admin IP whitelist entry created");
 
       // Create HR Department by ADMIN
       await queryInterface.bulkInsert("departments", [
@@ -271,6 +308,8 @@ export default {
           created_at: currentTime,
           updated_at: currentTime,
           deleted_at: null,
+          created_by_id: adminUserId, // FIXED: Added required created_by fields
+          created_by_type: "USER",
         },
       ]);
       console.log("✅ STATE_HEAD user created");
@@ -308,6 +347,8 @@ export default {
           created_at: currentTime,
           updated_at: currentTime,
           deleted_at: null,
+          created_by_id: stateHeadUserId, // FIXED: Added required created_by fields
+          created_by_type: "USER",
         },
       ]);
       console.log("✅ MASTER_DISTRIBUTOR user created");
@@ -345,6 +386,8 @@ export default {
           created_at: currentTime,
           updated_at: currentTime,
           deleted_at: null,
+          created_by_id: masterDistributorUserId, // FIXED: Added required created_by fields
+          created_by_type: "USER",
         },
       ]);
       console.log("✅ DISTRIBUTOR user created");
@@ -382,6 +425,8 @@ export default {
           created_at: currentTime,
           updated_at: currentTime,
           deleted_at: null,
+          created_by_id: distributorUserId, // FIXED: Added required created_by fields
+          created_by_type: "USER",
         },
       ]);
       console.log("✅ RETAILER user created");
@@ -582,10 +627,11 @@ export default {
     }
   },
 
-  async down(queryInterface, Sequelize) {
+  async down(queryInterface) {
     // Disable foreign key checks for clean removal
     await queryInterface.sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
 
+    await queryInterface.bulkDelete("ip_whitelists", null, {});
     await queryInterface.bulkDelete("wallets", null, {});
     await queryInterface.bulkDelete("root_wallets", null, {});
     await queryInterface.bulkDelete("employees", null, {});

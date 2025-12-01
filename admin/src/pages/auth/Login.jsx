@@ -1,10 +1,20 @@
 import { useState, useEffect } from "react";
-import { Shield, Eye, EyeOff, Lock, MapPinOff, MapPin } from "lucide-react";
+import {
+  Shield,
+  Eye,
+  EyeOff,
+  Lock,
+  MapPinOff,
+  MapPin,
+  Building,
+  Users,
+} from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import { login, passwordReset } from "../../redux/slices/authSlice";
+import { useNavigate, useLocation } from "react-router-dom";
+import { login, passwordReset, clearError } from "../../redux/slices/authSlice";
 
 const Login = () => {
+  const [activeTab, setActiveTab] = useState("business"); // 'employee' or 'business'
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,6 +32,7 @@ const Login = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const locationState = useLocation(); // Renamed to avoid conflict
 
   const { currentUser, error, success, isLoading, isAuthenticated } =
     useSelector((state) => state.auth);
@@ -30,6 +41,18 @@ const Login = () => {
   useEffect(() => {
     getLocation();
   }, []);
+
+  // Reset form when switching tabs
+  useEffect(() => {
+    setEmailOrUsername("");
+    setPassword("");
+    dispatch(clearError());
+  }, [activeTab, dispatch]);
+
+  // Clear error when showing/hiding forgot password
+  useEffect(() => {
+    dispatch(clearError());
+  }, [showForgotPassword, dispatch]);
 
   const getLocation = (isRetry = false) => {
     if (!navigator.geolocation) {
@@ -89,8 +112,8 @@ const Login = () => {
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000, // Increased timeout
-        maximumAge: 0, // Don't use cached position
+        timeout: 15000,
+        maximumAge: 0,
       }
     );
   };
@@ -104,7 +127,7 @@ const Login = () => {
 
     // Check if location access is denied
     if (location.error) {
-      return; // Prevent login if location error exists
+      return;
     }
 
     // Check if location is still loading
@@ -113,6 +136,7 @@ const Login = () => {
     }
 
     const payload = {
+      userType: activeTab, // 'employee' or 'business'
       emailOrUsername: emailOrUsername.trim(),
       password: password.trim(),
       ...(location.latitude && { latitude: location.latitude }),
@@ -123,6 +147,7 @@ const Login = () => {
     try {
       await dispatch(login(payload));
     } catch (err) {
+      // Error is already handled by authSlice and displayed via Redux state
       console.error("Login failed:", err);
     }
   };
@@ -135,16 +160,21 @@ const Login = () => {
     }
 
     try {
-      await dispatch(passwordReset(forgotPasswordEmail.trim()));
+      await dispatch(
+        passwordReset({
+          email: forgotPasswordEmail.trim(),
+          userType: activeTab,
+        })
+      );
       setForgotPasswordEmail("");
+      setShowForgotPassword(false);
     } catch (err) {
+      // Error is already handled by authSlice and displayed via Redux state
       console.error("Forgot password failed:", err);
     }
   };
 
-  // Improved retry location access
   const handleRetryLocation = () => {
-    // If permission was denied, guide user to browser settings
     if (location.permissionDenied && retryCount >= 1) {
       alert(
         "Please enable location permissions in your browser settings and try again."
@@ -155,7 +185,6 @@ const Login = () => {
     getLocation(true);
   };
 
-  // Open browser location settings guide
   const handleOpenLocationSettings = () => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -170,20 +199,31 @@ const Login = () => {
     }
   };
 
+  const handleBackToLogin = () => {
+    setShowForgotPassword(false);
+    setForgotPasswordEmail("");
+    dispatch(clearError());
+  };
+
+  // Redirect when authenticated
   useEffect(() => {
     if (isAuthenticated && currentUser) {
-      // Small delay to ensure auth state is fully updated
       const timer = setTimeout(() => {
-        const from = location.state?.from?.pathname || "/dashboard";
+        const from = locationState.state?.from?.pathname || "/dashboard";
         navigate(from, { replace: true });
       }, 100);
 
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, currentUser, navigate, location]);
+  }, [isAuthenticated, currentUser, navigate, locationState]);
 
   // Check if login button should be disabled
-  const isLoginDisabled = isLoading || location.loading || !!location.error;
+  const isLoginDisabled =
+    isLoading ||
+    location.loading ||
+    !!location.error ||
+    !emailOrUsername ||
+    !password;
 
   return (
     <div className="flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-4">
@@ -206,6 +246,42 @@ const Login = () => {
             </p>
           </div>
         </div>
+
+        {/* Tab Navigation */}
+        {!showForgotPassword && (
+          <div className="border-b border-gray-200">
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => setActiveTab("employee")}
+                className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${
+                  activeTab === "employee"
+                    ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Employee
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("business")}
+                className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${
+                  activeTab === "business"
+                    ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Building className="h-4 w-4" />
+                  Business
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="p-6">
@@ -311,7 +387,7 @@ const Login = () => {
               <div className="flex space-x-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowForgotPassword(false)}
+                  onClick={handleBackToLogin}
                   disabled={isLoading}
                   className="flex-1 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
@@ -319,7 +395,7 @@ const Login = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !forgotPasswordEmail}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isLoading ? "Sending..." : "Reset Password"}
@@ -337,7 +413,10 @@ const Login = () => {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email or Username *
+                  {activeTab === "employee"
+                    ? "Employee ID or Email"
+                    : "Business Email or Username"}{" "}
+                  *
                 </label>
                 <input
                   type="text"
@@ -346,7 +425,11 @@ const Login = () => {
                   autoComplete="username"
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Enter email or username"
+                  placeholder={
+                    activeTab === "employee"
+                      ? "Enter employee ID or email"
+                      : "Enter business email or username"
+                  }
                   disabled={isLoading || location.loading}
                 />
               </div>
@@ -405,7 +488,9 @@ const Login = () => {
                 ) : location.error ? (
                   "Location Required"
                 ) : (
-                  "Sign In"
+                  `Sign In as ${
+                    activeTab === "employee" ? "Employee" : "Business"
+                  }`
                 )}
               </button>
             </form>
@@ -420,7 +505,9 @@ const Login = () => {
                   <p className="text-xs">Your credentials are secure</p>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Use your registered Email or Username to login
+                  {activeTab === "employee"
+                    ? "Use your Employee ID or registered Email to login"
+                    : "Use your Business Email or Username to login"}
                 </p>
                 {location.error && (
                   <p className="text-xs text-red-600 mt-1 flex items-center justify-center">

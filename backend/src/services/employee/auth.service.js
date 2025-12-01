@@ -9,7 +9,6 @@ class EmployeeAuthService {
     const { emailOrUsername, password } = payload;
 
     try {
-      // Find employee user
       const user = await models.Employee.findOne({
         where: {
           [models.Sequelize.Op.or]: [
@@ -29,6 +28,19 @@ class EmployeeAuthService {
             where: { isActive: true, revokedAt: null },
             required: false,
             attributes: ["permission"],
+          },
+          // Include both creator types with proper scoping - FIXED
+          {
+            model: models.Root,
+            as: "createdByRoot",
+            required: false,
+            attributes: ["id"],
+          },
+          {
+            model: models.User,
+            as: "createdByUser",
+            required: false,
+            attributes: ["id"],
           },
         ],
       });
@@ -50,15 +62,10 @@ class EmployeeAuthService {
       );
       if (!isValidPassword) {
         await Helper.createAuthAuditLog(
-          {
-            ...user.toJSON(),
-            userType: "EMPLOYEE",
-          },
+          { ...user.toJSON(), userType: "EMPLOYEE" },
           "LOGIN_FAILED",
           req,
-          {
-            reason: "INVALID_PASSWORD",
-          }
+          { reason: "INVALID_PASSWORD" }
         );
         throw ApiError.unauthorized("Invalid credentials");
       }
@@ -69,6 +76,96 @@ class EmployeeAuthService {
       // Get permissions
       const permissions =
         user.employeePermissions?.map((ep) => ep.permission) || [];
+
+      const clientOrigin = req?.get("Origin");
+      const clientIp = req ? await Helper.getClientIP(req) : "";
+
+      let whitelistEntries = [];
+      let creatorId = null;
+      let creatorType = null;
+
+      // Use the created_by_type from Employee model directly
+      if (user.createdByType === "ROOT") {
+        creatorId = user.createdById;
+        creatorType = "ROOT";
+        whitelistEntries = await models.IpWhitelist.findAll({
+          where: {
+            userId: creatorId,
+            userType: "ROOT",
+          },
+          attributes: ["id", "domainName", "serverIp", "localIp"],
+        });
+      } else if (user.createdByType === "ADMIN") {
+        // Note: "ADMIN" in Employee corresponds to "User" in IpWhitelist
+        creatorId = user.createdById;
+        creatorType = "USER";
+        whitelistEntries = await models.IpWhitelist.findAll({
+          where: {
+            userId: creatorId,
+            userType: "USER",
+          },
+          attributes: ["id", "domainName", "serverIp", "localIp"],
+        });
+      } else {
+        // Fallback for users with no creator specified
+        await Helper.createAuthAuditLog(
+          { ...user.toJSON(), userType: "EMPLOYEE" },
+          "LOGIN_FAILED",
+          req,
+          { reason: "NO_CREATOR_SPECIFIED" }
+        );
+        throw ApiError.forbidden("Access denied: invalid user configuration");
+      }
+
+      // Check if origin is allowed based on whitelist
+      if (clientOrigin && whitelistEntries.length > 0) {
+        const allowedDomains = whitelistEntries
+          .map((entry) => entry.domainName)
+          .filter((domain) => domain && domain.trim() !== "");
+
+        if (
+          allowedDomains.length > 0 &&
+          !allowedDomains.includes(clientOrigin)
+        ) {
+          await Helper.createAuthAuditLog(
+            { ...user.toJSON(), userType: "EMPLOYEE" },
+            "LOGIN_FAILED",
+            req,
+            {
+              reason: "DOMAIN_NOT_WHITELISTED",
+              clientOrigin,
+              allowedDomains,
+              creatorType,
+              creatorId,
+            }
+          );
+          throw ApiError.forbidden("Access denied: domain not whitelisted");
+        }
+      }
+
+      // Enhanced IP validation using Helper methods
+      if (clientIp && whitelistEntries.length > 0) {
+        const isIpValid = await Helper.isValidIp(clientIp, whitelistEntries);
+        if (!isIpValid) {
+          const allowedIps = whitelistEntries
+            .flatMap((entry) => [entry.serverIp, entry.localIp])
+            .filter((ip) => ip && ip.trim() !== "");
+
+          await Helper.createAuthAuditLog(
+            { ...user.toJSON(), userType: "EMPLOYEE" },
+            "LOGIN_FAILED",
+            req,
+            {
+              reason: "IP_NOT_WHITELISTED",
+              clientIp,
+              allowedIps,
+              creatorType,
+              creatorId,
+            }
+          );
+          throw ApiError.forbidden("Access denied: IP address not whitelisted");
+        }
+      }
 
       // Build token payload
       const tokenPayload = {
@@ -81,25 +178,32 @@ class EmployeeAuthService {
         department: user.department?.name,
         departmentId: user.department?.id,
         permissions,
+        createdBy: creatorType.toLowerCase(),
+        creatorId: creatorId,
       };
 
       // Generate tokens
       const accessToken = Helper.generateAccessToken(tokenPayload);
       const refreshToken = Helper.generateRefreshToken(tokenPayload);
 
-      // Update refresh token
+      // Update refresh token and last login
       await models.Employee.update(
         { refreshToken, lastLoginAt: new Date() },
         { where: { id: user.id } }
       );
 
+      // Log successful login
       await Helper.createAuthAuditLog(
-        {
-          ...user.toJSON(),
-          userType: "EMPLOYEE",
-        },
+        { ...user.toJSON(), userType: "EMPLOYEE" },
         "LOGIN_SUCCESS",
-        req
+        req,
+        {
+          origin: clientOrigin,
+          ip: clientIp,
+          creatorType,
+          creatorId,
+          hasWhitelist: whitelistEntries.length > 0,
+        }
       );
 
       return {
@@ -108,6 +212,7 @@ class EmployeeAuthService {
         refreshToken,
         userType: "employee",
         permissions,
+        createdBy: creatorType.toLowerCase(),
       };
     } catch (error) {
       console.error("Employee login error:", error);

@@ -344,10 +344,14 @@ export default (sequelize, DataTypes) => {
       as: "apiEntities",
       onDelete: "CASCADE",
     });
+
     User.hasMany(models.IpWhitelist, {
       foreignKey: "user_id",
       as: "ipWhitelists",
-      onDelete: "CASCADE",
+      constraints: false,
+      scope: {
+        user_type: "USER", // Only include where user_type is USER
+      },
     });
 
     // FIXED: Service Provider relations

@@ -10,6 +10,10 @@ class RootAuthService {
     const { emailOrUsername, password } = payload;
 
     try {
+      // SECURITY: Get client origin first
+      const clientOrigin = req?.get("Origin");
+      const clientIp = req ? await Helper.getClientIP(req) : "";
+
       // Find root user
       const user = await models.Root.findOne({
         where: {
@@ -65,6 +69,55 @@ class RootAuthService {
       // Check user status
       await Helper.checkUserStatus(user);
 
+      // DYNAMIC ORIGIN VALIDATION: Get Root user's whitelist entries
+      const rootWhitelistEntries = await models.IpWhitelist.findAll({
+        where: {
+          userId: user.id,
+          userType: "ROOT",
+        },
+        attributes: ["id", "domainName", "serverIp", "localIp"],
+      });
+
+      // Validate origin against Root's whitelist domains
+      if (
+        !(await Helper.isValidOriginForRoot(clientOrigin, rootWhitelistEntries))
+      ) {
+        await Helper.createAuthAuditLog(
+          { ...user.toJSON(), userType: "ROOT" },
+          "LOGIN_FAILED",
+          req,
+          {
+            reason: "ORIGIN_NOT_WHITELISTED_FOR_ROOT",
+            clientOrigin,
+            allowedDomains: rootWhitelistEntries
+              .map((e) => e.domainName)
+              .filter(Boolean),
+          }
+        );
+        throw ApiError.forbidden(
+          "Access denied: Origin not whitelisted for Root access"
+        );
+      }
+
+      // Validate IP against Root's whitelist
+      if (!(await Helper.isValidIpForRoot(clientIp, rootWhitelistEntries))) {
+        await Helper.createAuthAuditLog(
+          { ...user.toJSON(), userType: "ROOT" },
+          "LOGIN_FAILED",
+          req,
+          {
+            reason: "IP_NOT_WHITELISTED_FOR_ROOT",
+            clientIp,
+            allowedIps: rootWhitelistEntries
+              .flatMap((e) => [e.serverIp, e.localIp])
+              .filter(Boolean),
+          }
+        );
+        throw ApiError.forbidden(
+          "Access denied: IP address not whitelisted for Root access"
+        );
+      }
+
       // Build token payload
       const tokenPayload = {
         id: user.id,
@@ -73,28 +126,54 @@ class RootAuthService {
         userType: "ROOT",
         role: "ROOT",
         roleLevel: 0,
+        loginOrigin: clientOrigin,
+        loginIp: clientIp,
       };
 
       // Generate tokens
       const accessToken = Helper.generateAccessToken(tokenPayload);
       const refreshToken = Helper.generateRefreshToken(tokenPayload);
 
-      // Update refresh token
+      // Update refresh token and login info
       await models.Root.update(
-        { refreshToken, lastLoginAt: new Date() },
+        {
+          refreshToken,
+          lastLoginAt: new Date(),
+          lastLoginIp: clientIp,
+          lastLoginOrigin: clientOrigin,
+        },
         { where: { id: user.id } }
       );
 
       await Helper.createAuthAuditLog(
-        { ...user.toJSON(), userType: "ROOT" },
+        {
+          ...user.toJSON(),
+          userType: "ROOT",
+        },
         "LOGIN_SUCCESS",
-        req
+        req,
+        {
+          origin: clientOrigin,
+          ip: clientIp,
+          hasWhitelist: rootWhitelistEntries.length > 0,
+          allowedDomains: rootWhitelistEntries
+            .map((e) => e.domainName)
+            .filter(Boolean),
+        }
       );
+
       return {
         user: Helper.sanitizeUserData(user),
         accessToken,
         refreshToken,
         userType: "root",
+        securityContext: {
+          origin: clientOrigin,
+          requiresWhitelist: rootWhitelistEntries.length > 0,
+          allowedDomains: rootWhitelistEntries
+            .map((e) => e.domainName)
+            .filter(Boolean),
+        },
       };
     } catch (error) {
       console.error("Root login error:", error);

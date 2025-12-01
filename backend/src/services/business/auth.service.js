@@ -10,7 +10,7 @@ class BusinessAuthService {
     const { emailOrUsername, password } = payload;
 
     try {
-      // Find admin user (User with All role)
+      // Find business user with all necessary associations
       const user = await models.User.findOne({
         where: {
           [models.Sequelize.Op.or]: [
@@ -23,6 +23,7 @@ class BusinessAuthService {
             model: models.Role,
             as: "role",
             required: true,
+            attributes: ["id", "name", "hierarchyLevel"],
           },
           {
             model: models.UserPermission,
@@ -30,6 +31,26 @@ class BusinessAuthService {
             where: { isActive: true, revokedAt: null },
             required: false,
             attributes: ["permission", "serviceId"],
+          },
+          // Include creator information for IP whitelist check
+          {
+            model: models.Root,
+            as: "creatorRoot",
+            required: false,
+            attributes: ["id"],
+          },
+          {
+            model: models.User,
+            as: "creatorUser",
+            required: false,
+            attributes: ["id", "username", "email"],
+            include: [
+              {
+                model: models.Role,
+                as: "role",
+                attributes: ["name", "hierarchyLevel"],
+              },
+            ],
           },
         ],
       });
@@ -67,13 +88,66 @@ class BusinessAuthService {
       // Check user status
       await Helper.checkUserStatus(user);
 
+      // SECURITY: IP & ORIGIN WHITELIST VALIDATION
+      const clientOrigin = req?.get("Origin");
+      const clientIp = req ? await Helper.getClientIP(req) : "";
+
+      // Determine creator hierarchy for whitelist validation
+      const { creatorId, creatorType } =
+        await Helper.determineWhitelistSource(user);
+
+      // Get relevant whitelist entries for domain validation
+      const whitelistEntries = await Helper.getRelevantWhitelistEntries(
+        creatorId,
+        creatorType,
+        user.id
+      );
+
+      // Validate origin against whitelist domains
+      if (!(await Helper.isValidOrigin(clientOrigin, whitelistEntries))) {
+        await Helper.createAuthAuditLog(
+          { ...user.toJSON(), userType: "BUSINESS" },
+          "LOGIN_FAILED",
+          req,
+          {
+            reason: "ORIGIN_NOT_WHITELISTED",
+            clientOrigin,
+            allowedDomains: whitelistEntries
+              .map((e) => e.domainName)
+              .filter(Boolean),
+            creatorType,
+            creatorId,
+          }
+        );
+        throw ApiError.forbidden("Access denied: Origin not whitelisted");
+      }
+
+      // Validate IP against whitelist
+      if (!(await Helper.isValidIp(clientIp, whitelistEntries))) {
+        await Helper.createAuthAuditLog(
+          { ...user.toJSON(), userType: "BUSINESS" },
+          "LOGIN_FAILED",
+          req,
+          {
+            reason: "IP_NOT_WHITELISTED",
+            clientIp,
+            allowedIps: whitelistEntries
+              .flatMap((e) => [e.serverIp, e.localIp])
+              .filter(Boolean),
+            creatorType,
+            creatorId,
+          }
+        );
+        throw ApiError.forbidden("Access denied: IP address not whitelisted");
+      }
+
       // Get effective permissions
       const permissions = await PermissionRegistry.getUserEffectivePermissions(
         user.id,
         models
       );
 
-      // Build token payload
+      // Build secure token payload
       const tokenPayload = {
         id: user.id,
         email: user.email,
@@ -82,25 +156,45 @@ class BusinessAuthService {
         role: user.role.name,
         roleLevel: user.role.hierarchyLevel,
         permissions: permissions.map((p) => p.permission),
+        creatorType: creatorType?.toLowerCase(),
+        creatorId,
+        loginOrigin: clientOrigin,
+        loginIp: clientIp,
+        iss: clientOrigin,
+        aud: "business-panel",
       };
 
-      // Generate tokens
+      // Generate tokens with secure settings
       const accessToken = Helper.generateAccessToken(tokenPayload);
       const refreshToken = Helper.generateRefreshToken(tokenPayload);
 
-      // Update refresh token
+      // Update user login info
       await models.User.update(
-        { refreshToken, lastLoginAt: new Date() },
+        {
+          refreshToken,
+          lastLoginAt: new Date(),
+          lastLoginIp: clientIp,
+          lastLoginOrigin: clientOrigin,
+        },
         { where: { id: user.id } }
       );
 
+      // Log successful login with security context
       await Helper.createAuthAuditLog(
         {
           ...user.toJSON(),
           userType: "BUSINESS",
         },
         "LOGIN_SUCCESS",
-        req
+        req,
+        {
+          origin: clientOrigin,
+          ip: clientIp,
+          creatorType,
+          creatorId,
+          hasWhitelist: whitelistEntries.length > 0,
+          role: user.role.name,
+        }
       );
 
       return {
@@ -109,10 +203,23 @@ class BusinessAuthService {
         refreshToken,
         userType: "business",
         permissions: tokenPayload.permissions,
+        securityContext: {
+          origin: clientOrigin,
+          creatorType: creatorType?.toLowerCase(),
+          requiresWhitelist: whitelistEntries.length > 0,
+        },
       };
     } catch (error) {
-      console.error("Admin login error:", error);
+      console.error("Business login error:", error);
       if (error instanceof ApiError) throw error;
+
+      // Don't leak internal errors to client
+      await Helper.createAuthAuditLog(
+        { id: null, userType: "BUSINESS" },
+        "LOGIN_FAILED",
+        req,
+        { reason: "SYSTEM_ERROR", emailOrUsername }
+      );
       throw ApiError.internal("Login failed");
     }
   }

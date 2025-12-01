@@ -2,6 +2,8 @@ import { createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { ZodErrorCatch } from "../../utils/ZodErrorCatch";
+import AuthValidationSchemas from "../../utils/validation/AuthValidationSchemas";
 
 // Configure axios once
 if (!axios.defaults.baseURL) {
@@ -17,12 +19,14 @@ const initialState = {
   success: null,
   isAuthenticated: false,
   userType: null, // 'business' or 'employee'
+  permissions: [],
 };
 
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
+    // Authentication actions
     authRequest: (state) => {
       state.isLoading = true;
       state.error = null;
@@ -31,78 +35,78 @@ const authSlice = createSlice({
     authSuccess: (state, action) => {
       state.isLoading = false;
 
-      // Handle different response structures
-      let userData;
-      if (action.payload?.user) {
-        userData = action.payload.user;
-      } else if (action.payload?.data?.user) {
-        userData = action.payload.data.user;
-      } else {
-        userData = action.payload;
+      const { user, userType, permissions } = action.payload;
+
+      if (user) {
+        state.currentUser = user;
+        state.userType = userType || user.role?.type || "business";
+        state.permissions = permissions || user.permissions || [];
       }
 
-      if (userData) {
-        state.currentUser = userData;
-        state.userType = userData.roleType || userData.role?.type || "business";
-
-        // Ensure permissions are included for employee users
-        if (userData.role?.type === "employee" && !userData.permissions) {
-          state.currentUser.permissions = userData.permissions || [];
-        }
-      }
-
-      state.success =
-        action.payload?.message || action.payload?.data?.message || null;
-      state.error = null;
       state.isAuthenticated = true;
+      state.error = null;
     },
     authFail: (state, action) => {
       state.isLoading = false;
       state.error = action.payload;
+      state.success = null;
 
-      const logoutErrors = [
+      // Clear auth state for authentication errors
+      const authErrors = [
         "Not authenticated",
         "Unauthorized",
         "Invalid token",
         "Token expired",
         "Access denied",
+        "User not authenticated",
       ];
 
-      if (
-        logoutErrors.some((logoutError) =>
-          action.payload?.includes(logoutError)
-        )
-      ) {
-        // Real auth error → logout user
+      if (authErrors.some((error) => action.payload?.includes(error))) {
         state.isAuthenticated = false;
         state.currentUser = null;
         state.userType = null;
-      } else {
-        // Stay logged in for normal business logic errors
-        state.isAuthenticated = true;
-      }
-
-      if (action.payload) {
-        toast.error(action.payload);
+        state.permissions = [];
       }
     },
+
+    // Profile update actions
+    updateProfileRequest: (state) => {
+      state.isLoading = true;
+      state.error = null;
+      state.success = null;
+    },
+    updateProfileSuccess: (state, action) => {
+      state.isLoading = false;
+      if (state.currentUser && action.payload.user) {
+        state.currentUser = { ...state.currentUser, ...action.payload.user };
+      }
+      state.success = action.payload?.message || "Profile updated successfully";
+    },
+    updateProfileFail: (state, action) => {
+      state.isLoading = false;
+      state.error = action.payload;
+      state.success = null;
+    },
+
+    // Credentials update actions
     credentialsUpdateRequest: (state) => {
+      state.isLoading = true;
       state.error = null;
       state.success = null;
     },
     credentialsUpdateSuccess: (state, action) => {
+      state.isLoading = false;
       state.success =
         action.payload?.message || "Credentials updated successfully";
       state.error = null;
     },
     credentialsUpdateFail: (state, action) => {
+      state.isLoading = false;
       state.error = action.payload;
       state.success = null;
-
-      if (action.payload) {
-        toast.error(action.payload);
-      }
     },
+
+    // Logout action
     logoutUser: (state) => {
       state.currentUser = null;
       state.isLoading = false;
@@ -110,42 +114,33 @@ const authSlice = createSlice({
       state.success = null;
       state.error = null;
       state.userType = null;
+      state.permissions = [];
     },
+
+    // Utility actions
     clearError: (state) => {
       state.error = null;
     },
     clearSuccess: (state) => {
       state.success = null;
     },
-    updateUser: (state, action) => {
-      if (state.currentUser) {
-        state.currentUser = { ...state.currentUser, ...action.payload };
-      }
-    },
     setAuthentication: (state, action) => {
       state.isAuthenticated = action.payload;
       if (!action.payload) {
         state.currentUser = null;
         state.userType = null;
+        state.permissions = [];
       }
     },
     setLoading: (state, action) => {
       state.isLoading = action.payload;
     },
     clearAuthState: (state) => {
-      state.currentUser = null;
-      state.isLoading = false;
-      state.isAuthenticated = false;
-      state.success = null;
-      state.error = null;
-      state.userType = null;
-    },
-    setUserType: (state, action) => {
-      state.userType = action.payload;
+      Object.assign(state, initialState);
     },
     updateUserPermissions: (state, action) => {
+      state.permissions = action.payload;
       if (state.currentUser) {
-        state.currentUser.userPermissions = action.payload;
         state.currentUser.permissions = action.payload;
       }
     },
@@ -156,17 +151,18 @@ export const {
   authRequest,
   authSuccess,
   authFail,
+  updateProfileRequest,
+  updateProfileSuccess,
+  updateProfileFail,
   credentialsUpdateRequest,
   credentialsUpdateSuccess,
   credentialsUpdateFail,
   logoutUser,
   clearError,
   clearSuccess,
-  updateUser,
   setAuthentication,
   setLoading,
   clearAuthState,
-  setUserType,
   updateUserPermissions,
 } = authSlice.actions;
 
@@ -174,18 +170,37 @@ export const {
 export const login = (credentials) => async (dispatch) => {
   try {
     dispatch(authRequest());
+
+    // Client-side validation
+    const validation = AuthValidationSchemas.login.safeParse({
+      body: credentials,
+    });
+    if (!validation.success) {
+      const errorMessage = validation.error.errors
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join(", ");
+      throw new Error(errorMessage);
+    }
+
+    // Filter out root user type from client requests
+    if (credentials.userType && credentials.userType.toUpperCase() === "ROOT") {
+      throw new Error("Invalid user type");
+    }
+
     const { data } = await axios.post(`/auth/login`, credentials);
 
+    if (data?.data?.userType?.toUpperCase() === "ROOT") {
+      throw new Error("Access denied");
+    }
+
     dispatch(setAuthentication(true));
-    dispatch(authSuccess(data));
-    toast.success("Login successful");
+    dispatch(authSuccess(data.data));
+    toast.success(data.message || "Login successful");
     return data;
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message || error?.message || "Login failed";
+    const errMsg = ZodErrorCatch(error);
     dispatch(setAuthentication(false));
     dispatch(authFail(errMsg));
-    throw error;
   }
 };
 
@@ -198,25 +213,27 @@ export const logout = () => async (dispatch) => {
     dispatch(logoutUser());
     toast.success("Logout successful");
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message || error?.message || "Logout failed";
+    console.error("Logout error:", error);
+    // Still logout locally even if server request fails
     dispatch(setAuthentication(false));
     dispatch(logoutUser());
-    dispatch(authFail(errMsg));
   }
 };
 
 export const refreshToken = () => async (dispatch) => {
   try {
     const { data } = await axios.post(`/auth/refresh`);
+
+    // Prevent root users from authenticating via refresh
+    if (data?.data?.userType?.toUpperCase() === "ROOT") {
+      throw new Error("Access denied");
+    }
+
     dispatch(setAuthentication(true));
-    dispatch(authSuccess(data));
+    dispatch(authSuccess(data.data));
     return data;
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Token refresh failed";
+    const errMsg = ZodErrorCatch(error);
     dispatch(setAuthentication(false));
     throw error;
   }
@@ -226,8 +243,14 @@ export const verifyAuth = () => async (dispatch) => {
   dispatch(setLoading(true));
   try {
     const { data } = await axios.get(`/auth/me`);
+
+    // Prevent root users from authenticating
+    if (data?.data?.user?.userType?.toUpperCase() === "ROOT") {
+      throw new Error("Access denied");
+    }
+
     dispatch(setAuthentication(true));
-    dispatch(authSuccess(data));
+    dispatch(authSuccess(data.data));
     return data;
   } catch (error) {
     dispatch(setAuthentication(false));
@@ -242,55 +265,145 @@ export const updateCredentials =
     try {
       dispatch(credentialsUpdateRequest());
 
+      // Client-side validation
+      const validation = AuthValidationSchemas.updateCredentials.safeParse({
+        body: credentialsData,
+        params: { userId },
+      });
+
+      if (!validation.success) {
+        const errorMessage = validation.error.errors
+          .map((err) => `${err.path.join(".")}: ${err.message}`)
+          .join(", ");
+        throw new Error(errorMessage);
+      }
+
       const { data } = await axios.put(
         `/auth/${userId}/credentials`,
         credentialsData
       );
 
       dispatch(credentialsUpdateSuccess(data));
-      toast.success("Credentials updated successfully");
+      toast.success(data.message || "Credentials updated successfully");
       return data;
     } catch (error) {
-      const errMsg =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Credentials update failed";
+      const errMsg = ZodErrorCatch(error);
       dispatch(credentialsUpdateFail(errMsg));
       throw error;
     }
   };
 
-export const passwordReset = (email) => async (dispatch) => {
+export const updateProfile = (profileData) => async (dispatch) => {
+  try {
+    dispatch(updateProfileRequest());
+
+    // Client-side validation
+    const validation = AuthValidationSchemas.updateProfile.safeParse({
+      body: profileData,
+    });
+    if (!validation.success) {
+      const errorMessage = validation.error.errors
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join(", ");
+      throw new Error(errorMessage);
+    }
+
+    const { data } = await axios.put(`/auth/profile`, profileData);
+
+    dispatch(updateProfileSuccess(data.data));
+    toast.success(data.message || "Profile updated successfully");
+    return data;
+  } catch (error) {
+    const errMsg = ZodErrorCatch(error);
+    dispatch(updateProfileFail(errMsg));
+    throw error;
+  }
+};
+
+export const updateProfileImage = (formData) => async (dispatch) => {
+  try {
+    dispatch(updateProfileRequest());
+
+    const { data } = await axios.put(`/auth/profile/image`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    dispatch(updateProfileSuccess(data.data));
+    toast.success(data.message || "Profile image updated successfully");
+    return data;
+  } catch (error) {
+    const errMsg = ZodErrorCatch(error);
+    dispatch(updateProfileFail(errMsg));
+    throw error;
+  }
+};
+
+export const passwordReset = (email, userType) => async (dispatch) => {
   try {
     dispatch(authRequest());
-    const { data } = await axios.post(`/auth/password-reset`, { email });
+
+    // Client-side validation
+    const validation = AuthValidationSchemas.forgotPassword.safeParse({
+      body: { email, userType },
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.errors
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join(", ");
+      throw new Error(errorMessage);
+    }
+
+    // Prevent root password reset from client
+    if (userType && userType.toUpperCase() === "ROOT") {
+      throw new Error("Invalid user type");
+    }
+
+    const { data } = await axios.post(`/auth/password-reset`, {
+      email,
+      userType,
+    });
     dispatch(authSuccess(data));
     toast.success(data.message || "Password reset email sent");
     return data;
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Password reset failed";
+    const errMsg = ZodErrorCatch(error);
     dispatch(authFail(errMsg));
     throw error;
   }
 };
 
-export const verifyPasswordReset = (token) => async (dispatch) => {
+export const verifyPasswordReset = (token, userType) => async (dispatch) => {
   try {
     dispatch(authRequest());
+
+    // Client-side validation
+    const validation = AuthValidationSchemas.confirmPasswordReset.safeParse({
+      query: { token, type: userType },
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.errors
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join(", ");
+      throw new Error(errorMessage);
+    }
+
+    // Prevent root password reset from client
+    if (userType && userType.toUpperCase() === "ROOT") {
+      throw new Error("Invalid user type");
+    }
+
     const { data } = await axios.get(
-      `/auth/verify-password-reset?token=${token}`
+      `/auth/verify-password-reset?token=${token}&type=${userType}`
     );
     dispatch(authSuccess(data));
     toast.success(data.message || "Password reset successful");
     return data;
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Password reset failed";
+    const errMsg = ZodErrorCatch(error);
     dispatch(authFail(errMsg));
     throw error;
   }
@@ -299,15 +412,25 @@ export const verifyPasswordReset = (token) => async (dispatch) => {
 export const verifyEmail = (token) => async (dispatch) => {
   try {
     dispatch(authRequest());
+
+    // Client-side validation
+    const validation = AuthValidationSchemas.verifyEmail.safeParse({
+      query: { token },
+    });
+
+    if (!validation.success) {
+      const errorMessage = validation.error.errors
+        .map((err) => `${err.path.join(".")}: ${err.message}`)
+        .join(", ");
+      throw new Error(errorMessage);
+    }
+
     const { data } = await axios.get(`/auth/verify-email?token=${token}`);
     dispatch(authSuccess(data));
     toast.success(data.message || "Email verified successfully");
     return data;
   } catch (error) {
-    const errMsg =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Email verification failed";
+    const errMsg = ZodErrorCatch(error);
     dispatch(authFail(errMsg));
     throw error;
   }
@@ -315,9 +438,13 @@ export const verifyEmail = (token) => async (dispatch) => {
 
 // Selectors for better state access
 export const selectCurrentUser = (state) => state.auth.currentUser;
-export const selectUserPermissions = (state) =>
-  state.auth.currentUser?.userPermissions || [];
-export const selectIsEmployee = (state) =>
-  state.auth.currentUser?.role?.type === "employee";
+export const selectUserPermissions = (state) => state.auth.permissions;
+export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
+export const selectIsLoading = (state) => state.auth.isLoading;
+export const selectAuthError = (state) => state.auth.error;
+export const selectAuthSuccess = (state) => state.auth.success;
+export const selectUserType = (state) => state.auth.userType;
+export const selectIsEmployee = (state) => state.auth.userType === "employee";
+export const selectIsBusiness = (state) => state.auth.userType === "business";
 
 export default authSlice.reducer;
